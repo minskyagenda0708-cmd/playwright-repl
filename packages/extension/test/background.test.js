@@ -29,6 +29,14 @@ globalThis.fetch = vi.fn(() =>
 );
 chrome.runtime.getURL = vi.fn((path) => `chrome-extension://test/${path}`);
 
+// Mock chrome.action (not provided by vitest-chrome)
+chrome.action = {
+  onClicked: { addListener: vi.fn() },
+  setBadgeText: vi.fn(() => Promise.resolve()),
+  setBadgeBackgroundColor: vi.fn(() => Promise.resolve()),
+  setTitle: vi.fn(() => Promise.resolve()),
+};
+
 // ─── Import + reset helpers ─────────────────────────────────────────────────
 
 let mod;
@@ -50,6 +58,12 @@ beforeEach(async () => {
   chrome.debugger.onDetach.clearListeners();
   chrome.runtime.onConnect.clearListeners();
   chrome.runtime.onMessage.clearListeners();
+  chrome.action = {
+    onClicked: { addListener: vi.fn() },
+    setBadgeText: vi.fn(() => Promise.resolve()),
+    setBadgeBackgroundColor: vi.fn(() => Promise.resolve()),
+    setTitle: vi.fn(() => Promise.resolve()),
+  };
 
   vi.resetModules();
   mod = await import("../background.js");
@@ -107,7 +121,8 @@ describe("RelayConnection", () => {
     });
 
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 42);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(42);
 
     // Simulate server sending attachToTab
     await relay._onMessageAsync({
@@ -135,7 +150,8 @@ describe("RelayConnection", () => {
     chrome.debugger.sendCommand.mockResolvedValue({ result: { value: 42 } });
 
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
 
     await relay._onMessageAsync({
       data: JSON.stringify({
@@ -165,7 +181,8 @@ describe("RelayConnection", () => {
     chrome.debugger.sendCommand.mockResolvedValue({});
 
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
 
     await relay._onMessageAsync({
       data: JSON.stringify({
@@ -184,7 +201,8 @@ describe("RelayConnection", () => {
 
   it("forwards CDP events to server", () => {
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
 
     // Simulate chrome.debugger.onEvent
     chrome.debugger.onEvent.callListeners(
@@ -202,7 +220,8 @@ describe("RelayConnection", () => {
 
   it("ignores CDP events from other tabs", () => {
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
 
     chrome.debugger.onEvent.callListeners(
       { tabId: 99 },
@@ -217,7 +236,8 @@ describe("RelayConnection", () => {
     chrome.debugger.attach.mockRejectedValue(new Error("Cannot attach"));
 
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
 
     await relay._onMessageAsync({
       data: JSON.stringify({ id: 1, method: "attachToTab", params: {} }),
@@ -231,15 +251,16 @@ describe("RelayConnection", () => {
   it("cleans up on close", () => {
     chrome.debugger.detach.mockResolvedValue(undefined);
     const mockWs = new MockWebSocket("ws://test");
-    const relay = new RelayConnection(mockWs, 10);
-    mod._setActiveRelay(relay);
-    relay.onclose = () => { mod._setActiveRelay(null); };
+    const relay = new RelayConnection(mockWs);
+    relay.setTabId(10);
+    const onclose = vi.fn();
+    relay.onclose = onclose;
 
     relay.close("test");
 
     expect(mockWs.close).toHaveBeenCalledWith(1000, "test");
     expect(chrome.debugger.detach).toHaveBeenCalledWith({ tabId: 10 });
-    expect(getState().activeRelay).toBeNull();
+    expect(onclose).toHaveBeenCalled();
   });
 });
 

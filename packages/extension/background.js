@@ -1,50 +1,67 @@
 /**
  * background.js — Service worker for the Playwright REPL DevTools extension.
  *
- * Three roles:
- *   1. CDP bridge: WebSocket connection to CommandServer, bridging chrome.debugger
- *      so Playwright can control the inspected tab via connectOverCDP
+ * Roles:
+ *   1. CDP bridge: Handles connect.html flow from Playwright's CDPRelayServer,
+ *      bridging chrome.debugger via RelayConnection (copied from MCP Bridge)
  *   2. Command proxy: forward panel commands to CommandServer via HTTP POST /run
  *   3. Recording: inject recorder.js, listen for __pw: events (extension-side only)
  */
 
-import { RelayConnection } from './lib/relayConnection.js';
+import { RelayConnection, debugLog } from './lib/relayConnection.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let serverPort = 3000;
 let panelPorts = {};     // tabId → port (for sending recorded commands to panel)
 let recording = {};      // tabId → boolean
-let activeRelay = null;  // RelayConnection instance
 
-// ─── Bridge connection ──────────────────────────────────────────────────────
+// ─── MCP Bridge relay (matches TabShareExtension from Playwright MCP Bridge) ─
 
-function connectBridge(tabId) {
-  if (activeRelay) return;
+let activeConnection = null;
+let connectedTabId = null;
+const pendingTabSelection = new Map(); // selectorTabId → { connection, timerId? }
 
-  try {
-    const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/extension`);
-    ws.onopen = () => {
-      activeRelay = new RelayConnection(ws, tabId);
-      activeRelay.onclose = () => { activeRelay = null; };
-      console.log('[bridge] Connected to server, tabId:', tabId);
-    };
-    ws.onerror = () => {
-      // Server not running yet, will retry when panel reconnects
-    };
-    ws.onclose = () => {
-      if (activeRelay) return; // RelayConnection handles its own cleanup
-      // Auto-reconnect after delay if no active relay
-      setTimeout(() => connectBridge(tabId), 2000);
-    };
-  } catch (e) {
-    // WebSocket constructor failed
-  }
-}
-
-// ─── Panel command handling ──────────────────────────────────────────────────
+// ─── Message handling (MCP Bridge + panel commands) ──────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // MCP Bridge messages (from connect.html)
+  if (message.type === 'connectToMCPRelay') {
+    connectToRelay(sender.tab.id, message.mcpRelayUrl).then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'getTabs') {
+    getTabs().then(
+      tabs => sendResponse({ success: true, tabs, currentTabId: sender.tab?.id }),
+      (error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'connectToTab') {
+    const tabId = message.tabId || sender.tab?.id;
+    const windowId = message.windowId || sender.tab?.windowId;
+    connectTab(sender.tab.id, tabId, windowId, message.mcpRelayUrl).then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'getConnectionStatus') {
+    sendResponse({ connectedTabId });
+    return false;
+  }
+
+  if (message.type === 'disconnect') {
+    disconnect().then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  // Panel commands (from DevTools panel)
   if (message.type === 'pw-command') {
     handlePanelCommand(message.raw).then(sendResponse);
     return true;
@@ -61,6 +78,149 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// ─── MCP Bridge relay functions ─────────────────────────────────────────────
+
+async function connectToRelay(selectorTabId, mcpRelayUrl) {
+  try {
+    debugLog(`Connecting to relay at ${mcpRelayUrl}`);
+    const socket = new WebSocket(mcpRelayUrl);
+    await new Promise((resolve, reject) => {
+      socket.onopen = () => resolve();
+      socket.onerror = () => reject(new Error('WebSocket error'));
+      setTimeout(() => reject(new Error('Connection timeout')), 5000);
+    });
+
+    const connection = new RelayConnection(socket);
+    connection.onclose = () => {
+      debugLog('Connection closed');
+      pendingTabSelection.delete(selectorTabId);
+    };
+    pendingTabSelection.set(selectorTabId, { connection });
+    debugLog(`Connected to MCP relay`);
+  } catch (error) {
+    const message = `Failed to connect to MCP relay: ${error.message}`;
+    debugLog(message);
+    throw new Error(message);
+  }
+}
+
+async function connectTab(selectorTabId, tabId, windowId, mcpRelayUrl) {
+  try {
+    debugLog(`Connecting tab ${tabId} to relay at ${mcpRelayUrl}`);
+    try {
+      activeConnection?.close('Another connection is requested');
+    } catch (error) {
+      debugLog(`Error closing active connection:`, error);
+    }
+    await setConnectedTabId(null);
+
+    activeConnection = pendingTabSelection.get(selectorTabId)?.connection;
+    if (!activeConnection)
+      throw new Error('No active MCP relay connection');
+    pendingTabSelection.delete(selectorTabId);
+
+    activeConnection.setTabId(tabId);
+    activeConnection.onclose = () => {
+      debugLog('MCP connection closed');
+      activeConnection = null;
+      void setConnectedTabId(null);
+    };
+
+    await Promise.all([
+      setConnectedTabId(tabId),
+      chrome.tabs.update(tabId, { active: true }),
+      chrome.windows.update(windowId, { focused: true }),
+    ]);
+    debugLog(`Connected to MCP bridge`);
+  } catch (error) {
+    await setConnectedTabId(null);
+    debugLog(`Failed to connect tab ${tabId}:`, error.message);
+    throw error;
+  }
+}
+
+async function setConnectedTabId(tabId) {
+  const oldTabId = connectedTabId;
+  connectedTabId = tabId;
+  if (oldTabId && oldTabId !== tabId)
+    await updateBadge(oldTabId, { text: '' });
+  if (tabId)
+    await updateBadge(tabId, { text: '\u2713', color: '#4CAF50', title: 'Connected to MCP client' });
+}
+
+async function updateBadge(tabId, { text, color, title }) {
+  try {
+    await chrome.action.setBadgeText({ tabId, text });
+    await chrome.action.setTitle({ tabId, title: title || '' });
+    if (color)
+      await chrome.action.setBadgeBackgroundColor({ tabId, color });
+  } catch (error) {
+    // Ignore errors as the tab may be closed already.
+  }
+}
+
+async function getTabs() {
+  const tabs = await chrome.tabs.query({});
+  return tabs.filter(tab => tab.url && !['chrome:', 'edge:', 'devtools:'].some(scheme => tab.url.startsWith(scheme)));
+}
+
+async function disconnect() {
+  activeConnection?.close('User disconnected');
+  activeConnection = null;
+  await setConnectedTabId(null);
+}
+
+// ─── Tab lifecycle ──────────────────────────────────────────────────────────
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const pendingConn = pendingTabSelection.get(tabId)?.connection;
+  if (pendingConn) {
+    pendingTabSelection.delete(tabId);
+    pendingConn.close('Browser tab closed');
+    return;
+  }
+  if (connectedTabId !== tabId) return;
+  activeConnection?.close('Browser tab closed');
+  activeConnection = null;
+  connectedTabId = null;
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (connectedTabId === tabId)
+    void setConnectedTabId(tabId);
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  for (const [tabId, pending] of pendingTabSelection) {
+    if (tabId === activeInfo.tabId) {
+      if (pending.timerId) {
+        clearTimeout(pending.timerId);
+        pending.timerId = undefined;
+      }
+      continue;
+    }
+    if (!pending.timerId) {
+      pending.timerId = setTimeout(() => {
+        const existed = pendingTabSelection.delete(tabId);
+        if (existed) {
+          pending.connection.close('Tab has been inactive for 5 seconds');
+          chrome.tabs.sendMessage(tabId, { type: 'connectionTimeout' });
+        }
+      }, 5000);
+      return;
+    }
+  }
+});
+
+chrome.action.onClicked.addListener(async () => {
+  await chrome.tabs.create({
+    url: chrome.runtime.getURL('connect.html'),
+    active: true,
+  });
+});
+
+// ─── Panel command handling ──────────────────────────────────────────────────
+
 async function handlePanelCommand(raw) {
   try {
     const res = await fetch(`http://127.0.0.1:${serverPort}/run`, {
@@ -75,6 +235,8 @@ async function handlePanelCommand(raw) {
 }
 
 // ─── Recording ───────────────────────────────────────────────────────────────
+
+let recordingAttachedTabId = null;
 
 async function startRecording(tabId) {
   try {
@@ -108,10 +270,6 @@ async function stopRecording(tabId) {
   }
   return { success: true };
 }
-
-// ─── Debugger attach/detach (for recording only) ────────────────────────────
-
-let recordingAttachedTabId = null;
 
 async function ensureAttached(tabId) {
   if (recordingAttachedTabId === tabId) return;
@@ -150,9 +308,6 @@ chrome.runtime.onConnect.addListener((port) => {
   const tabId = parseInt(port.name.replace('pw-panel-', ''), 10);
   panelPorts[tabId] = port;
 
-  // When a panel connects, start the CDP bridge for this tab
-  connectBridge(tabId);
-
   port.onDisconnect.addListener(() => {
     delete panelPorts[tabId];
   });
@@ -165,20 +320,20 @@ export {
   startRecording,
   stopRecording,
   ensureAttached,
-  connectBridge,
+  connectToRelay,
+  connectTab,
+  disconnect,
 };
 
 export function _getState() {
-  return { serverPort, panelPorts, recording, activeRelay, recordingAttachedTabId };
+  return { serverPort, panelPorts, recording, activeConnection, connectedTabId, recordingAttachedTabId, pendingTabSelection };
 }
 
 export function _resetState() {
   panelPorts = {};
   recording = {};
-  activeRelay = null;
+  activeConnection = null;
+  connectedTabId = null;
   recordingAttachedTabId = null;
-}
-
-export function _setActiveRelay(relay) {
-  activeRelay = relay;
+  pendingTabSelection.clear();
 }
