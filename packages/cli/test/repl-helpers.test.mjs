@@ -84,12 +84,12 @@ describe('text locator buildRunCode output', () => {
 describe('filterResponse', () => {
   it('extracts Result section', () => {
     const text = '### Page\nhttp://example.com\n### Result\nClicked element';
-    expect(filterResponse(text)).toBe('Clicked element');
+    expect(filterResponse(text)).toBe('http://example.com\nClicked element');
   });
 
   it('extracts Error section in red', () => {
     const text = '### Page\nhttp://example.com\n### Error\nElement not found';
-    expect(filterResponse(text)).toBe(`${c.red}Element not found${c.reset}`);
+    expect(filterResponse(text)).toBe(`http://example.com\n${c.red}Element not found${c.reset}`);
   });
 
   it('extracts Modal state section', () => {
@@ -97,14 +97,14 @@ describe('filterResponse', () => {
     expect(filterResponse(text)).toBe('[Alert] Are you sure?');
   });
 
-  it('strips Page and Snapshot sections', () => {
+  it('includes Page and Snapshot sections', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- element tree\n### Result\nDone';
-    expect(filterResponse(text)).toBe('Done');
+    expect(filterResponse(text)).toBe('http://example.com\n- element tree\nDone');
   });
 
-  it('returns null when no matching sections', () => {
+  it('returns Page and Snapshot content when no Result section', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- tree';
-    expect(filterResponse(text)).toBeNull();
+    expect(filterResponse(text)).toBe('http://example.com\n- tree');
   });
 
   it('returns null for text with no sections', () => {

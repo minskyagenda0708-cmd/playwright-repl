@@ -18,11 +18,12 @@ playwright-repl/
 │   │   │   ├── parser.mjs          # Command parsing + alias resolution
 │   │   │   ├── page-scripts.mjs    # Text locators + assertion helpers
 │   │   │   ├── completion-data.mjs # Ghost completion items
+│   │   │   ├── extension-server.mjs # WebSocket server for extension CDP relay
 │   │   │   ├── colors.mjs          # ANSI color helpers
 │   │   │   └── resolve.mjs         # COMMANDS map, minimist re-export
 │   │   └── test/
 │   │
-│   └── cli/                        # Terminal REPL (published as "playwright-repl")
+│   ├── cli/                        # Terminal REPL (published as "playwright-repl")
 │       ├── bin/
 │       │   └── playwright-repl.mjs # CLI entry point
 │       ├── src/
@@ -31,6 +32,18 @@ playwright-repl/
 │       │   └── index.mjs           # Public API exports
 │       ├── test/
 │       └── examples/               # .pw session files
+│
+│   └── extension/                  # Chrome DevTools panel extension
+│       ├── manifest.json           # Manifest V3 config
+│       ├── background.js           # Thin CDP relay + command proxy (~150 lines)
+│       ├── panel/                  # DevTools panel UI
+│       │   ├── panel.html
+│       │   ├── panel.js
+│       │   └── panel.css
+│       ├── content/
+│       │   └── recorder.js         # Event recorder injected into pages
+│       └── lib/
+│           └── converter.js        # .pw → Playwright test export
 ```
 
 ## Architecture
@@ -90,6 +103,7 @@ await engine.close();
 Three connection modes via `start(opts)`:
 - **launch** (default): `contextFactory(config)` → new browser
 - **connect**: `opts.connect = 9222` → `cdpEndpoint` → `connectOverCDP()`
+- **extension**: `opts.extension = true` → starts `ExtensionServer`, Chrome extension relays CDP from user's browser
 - Dependency injection: constructor accepts `deps` for testing
 
 Key Playwright internals used (via `createRequire`):
@@ -98,6 +112,32 @@ Key Playwright internals used (via `createRequire`):
 - `playwright/lib/mcp/browser/config` → `resolveConfig`
 - `playwright/lib/mcp/terminal/commands` → `commands` map
 - `playwright/lib/mcp/terminal/command` → `parseCommand`
+
+### ExtensionServer (packages/core/src/extension-server.mjs)
+
+When `--extension` mode is used, `ExtensionServer` starts an HTTP + WebSocket server:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Chrome Extension (DevTools Panel)                      │
+│  panel.js ──sendMessage──► background.js                │
+│     ▲                         │  ▲                      │
+│     │ port.postMessage        │  │ chrome.debugger      │
+└───────────────────────────────┼──┼──────────────────────┘
+                     WebSocket  │  │
+                                ▼  │
+┌───────────────────────────────────────────────────────────┐
+│  ExtensionServer                                          │
+│    ├── /extension WS  ← background.js connects here      │
+│    ├── HTTP /json/*   ← Playwright CDP discovery          │
+│    └── /devtools/*    ← Playwright CDP WebSocket          │
+│  Engine → connectOverCDP → local proxy → relay → ext      │
+└───────────────────────────────────────────────────────────┘
+```
+
+- **CDP relay**: background.js bridges `chrome.debugger` ↔ WebSocket so Playwright can control the user's browser
+- **Command channel**: panel sends commands via background.js → server → `Engine.run()` → results back
+- **Recording**: stays extension-side (inject recorder.js, listen for `__pw:` events)
 
 ### Element Refs (e1, e5, etc.)
 
@@ -138,8 +178,8 @@ async function processQueue() {
 ## Tech Stack
 
 - **Runtime**: Node.js (ESM modules, `.mjs`)
-- **Dependencies**: `minimist` (command parsing), `playwright@>=1.59.0-alpha` (browser engine)
-- **Monorepo**: npm workspaces (`packages/core`, `packages/cli`)
+- **Dependencies**: `minimist` (command parsing), `playwright@>=1.59.0-alpha` (browser engine), `ws` (WebSocket server for extension mode)
+- **Monorepo**: npm workspaces (`packages/core`, `packages/cli`, `packages/extension`)
 - **Testing**: vitest
 - **Key insight**: `playwright@1.59.0-alpha` includes `lib/mcp/browser/` (BrowserServerBackend, contextFactory).
   The stable `playwright@1.58` does NOT. Once 1.59 goes stable, the alpha pin can be removed.

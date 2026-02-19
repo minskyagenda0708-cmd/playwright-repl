@@ -11,3 +11,4 @@ export {
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
 } from './page-scripts.mjs';
 export { Engine } from './engine.mjs';
+export { CommandServer } from './extension-server.mjs';

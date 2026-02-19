@@ -211,27 +211,92 @@ click "Sign In"
 
 ## Phase 8: Extension Server + Extension Rewrite
 
-**Goal**: `playwright-repl --extension` starts a WebSocket server. Extension connects as thin CDP relay.
+**Goal**: `playwright-repl --extension` starts a WebSocket server. Chrome extension connects as a thin CDP relay. All 35+ commands handled by server-side Playwright — extension drops from 800 lines to ~150.
 
-### New file: `packages/core/src/extension-server.mjs` (~150 lines)
+**Status**: In progress
 
-WebSocket server that:
-1. Starts CDP relay (reuse `CDPRelayServer` from Playwright)
-2. Accepts extension WebSocket connection for CDP forwarding
-3. Accepts command WebSocket connection from panel
-4. Routes commands → `Engine.run()` → results back to panel
+### Architecture
 
-### Extension `background.js` rewrite (~150 lines, replaces 800)
+```
+┌─────────────────────────────────────────────────────────┐
+│  Chrome Extension (DevTools Panel)                      │
+│                                                         │
+│  panel.js ──sendMessage──► background.js                │
+│     ▲                         │  ▲                      │
+│     │ port.postMessage        │  │ chrome.debugger      │
+│     │ (results, recording)    │  │ (CDP to tab)         │
+│                               │  │                      │
+└───────────────────────────────┼──┼──────────────────────┘
+                     WebSocket  │  │
+                                ▼  │
+┌───────────────────────────────────────────────────────────┐
+│  Node.js Server (playwright-repl --extension)             │
+│                                                           │
+│  ExtensionServer                                          │
+│    ├── /extension WS  ← background.js connects here      │
+│    ├── HTTP /json/*   ← Playwright CDP discovery          │
+│    └── /devtools/*    ← Playwright CDP WebSocket          │
+│                                                           │
+│  Engine (BrowserServerBackend)                            │
+│    └── connectOverCDP → local proxy → relay → extension   │
+└───────────────────────────────────────────────────────────┘
+```
+
+### Three Connection Modes
+
+| Mode | Flag | Browser Source | Use Case |
+|------|------|---------------|----------|
+| **Launch** | `--headed` (default) | Launches new Chromium via Playwright | General automation |
+| **Connect** | `--connect [port]` | Existing Chrome with `--remote-debugging-port` | Debug running app |
+| **Extension** | `--extension [--port N]` | User's normal Chrome via extension CDP relay | DevTools panel REPL |
+
+### New file: `packages/core/src/extension-server.mjs` (~300 lines)
+
+`ExtensionServer` class — HTTP + WebSocket server:
+
+1. **CDP discovery** — `GET /json/version`, `GET /json` so Playwright can discover the relayed browser
+2. **CDP relay** — WebSocket `/devtools/browser/{id}` accepts Playwright connection, forwards CDP to extension via `/extension` WebSocket
+3. **Target domain** — handles `setDiscoverTargets`, `attachToTarget`, `detachFromTarget` to present the extension's tab as a Playwright target
+4. **Command channel** — receives commands from panel (via background.js relay), routes through `Engine.run()`, returns results
+
+### Extension rewrite: `packages/extension/background.js` (~150 lines, replaces 800)
 
 Two roles:
-1. **CDP relay client**: connect to server's relay WebSocket, forward `chrome.debugger` commands
-2. **Command proxy**: receive commands from panel, forward to server's command WebSocket
+1. **CDP relay**: connect to server WebSocket, bridge `chrome.debugger.sendCommand()` ↔ CDP messages
+2. **Command proxy**: receive commands from panel via `chrome.runtime.onMessage`, forward to server, return results
+
+Recording stays extension-side for Phase 8 (inject recorder.js, listen for `__pw:` events, forward to panel).
+
+### Copied from `playwright-repl-extension` repo
+
+- `panel/panel.html`, `panel/panel.css`, `panel/panel.js` (DevTools panel UI)
+- `content/recorder.js` (event recorder injected into pages)
+- `lib/converter.js` (.pw → Playwright test export)
+- `devtools.html`, `devtools.js`, `manifest.json`, `icons/`
+
+### Deleted (replaced by server-side Playwright)
+
+- `lib/commands.js`, `lib/locators.js`, `lib/page-scripts.js`, `lib/formatter.js`
+
+### Modify: `packages/core/src/engine.mjs` (+30 lines)
+
+Extension mode in `start()`:
+- Create `ExtensionServer`, start on `opts.port || 3000`
+- Wait for extension to connect
+- Set `cdpEndpoint` to local proxy
+- Update `close()` to shut down ExtensionServer
+
+### Modify: `packages/cli/bin/playwright-repl.mjs` (+5 lines)
+
+- Add `--port` string option (default: 3000)
+- Pass `port` to `startRepl(opts)`
 
 ### Verify
 ```bash
-node packages/cli/bin/playwright-repl.mjs --extension --port 9876
-# Extension auto-connects, commands work in DevTools panel
-# Recording still works
+node packages/cli/bin/playwright-repl.mjs --extension --port 3000
+# Load unpacked extension from packages/extension/
+# Open website → DevTools → Playwright REPL panel
+# snapshot, click e5, run-code, recording all work
 ```
 
 ---
@@ -248,9 +313,9 @@ node packages/cli/bin/playwright-repl.mjs --extension --port 9876
 ## Phase Dependencies
 
 ```
-Phase 5 (Monorepo) → Phase 6 (Engine) → Phase 7 (Connect)
-                                       → Phase 8 (Extension)
-                                       → Phase 9 (Cleanup)
+Phase 5 (Monorepo) ✓ → Phase 6 (Engine) ✓ → Phase 7 (Connect) ✓
+                                            → Phase 8 (Extension) ← current
+                                            → Phase 9 (Cleanup)
 ```
 
 Phases 7 and 8 are independent of each other. Phase 9 after all modes are verified.

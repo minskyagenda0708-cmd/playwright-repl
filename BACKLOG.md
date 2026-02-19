@@ -6,6 +6,8 @@
 - [ ] **String escaping misses newlines** — `packages/cli/src/repl.mjs`: `esc()` for verify commands doesn't escape `\n`, `\r`, `\t` — multiline user input breaks generated code
 - [ ] **Ghost completion crash on empty array** — `packages/cli/src/repl.mjs`: `renderGhost(matches[0])` has no guard if `cmds` is empty
 
+- [ ] **Auto-inject `expect` in `run-code`** — auto-prepend `const { expect } = require('@playwright/test')` in the `run-code` auto-wrap so users can write `run-code await expect(page).toHaveTitle('Todo')` without manual imports
+
 ## Medium Priority
 
 - [ ] **Failed commands not recorded** — `packages/cli/src/repl.mjs`: `session.record(line)` only runs after success; replay files miss failed commands
@@ -15,5 +17,9 @@
 
 ## Low Priority
 
+- [ ] **`@types/chrome` types `sendCommand` as void** — `packages/extension/background.js`: `await chrome.debugger.sendCommand(...)`, `chrome.debugger.attach()`, `chrome.debugger.detach()` are correctly awaited (MV3 returns Promises) but `@types/chrome` still types them as `void`, causing IDE "await has no effect" warnings. Revisit when `@types/chrome` updates or if migrating to TypeScript.
+
 - [ ] **Convert to TypeScript** — migrate `.mjs` files to `.ts` across `packages/core` and `packages/cli` for type safety and better IDE support
-- [ ] **Extension server (Phase 8)** — `playwright-repl --extension` starts a WebSocket server; extension connects as thin CDP relay instead of reimplementing all commands
+- [x] **Extension server (Phase 8)** — `playwright-repl --extension` starts a WebSocket server; extension connects as thin CDP relay instead of reimplementing all commands
+- [ ] **Improve README structure** — Consider splitting README into per-package docs (`packages/cli/README.md`, `packages/extension/README.md`) with a concise root README linking to both. Current root README covers both CLI and extension but could be better organized.
+- [ ] **Restructure the extension code structure, add src folder, and add build step

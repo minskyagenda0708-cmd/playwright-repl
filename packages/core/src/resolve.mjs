@@ -3,7 +3,6 @@
  * No @playwright/cli — we start the daemon ourselves via daemon-launcher.cjs.
  */
 
-import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -14,8 +13,7 @@ const require = createRequire(import.meta.url);
 export const minimist = require('minimist');
 
 const pkgUrl = new URL('../package.json', import.meta.url);
-const pkg = JSON.parse(fs.readFileSync(pkgUrl, 'utf-8'));
-export const replVersion = pkg.version;
+export const replVersion = require('../../cli/package.json').version;
 
 // Must match what daemon-launcher.cjs computes via require.resolve('../package.json')
 export const packageLocation = fileURLToPath(pkgUrl);

@@ -1,7 +1,9 @@
 {
   "name": "playwright-repl",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "test:core": "npm test -w packages/core",
@@ -10,5 +12,9 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "playwright": "^1.59.0-alpha-1771104257000",
+    "playwright-core": "^1.58.2"
   }
 }

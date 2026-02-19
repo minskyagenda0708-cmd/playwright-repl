@@ -15,7 +15,7 @@ import { startRepl } from '../src/repl.mjs';
 
 const args = minimist(process.argv.slice(2), {
   boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -38,6 +38,8 @@ Options:
   --persistent           Use persistent browser profile
   --profile <dir>        Persistent profile directory
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
+  --extension            Start WebSocket server for Chrome extension
+  --port <number>        Extension server port (default: 3000)
   --config <file>        Path to config file
   --replay <file>        Replay a .pw session file
   --record <file>        Start REPL with recording to file
@@ -62,6 +64,8 @@ Examples:
   playwright-repl --headed               # start with visible browser
   playwright-repl --connect              # connect to Chrome on port 9222
   playwright-repl --connect 9333         # connect to Chrome on custom port
+  playwright-repl --extension            # start extension server on port 3000
+  playwright-repl --extension --port 4000  # custom extension port
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
   echo "open https://example.com" | playwright-repl  # pipe commands
@@ -76,6 +80,8 @@ startRepl({
   persistent: args.persistent,
   profile: args.profile,
   connect: args.connect,
+  extension: args.extension,
+  port: args.port ? parseInt(args.port, 10) : undefined,
   config: args.config,
   replay: args.replay,
   record: args.record,

@@ -28,7 +28,7 @@ export function filterResponse(text) {
     const content = section.substring(newline + 1).trim();
     if (title === 'Error')
       kept.push(`${c.red}${content}${c.reset}`);
-    else if (title === 'Result' || title === 'Modal state')
+    else if (title === 'Result' || title === 'Modal state' || title === 'Page' || title === 'Snapshot')
       kept.push(content);
   }
   return kept.length > 0 ? kept.join('\n') : null;
@@ -284,8 +284,8 @@ export async function processLine(ctx, line) {
     const result = await ctx.conn.run(args);
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {
-      const output = filterResponse(result.text);
-      if (output) console.log(output);
+      const filtered = filterResponse(result.text);
+      if (filtered !== null) console.log(filtered);
     }
     ctx.commandCount++;
     ctx.session.record(line);
@@ -504,14 +504,23 @@ export async function startRepl(opts = {}) {
   const log = (...args) => { if (!silent) console.log(...args); };
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
-  log(`${c.dim}Type .help for commands${c.reset}\n`);
 
   // ─── Start engine ────────────────────────────────────────────────
+
+  if (opts.extension) {
+    log(`${c.dim}Extension mode: starting MCP Bridge (will open Chrome)...${c.reset}`);
+    log('');
+  } else {
+    log(`${c.dim}Type .help for commands${c.reset}\n`);
+  }
 
   const conn = new Engine();
   try {
     await conn.start(opts);
-    log(`${c.green}✓${c.reset} Browser ready\n`);
+    if (opts.extension)
+      log(`${c.green}✓${c.reset} Extension mode ready (MCP Bridge connected)\n`);
+    else
+      log(`${c.green}✓${c.reset} Browser ready\n`);
   } catch (err) {
     console.error(`${c.red}✗${c.reset} Failed to start: ${err.message}`);
     process.exit(1);

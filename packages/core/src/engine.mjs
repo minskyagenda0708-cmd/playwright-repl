@@ -7,12 +7,13 @@
  * Three connection modes:
  *   - launch:    new browser via Playwright (default)
  *   - connect:   existing Chrome via CDP port (--connect [port])
- *   - extension: Chrome extension CDP relay (--extension)
+ *   - extension: DevTools extension CDP relay (--extension)
  */
 
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import url from 'node:url';
+import { replVersion } from './resolve.mjs';
 
 // ─── Lazy-loaded Playwright dependencies ────────────────────────────────────
 
@@ -25,11 +26,12 @@ function loadDeps() {
   const pwDir = path.dirname(require.resolve('playwright/package.json'));
   const pwReq = (sub) => require(path.join(pwDir, sub));
   _deps = {
-    BrowserServerBackend: pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
-    contextFactory:       pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
-    resolveConfig:        pwReq('lib/mcp/browser/config.js').resolveConfig,
-    commands:             pwReq('lib/cli/daemon/commands.js').commands,
-    parseCommand:         pwReq('lib/cli/daemon/command.js').parseCommand,
+    BrowserServerBackend:     pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
+    contextFactory:           pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
+    ExtensionContextFactory:  pwReq('lib/mcp/extension/extensionContextFactory.js').ExtensionContextFactory,
+    resolveConfig:            pwReq('lib/mcp/browser/config.js').resolveConfig,
+    commands:                 pwReq('lib/cli/daemon/commands.js').commands,
+    parseCommand:             pwReq('lib/cli/daemon/command.js').parseCommand,
   };
   return _deps;
 }
@@ -58,32 +60,61 @@ export class Engine {
   async start(opts = {}) {
     const deps = this._deps || loadDeps();
     const config = await this._buildConfig(opts, deps);
-    const factory = deps.contextFactory(config);
 
     const cwd = url.pathToFileURL(process.cwd()).href;
     const clientInfo = {
       name: 'playwright-repl',
-      version: '0.4.0',
+      version: replVersion,
       roots: [{ uri: cwd, name: 'cwd' }],
       timestamp: Date.now(),
     };
 
-    const { browserContext, close } = await factory.createContext(clientInfo, new AbortController().signal, {});
-    this._close = close;
+    // Choose context factory based on mode.
+    let factory;
+    if (opts.extension) {
+      // Phase 1: ExtensionContextFactory (MCP Bridge) handles the CDP relay.
+      // CommandServer only provides HTTP /run for panel commands.
+      const { CommandServer } = await import('./extension-server.mjs');
+      this._commandServer = new CommandServer(this);
+      await this._commandServer.start(opts.port || 3000);
 
-    // Wrap in an "existing context" factory so BrowserServerBackend reuses it.
-    const existingContextFactory = {
-      createContext: () => Promise.resolve({ browserContext, close }),
-    };
+      // ExtensionContextFactory spawns Chrome with MCP Bridge extension,
+      // creates CDPRelayServer, and connects Playwright through it.
+      const extFactory = new deps.ExtensionContextFactory('chrome', undefined, undefined);
+      const { browserContext, close } = await extFactory.createContext(
+        clientInfo, new AbortController().signal, {},
+      );
+      this._close = close;
 
-    this._backend = new deps.BrowserServerBackend(config, existingContextFactory, { allTools: true });
-    await this._backend.initialize?.(clientInfo);
-    this._connected = true;
+      const existingContextFactory = {
+        createContext: () => Promise.resolve({ browserContext, close }),
+      };
+      this._backend = new deps.BrowserServerBackend(config, existingContextFactory, { allTools: true });
+      await this._backend.initialize?.(clientInfo);
+      this._connected = true;
 
-    // If the browser closes externally, update our state.
-    browserContext.on('close', () => {
-      this._connected = false;
-    });
+      browserContext.on('close', () => {
+        this._connected = false;
+      });
+    } else {
+      // Launch/connect mode: eagerly create context for immediate feedback.
+      factory = deps.contextFactory(config);
+      const { browserContext, close } = await factory.createContext(
+        clientInfo, new AbortController().signal, {},
+      );
+      this._close = close;
+
+      const existingContextFactory = {
+        createContext: () => Promise.resolve({ browserContext, close }),
+      };
+      this._backend = new deps.BrowserServerBackend(config, existingContextFactory, { allTools: true });
+      await this._backend.initialize?.(clientInfo);
+      this._connected = true;
+
+      browserContext.on('close', () => {
+        this._connected = false;
+      });
+    }
   }
 
   /**
@@ -116,6 +147,10 @@ export class Engine {
    */
   async close() {
     this._connected = false;
+    if (this._commandServer) {
+      await this._commandServer.close();
+      this._commandServer = null;
+    }
     if (this._backend) {
       this._backend.serverClosed();
       this._backend = null;
@@ -144,7 +179,7 @@ export class Engine {
       server: {},
       network: {},
       timeouts: {
-        action: 5000,
+        action: opts.extension ? 30000 : 5000,
         navigation: 60000,
       },
     };
@@ -171,7 +206,7 @@ export class Engine {
     // Persistent profile
     if (opts.persistent || opts.profile) {
       config.browser.userDataDir = opts.profile || undefined;
-    } else {
+    } else if (!opts.extension) {
       config.browser.isolated = true;
     }
 

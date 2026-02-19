@@ -2,20 +2,61 @@
 
 ![playwright-repl](cover-image.png)
 
-Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal.
+Interactive browser automation powered by Playwright — use it from your **terminal** or as a **Chrome DevTools panel**.
 
-Inspired by [playwright-cli](https://github.com/anthropics/playwright-cli), reusing its command vocabulary and Playwright's browser tools. Where playwright-cli is designed for AI agents (one command per process), playwright-repl is designed for **humans** — a persistent session with recording, replay, and instant feedback.
+Two frontends, one engine: the CLI gives you a terminal REPL with recording and replay; the Chrome extension gives you a DevTools panel with a script editor and visual recorder. Both run the same 35+ Playwright commands through a shared Engine — no command duplication.
 
 ## Why?
 
-**playwright-repl** runs Playwright's browser tools in-process. Type a command, see the result instantly. Record your session, replay it later — no code, no tokens, no setup.
+**playwright-repl** runs Playwright's browser tools in-process. Type a command, see the result instantly. No code, no tokens, no setup.
+
+- **CLI** — terminal REPL with recording, replay, piping, and 50+ aliases
+- **Extension** — Chrome DevTools panel with script editor, recorder, and light/dark themes
+- **Same commands everywhere** — `click`, `fill`, `snapshot`, `verify-text` work identically in both
 
 Key features:
-- **Text locators** — use `click "Submit"` or `fill "Email" "test@example.com"` instead of element refs. Auto-resolves via getByText, getByLabel, getByPlaceholder, and getByRole with fallback chains
-- **Element refs** — also supports ref-based commands (`click e5`, `fill e7 "hello"`) from `snapshot` output
-- **Assertions** — `verify-text`, `verify-element`, `verify-value`, `verify-list` for inline validation
-- **Record & replay** — capture sessions as `.pw` files and replay them headlessly or step-by-step
-- **Connect mode** — attach to an existing Chrome instance via `--connect [port]`
+- **Text locators** — `click "Submit"` or `fill "Email" "test@example.com"` instead of element refs
+- **Element refs** — `click e5`, `fill e7 "hello"` from `snapshot` output
+- **Assertions** — `verify-text`, `verify-element`, `verify-value`, `verify-list`
+- **Record & replay** — capture sessions as `.pw` files (CLI) or record interactions visually (extension)
+- **Three connection modes** — launch a new browser, connect to existing Chrome, or use the extension relay
+
+## Architecture
+
+![How It Works](architecture-diagram.png)
+
+Both CLI and Extension are frontends to the Engine. Neither directly accesses Chrome.
+
+### Three Connection Modes
+
+| Mode | Flag | Browser Source | Use Case |
+|------|------|---------------|----------|
+| **Launch** | `--headed` (default) | Launches new Chromium via Playwright | General automation |
+| **Connect** | `--connect [port]` | Existing Chrome with `--remote-debugging-port` | Debug running app |
+| **Extension** | `--extension [--port N]` | User's normal Chrome via extension CDP relay | DevTools panel REPL |
+
+### Extension Mode Detail
+
+![Extension Mode](extension-architecture.png)
+
+The extension is a thin CDP relay — it bridges `chrome.debugger` access from the user's browser to the Node.js server, which runs the full Engine with all 35+ Playwright commands.
+
+## Quick Start — CLI
+
+```bash
+# Install
+npm install -g playwright-repl
+npx playwright install  # browser binaries (if needed)
+
+# Start the REPL (launches browser automatically)
+playwright-repl
+
+# With a visible browser
+playwright-repl --headed
+
+# Connect to existing Chrome
+playwright-repl --connect 9222
+```
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
@@ -27,22 +68,21 @@ pw> check "Buy groceries"
 pw> verify-text "1 item left"
 ```
 
-Record it, replay it later:
+## Quick Start — Extension
 
 ```bash
-pw> .record smoke-test
-⏺ Recording to smoke-test.pw
+# 1. Start the extension server
+playwright-repl --extension
 
-pw> goto https://demo.playwright.dev/todomvc/
-pw> fill "What needs to be done?" "Buy groceries"
-pw> press Enter
-pw> verify-text "1 item left"
-pw> .save
-✓ Saved 4 commands to smoke-test.pw
+# 2. Load the extension
+#    chrome://extensions → Enable Developer Mode → Load unpacked → packages/extension/
 
-# Replay any time
-$ playwright-repl --replay smoke-test.pw
+# 3. Open any website → DevTools (F12) → "Playwright REPL" panel
+
+# 4. Type commands in the panel — same syntax as CLI
 ```
+
+The extension panel includes a script editor, visual recorder, and export to Playwright tests.
 
 ## Install
 
@@ -55,43 +95,6 @@ npx playwright install
 # Or install from source
 git clone https://github.com/stevez/playwright-repl.git
 cd playwright-repl && npm install && npm link
-```
-
-## Quick Start
-
-```bash
-# Start the REPL (launches browser automatically)
-playwright-repl
-
-# With a visible browser
-playwright-repl --headed
-
-# With a specific browser
-playwright-repl --headed --browser firefox
-
-# Connect to existing Chrome (must be launched with --remote-debugging-port)
-playwright-repl --connect 9222
-```
-
-Once inside the REPL, use either **text locators** or **element refs**:
-
-```
-pw> goto https://demo.playwright.dev/todomvc/
-
-# Text locators — no snapshot needed
-pw> fill "What needs to be done?" "Buy groceries"
-pw> press Enter
-pw> check "Buy groceries"
-pw> verify-text "0 items left"
-
-# Or use element refs from snapshot
-pw> snapshot
-- textbox "What needs to be done?" [ref=e8]
-- listitem "Buy groceries" [ref=e21]
-
-pw> click e21                      # click by ref
-pw> screenshot                     # take a screenshot
-pw> close                          # close browser
 ```
 
 ## Usage
@@ -115,6 +118,10 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 # Connect to existing Chrome via CDP
 playwright-repl --connect         # default port 9222
 playwright-repl --connect 9333    # custom port
+
+# Extension mode
+playwright-repl --extension              # default port 3000
+playwright-repl --extension --port 4000  # custom port
 ```
 
 ### CLI Options
@@ -126,6 +133,8 @@ playwright-repl --connect 9333    # custom port
 | `--persistent` | Use persistent browser profile |
 | `--profile <dir>` | Persistent profile directory |
 | `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
+| `--extension` | Start WebSocket server for Chrome extension |
+| `--port <number>` | Extension server port (default: `3000`) |
 | `--config <file>` | Path to config file |
 | `--replay <file>` | Replay a `.pw` session file |
 | `--record <file>` | Start REPL with recording to file |
@@ -134,6 +143,8 @@ playwright-repl --connect 9333    # custom port
 | `-h, --help` | Show help |
 
 ## Commands
+
+All commands work in both CLI and extension. In the CLI, type directly at the `pw>` prompt. In the extension, type in the REPL input or use the script editor.
 
 ### Navigation
 
@@ -236,6 +247,8 @@ playwright-repl --connect 9333    # custom port
 | `close` | `q` | Close the browser |
 | `config-print` | — | Print browser config |
 
+## CLI Features
+
 ### REPL Meta-Commands
 
 | Command | Description |
@@ -251,11 +264,11 @@ playwright-repl --connect 9333    # custom port
 | `.replay <file>` | Replay a recorded session |
 | `.exit` | Exit REPL (also Ctrl+D) |
 
-## Session Recording & Replay
+### Session Recording & Replay
 
 Record your browser interactions and replay them later — great for regression tests, onboarding demos, or sharing reproducible flows.
 
-### Record
+#### Record
 
 ```bash
 # From CLI
@@ -272,7 +285,7 @@ pw> .save
 ✓ Saved 4 commands to my-test.pw
 ```
 
-### Replay
+#### Replay
 
 ```bash
 # Full speed
@@ -285,7 +298,7 @@ playwright-repl --replay my-test.pw --step --headed
 pw> .replay my-test.pw
 ```
 
-### File Format
+#### File Format
 
 `.pw` files are plain text — human-readable, diffable, version-controllable:
 
@@ -300,7 +313,7 @@ verify-text "Buy groceries"
 verify-text "1 item left"
 ```
 
-### Recording Controls
+#### Recording Controls
 
 | Command | Description |
 |---------|-------------|
@@ -308,6 +321,91 @@ verify-text "1 item left"
 | `.pause` | Pause recording (toggle) |
 | `.save` | Stop and save to file |
 | `.discard` | Discard without saving |
+
+### eval & run-code
+
+Two ways to run custom code from the REPL:
+
+#### eval — Browser Context
+
+Runs JavaScript inside the browser page (via `page.evaluate`). Use browser globals like `document`, `window`, `location`:
+
+```
+pw> eval document.title
+"Installation | Playwright"
+
+pw> eval window.location.href
+"https://playwright.dev/docs/intro"
+
+pw> eval document.querySelectorAll('a').length
+42
+```
+
+#### run-code — Playwright API
+
+Runs code with full access to the Playwright `page` object. The REPL auto-wraps your code — just write the body:
+
+```
+pw> run-code page.url()
+→ async (page) => { return await page.url() }
+"https://playwright.dev/docs/intro"
+
+pw> run-code page.locator('h1').textContent()
+→ async (page) => { return await page.locator('h1').textContent() }
+"Installation"
+```
+
+For multiple statements, use semicolons:
+
+```
+pw> run-code const u = await page.url(); const t = await page.title(); return {u, t}
+```
+
+## Extension Features
+
+### DevTools Panel
+
+The extension adds a "Playwright REPL" tab in Chrome DevTools with:
+
+- **REPL input** — type commands at the bottom, results appear in the console pane
+- **Script editor** — write multi-line `.pw` scripts with line numbers, run all or step through
+- **Visual recorder** — click Record, interact with the page, recorded commands appear automatically
+- **Export** — convert `.pw` commands to Playwright TypeScript test code
+- **Light/dark themes** — matches your DevTools theme
+
+### Recording in Extension
+
+Click the Record button in the toolbar, then interact with the page normally. The recorder captures:
+
+- **Clicks** — with text locators and context (e.g., `click "Delete" "Buy groceries"`)
+- **Form input** — debounced fill commands (e.g., `fill "Email" "test@example.com"`)
+- **Selections** — dropdown changes (e.g., `select "Country" "United States"`)
+- **Checkboxes** — check/uncheck with label context
+- **Key presses** — Enter, Tab, Escape
+
+### Export to Playwright
+
+The extension can export `.pw` commands to Playwright TypeScript:
+
+```
+# .pw commands                    → Playwright TypeScript
+goto https://example.com          → await page.goto("https://example.com");
+click "Submit"                    → await page.getByText("Submit").click();
+fill "Email" "test@example.com"   → await page.getByLabel("Email").fill("test@example.com");
+verify-text "Success"             → await expect(page.getByText("Success")).toBeVisible();
+```
+
+### Connect Mode
+
+To control an existing Chrome instance from the CLI:
+
+```bash
+# Start Chrome with debugging port
+chrome --remote-debugging-port=9222
+
+# Connect the REPL
+playwright-repl --connect 9222
+```
 
 ## Examples
 
@@ -335,90 +433,32 @@ playwright-repl --replay packages/cli/examples/04-replay-session.pw --step --hea
 playwright-repl --replay packages/cli/examples/05-ci-pipe.pw --silent
 ```
 
-## eval & run-code
-
-Two ways to run custom code from the REPL:
-
-### eval — Browser Context
-
-Runs JavaScript inside the browser page (via `page.evaluate`). Use browser globals like `document`, `window`, `location`:
-
-```
-pw> eval document.title
-"Installation | Playwright"
-
-pw> eval window.location.href
-"https://playwright.dev/docs/intro"
-
-pw> eval document.querySelectorAll('a').length
-42
-```
-
-### run-code — Playwright API
-
-Runs code with full access to the Playwright `page` object. The REPL auto-wraps your code — just write the body:
-
-```
-pw> run-code page.url()
-→ async (page) => { return await page.url() }
-"https://playwright.dev/docs/intro"
-
-pw> run-code page.locator('h1').textContent()
-→ async (page) => { return await page.locator('h1').textContent() }
-"Installation"
-
-pw> run-code await page.locator('.nav a').allTextContents()
-→ async (page) => { await page.locator('.nav a').allTextContents() }
-```
-
-For multiple statements, use semicolons:
-
-```
-pw> run-code const u = await page.url(); const t = await page.title(); return {u, t}
-```
-
-Full function expressions also work:
-
-```
-pw> run-code async (page) => { await page.waitForSelector('.loaded'); return await page.title(); }
-```
-
-## Architecture
-
-The REPL runs Playwright's `BrowserServerBackend` in-process via an `Engine` class. No daemon, no socket — commands execute directly.
-
-![Architecture](architecture-diagram.png)
-
-### How It Works
-
-![Command Flow](flow-diagram.png)
-
-### Monorepo Structure
+## Monorepo Structure
 
 ```
 packages/
-├── core/         # Engine + shared utilities
+├── core/           # Engine + shared utilities
 │   └── src/
-│       ├── engine.mjs          # Wraps BrowserServerBackend in-process
-│       ├── parser.mjs          # Command parsing and alias resolution
-│       ├── page-scripts.mjs    # Text locator and assertion helpers
+│       ├── engine.mjs            # Wraps BrowserServerBackend in-process
+│       ├── extension-server.mjs  # WebSocket server for extension CDP relay
+│       ├── parser.mjs            # Command parsing and alias resolution
+│       ├── page-scripts.mjs      # Text locator and assertion helpers
 │       └── ...
-└── cli/          # Terminal REPL
-    └── src/
-        ├── repl.mjs            # Interactive readline loop
-        └── recorder.mjs        # Session recording/replay
-```
-
-### Connect Mode
-
-To control an existing Chrome instance:
-
-```bash
-# Start Chrome with debugging port
-chrome --remote-debugging-port=9222
-
-# Connect the REPL
-playwright-repl --connect 9222
+├── cli/            # Terminal REPL
+│   └── src/
+│       ├── repl.mjs              # Interactive readline loop
+│       └── recorder.mjs          # Session recording/replay
+└── extension/      # Chrome DevTools panel extension
+    ├── manifest.json             # Manifest V3 config
+    ├── background.js             # Thin CDP relay + command proxy
+    ├── panel/                    # DevTools panel UI
+    │   ├── panel.html
+    │   ├── panel.js
+    │   └── panel.css
+    ├── content/
+    │   └── recorder.js           # Event recorder injected into pages
+    └── lib/
+        └── converter.js          # .pw → Playwright test export
 ```
 
 ## Requirements
