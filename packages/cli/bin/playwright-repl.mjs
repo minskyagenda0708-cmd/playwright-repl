@@ -39,6 +39,7 @@ Options:
   --profile <dir>        Persistent profile directory
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
   --extension            Start WebSocket server for Chrome extension
+  --no-spawn             Don't spawn Chrome (wait for DevTools panel to connect)
   --port <number>        Extension server port (default: 3000)
   --config <file>        Path to config file
   --replay <file>        Replay a .pw session file
@@ -81,6 +82,7 @@ startRepl({
   profile: args.profile,
   connect: args.connect,
   extension: args.extension,
+  spawn: args.spawn,
   port: args.port ? parseInt(args.port, 10) : undefined,
   config: args.config,
   replay: args.replay,

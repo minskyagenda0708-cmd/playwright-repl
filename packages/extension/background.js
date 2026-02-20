@@ -318,10 +318,16 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 /**
- * Auto-connect a CDP relay WebSocket to the CommandServer's /extension endpoint.
- * Called when a DevTools panel opens for a tab.
+ * Auto-connect relay when a DevTools panel opens.
+ * Mimics the spawn-mode flow (connectToMCPRelay + connectToTab) without
+ * opening connect.html or requiring user interaction:
+ *   1. Fetch /relay-info to discover CDPRelayServer's WS endpoint
+ *   2. Create WebSocket + RelayConnection (same as connectToMCPRelay)
+ *   3. Create a new blank tab for Playwright to control (avoids DevTools
+ *      conflict — chrome.debugger can't share a tab with open DevTools)
+ *   4. setTabId on the connection (same as connectToTab)
  */
-async function autoConnectRelay(tabId) {
+async function autoConnectRelay(inspectedTabId) {
   try {
     // Close existing relay if any
     if (activeConnection) {
@@ -330,30 +336,42 @@ async function autoConnectRelay(tabId) {
       await setConnectedTabId(null);
     }
 
-    const wsUrl = `ws://127.0.0.1:${serverPort}/extension`;
-    debugLog(`Auto-connecting relay for tab ${tabId} to ${wsUrl}`);
+    // 1. Discover the CDPRelayServer's WebSocket endpoint.
+    const infoRes = await fetch(`http://127.0.0.1:${serverPort}/relay-info`);
+    if (!infoRes.ok) throw new Error(`/relay-info returned ${infoRes.status}`);
+    const { extensionEndpoint } = await infoRes.json();
+    if (!extensionEndpoint) throw new Error('/relay-info missing extensionEndpoint');
 
-    const socket = new WebSocket(wsUrl);
+    debugLog(`Auto-connecting relay to ${extensionEndpoint}`);
+
+    // 2. Connect WebSocket to CDPRelayServer (same as connectToMCPRelay).
+    const socket = new WebSocket(extensionEndpoint);
     await new Promise((resolve, reject) => {
       socket.onopen = () => resolve();
       socket.onerror = () => reject(new Error('WebSocket connection failed'));
       setTimeout(() => reject(new Error('Connection timeout')), 5000);
     });
 
+    // 3. Create a new blank tab for Playwright to control.
+    //    We can't use inspectedTabId because DevTools is open on it,
+    //    and chrome.debugger conflicts with an active DevTools session.
+    const controlTab = await chrome.tabs.create({ active: false, url: 'about:blank' });
+    debugLog(`Created control tab ${controlTab.id} for Playwright`);
+
+    // 4. Wire up RelayConnection and set the tab ID (same as connectToTab).
     activeConnection = new RelayConnection(socket);
-    activeConnection.setTabId(tabId);
+    activeConnection.setTabId(controlTab.id);
     activeConnection.onclose = () => {
       debugLog('Auto-connect relay closed');
       activeConnection = null;
       void setConnectedTabId(null);
     };
 
-    await setConnectedTabId(tabId);
-    debugLog(`Auto-connected relay for tab ${tabId}`);
+    await setConnectedTabId(controlTab.id);
+    debugLog(`Auto-connected relay for control tab ${controlTab.id}`);
   } catch (e) {
     debugLog(`Auto-connect relay failed: ${e.message}`);
     // Not fatal — the server might not be running yet.
-    // User can manually connect later or restart.
   }
 }
 

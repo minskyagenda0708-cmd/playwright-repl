@@ -86,6 +86,7 @@ export class Engine {
       await new Promise(r => relayHttp.listen(relayPort, '127.0.0.1', r));
       const relay = new deps.CDPRelayServer(relayHttp, opts.browser || 'chrome');
       this._relayHttp = relayHttp;
+      this._commandServer.relay = relay;
 
       // Spawn Chrome with our extension's connect.html pointing at CDPRelayServer.
       const extensionId = opts.extensionId || 'hofgdkanlhhkikiomnnndihbefnjhlmp';
@@ -93,22 +94,29 @@ export class Engine {
       connectUrl.searchParams.set('mcpRelayUrl', relay.extensionEndpoint());
       connectUrl.searchParams.set('client', JSON.stringify({ name: 'playwright-repl', version: replVersion }));
 
-      const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
-      const execPath = execInfo?.executablePath();
-      if (!execPath)
-        throw new Error('Chrome executable not found. Make sure Chrome is installed.');
+      if (opts.spawn !== false) {
+        const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
+        const execPath = execInfo?.executablePath();
+        if (!execPath)
+          throw new Error('Chrome executable not found. Make sure Chrome is installed.');
 
-      const { spawn } = await import('node:child_process');
-      spawn(execPath, [connectUrl.toString()], {
-        detached: true, stdio: 'ignore', windowsHide: true,
-      });
+        const { spawn } = await import('node:child_process');
+        spawn(execPath, [connectUrl.toString()], {
+          detached: true, stdio: 'ignore', windowsHide: true,
+        });
 
-      // Wait for extension to connect to CDPRelayServer.
-      console.log('Waiting for extension to connect...');
-      await Promise.race([
-        relay._extensionConnectionPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (30s)')), 30000)),
-      ]);
+        console.log('Waiting for extension to connect...');
+        await Promise.race([
+          relay._extensionConnectionPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (30s)')), 30000)),
+        ]);
+      } else {
+        console.log('Waiting for DevTools panel to connect... Open DevTools on any tab.');
+        await Promise.race([
+          relay._extensionConnectionPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (120s). No DevTools panel connected.')), 120000)),
+        ]);
+      }
       console.log('Extension connected. Connecting Playwright...');
 
       // Connect Playwright through CDPRelayServer — exactly like ExtensionContextFactory.

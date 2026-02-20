@@ -94,8 +94,21 @@ export class CommandServer {
       return;
     }
 
-    // CDP discovery endpoint
     const urlPath = req.url.replace(/\/+$/, '');
+
+    // Relay info endpoint — background.js uses this to discover the CDPRelayServer WS URL.
+    if (req.method === 'GET' && urlPath === '/relay-info') {
+      if (!this.relay) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Relay not ready' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ extensionEndpoint: this.relay.extensionEndpoint() }));
+      return;
+    }
+
+    // CDP discovery endpoint
     if (req.method === 'GET' && urlPath === '/json/version') {
       const wsUrl = `ws://127.0.0.1:${this._port}${this._cdpPath}`;
       res.writeHead(200, { 'Content-Type': 'application/json' });
