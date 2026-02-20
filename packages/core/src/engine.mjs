@@ -28,7 +28,9 @@ function loadDeps() {
   _deps = {
     BrowserServerBackend:     pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
     contextFactory:           pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
-    ExtensionContextFactory:  pwReq('lib/mcp/extension/extensionContextFactory.js').ExtensionContextFactory,
+    CDPRelayServer:           pwReq('lib/mcp/extension/cdpRelay.js').CDPRelayServer,
+    playwright:               pwReq('node_modules/playwright-core'),
+    registry:                 pwReq('node_modules/playwright-core/lib/server/registry/index.js').registry,
     resolveConfig:            pwReq('lib/mcp/browser/config.js').resolveConfig,
     commands:                 pwReq('lib/cli/daemon/commands.js').commands,
     parseCommand:             pwReq('lib/cli/daemon/command.js').parseCommand,
@@ -72,18 +74,51 @@ export class Engine {
     // Choose context factory based on mode.
     let factory;
     if (opts.extension) {
-      // Phase 1: ExtensionContextFactory (MCP Bridge) handles the CDP relay.
-      // CommandServer only provides HTTP /run for panel commands.
+      // Start CommandServer for panel HTTP commands.
       const { CommandServer } = await import('./extension-server.mjs');
       this._commandServer = new CommandServer(this);
       await this._commandServer.start(opts.port || 3000);
 
-      // ExtensionContextFactory spawns Chrome with MCP Bridge extension,
-      // creates CDPRelayServer, and connects Playwright through it.
-      const extFactory = new deps.ExtensionContextFactory('chrome', undefined, undefined);
-      const { browserContext, close } = await extFactory.createContext(
-        clientInfo, new AbortController().signal, {},
-      );
+      // Use Playwright's own CDPRelayServer (proven to work).
+      const { createServer } = await import('node:http');
+      const relayHttp = createServer();
+      const relayPort = (opts.port || 3000) + 1;
+      await new Promise(r => relayHttp.listen(relayPort, '127.0.0.1', r));
+      const relay = new deps.CDPRelayServer(relayHttp, opts.browser || 'chrome');
+      this._relayHttp = relayHttp;
+
+      // Spawn Chrome with our extension's connect.html pointing at CDPRelayServer.
+      const extensionId = opts.extensionId || 'hofgdkanlhhkikiomnnndihbefnjhlmp';
+      const connectUrl = new URL(`chrome-extension://${extensionId}/connect.html`);
+      connectUrl.searchParams.set('mcpRelayUrl', relay.extensionEndpoint());
+      connectUrl.searchParams.set('client', JSON.stringify({ name: 'playwright-repl', version: replVersion }));
+
+      const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
+      const execPath = execInfo?.executablePath();
+      if (!execPath)
+        throw new Error('Chrome executable not found. Make sure Chrome is installed.');
+
+      const { spawn } = await import('node:child_process');
+      spawn(execPath, [connectUrl.toString()], {
+        detached: true, stdio: 'ignore', windowsHide: true,
+      });
+
+      // Wait for extension to connect to CDPRelayServer.
+      console.log('Waiting for extension to connect...');
+      await Promise.race([
+        relay._extensionConnectionPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (30s)')), 30000)),
+      ]);
+      console.log('Extension connected. Connecting Playwright...');
+
+      // Connect Playwright through CDPRelayServer — exactly like ExtensionContextFactory.
+      const browser = await deps.playwright.chromium.connectOverCDP(relay.cdpEndpoint(), { isLocal: true });
+      const browserContext = browser.contexts()[0];
+      const close = async () => {
+        await browser.close();
+        relay.stop();
+        relayHttp.close();
+      };
       this._close = close;
 
       const existingContextFactory = {

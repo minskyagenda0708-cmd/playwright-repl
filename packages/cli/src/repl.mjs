@@ -508,7 +508,7 @@ export async function startRepl(opts = {}) {
   // ─── Start engine ────────────────────────────────────────────────
 
   if (opts.extension) {
-    log(`${c.dim}Extension mode: starting MCP Bridge (will open Chrome)...${c.reset}`);
+    log(`${c.dim}Extension mode: starting CDP relay server...${c.reset}`);
     log('');
   } else {
     log(`${c.dim}Type .help for commands${c.reset}\n`);
@@ -518,7 +518,7 @@ export async function startRepl(opts = {}) {
   try {
     await conn.start(opts);
     if (opts.extension)
-      log(`${c.green}✓${c.reset} Extension mode ready (MCP Bridge connected)\n`);
+      log(`${c.green}✓${c.reset} Extension connected, ready for commands\n`);
     else
       log(`${c.green}✓${c.reset} Browser ready\n`);
   } catch (err) {

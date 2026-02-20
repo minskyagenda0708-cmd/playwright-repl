@@ -301,17 +301,61 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   }
 });
 
-// ─── Panel port management ──────────────────────────────────────────────────
+// ─── Panel port management + auto-connect relay ─────────────────────────────
 
 chrome.runtime.onConnect.addListener((port) => {
   if (!port.name.startsWith('pw-panel-')) return;
   const tabId = parseInt(port.name.replace('pw-panel-', ''), 10);
   panelPorts[tabId] = port;
 
+  // Auto-connect CDP relay to CommandServer when panel opens.
+  // This enables Phase 2: Playwright controls the inspected tab directly.
+  autoConnectRelay(tabId);
+
   port.onDisconnect.addListener(() => {
     delete panelPorts[tabId];
   });
 });
+
+/**
+ * Auto-connect a CDP relay WebSocket to the CommandServer's /extension endpoint.
+ * Called when a DevTools panel opens for a tab.
+ */
+async function autoConnectRelay(tabId) {
+  try {
+    // Close existing relay if any
+    if (activeConnection) {
+      activeConnection.close('New panel opened');
+      activeConnection = null;
+      await setConnectedTabId(null);
+    }
+
+    const wsUrl = `ws://127.0.0.1:${serverPort}/extension`;
+    debugLog(`Auto-connecting relay for tab ${tabId} to ${wsUrl}`);
+
+    const socket = new WebSocket(wsUrl);
+    await new Promise((resolve, reject) => {
+      socket.onopen = () => resolve();
+      socket.onerror = () => reject(new Error('WebSocket connection failed'));
+      setTimeout(() => reject(new Error('Connection timeout')), 5000);
+    });
+
+    activeConnection = new RelayConnection(socket);
+    activeConnection.setTabId(tabId);
+    activeConnection.onclose = () => {
+      debugLog('Auto-connect relay closed');
+      activeConnection = null;
+      void setConnectedTabId(null);
+    };
+
+    await setConnectedTabId(tabId);
+    debugLog(`Auto-connected relay for tab ${tabId}`);
+  } catch (e) {
+    debugLog(`Auto-connect relay failed: ${e.message}`);
+    // Not fatal — the server might not be running yet.
+    // User can manually connect later or restart.
+  }
+}
 
 // ─── Exports (for testing) ──────────────────────────────────────────────────
 
