@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "happy-dom",
     coverage: {
       provider: "v8",
-      include: ["content/**/*.js", "lib/**/*.js", "panel/**/*.js", "background.js", "devtools.js"],
+      include: ["lib/**/*.js", "panel/**/*.js", "background.js"],
       reporter: ["text", "html"],
     },
   },

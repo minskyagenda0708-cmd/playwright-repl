@@ -117,6 +117,17 @@ describe('CommandServer', () => {
     });
   });
 
+  describe('GET /health', () => {
+    it('returns 200 with status ok', async () => {
+      await server.start(TEST_PORT);
+
+      const res = await fetch(`http://localhost:${TEST_PORT}/health`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.status).toBe('ok');
+    });
+  });
+
   describe('other routes', () => {
     it('returns 404 for unknown paths', async () => {
       await server.start(TEST_PORT);

@@ -26,12 +26,12 @@ const lightboxCloseBtn = document.getElementById("lightbox-close-btn");
 const ghostText = document.getElementById("ghost-text");
 const dropdown = document.getElementById("autocomplete-dropdown");
 
-// The tab we're inspecting
-const inspectedTabId = chrome.devtools.inspectedWindow.tabId;
+// --- Server config ---
+const SERVER_PORT = 6781;
+const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
 // --- Theme detection ---
-const themeName = chrome.devtools?.panels?.themeName;
-if (themeName === "dark") {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
   document.body.classList.add("theme-dark");
 }
 
@@ -425,61 +425,29 @@ async function executeCommand(raw) {
   addCommand(trimmed);
 
   try {
-    const result = await chrome.runtime.sendMessage({
-      type: "pw-command",
-      raw: trimmed,
-      tabId: inspectedTabId,
+    const res = await fetch(`${SERVER_URL}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ raw: trimmed }),
     });
+    const result = await res.json();
 
-    if (!result) {
-      addError("No response from background worker.");
-      return;
-    }
-
-    // Handle Engine result format: { text, isError }
-    if (result.text !== undefined) {
-      if (result.isError) {
-        addError(result.text);
-      } else {
-        // Detect result type from content
-        const text = result.text;
-        if (text.startsWith("data:image/png;base64,")) {
-          addScreenshot(text.slice("data:image/png;base64,".length));
-        } else if (text.includes("[ref=") || text.startsWith("- ")) {
-          for (const line of text.split("\n")) {
-            addSnapshot(line);
-          }
-        } else {
-          addSuccess(text);
-        }
-      }
-      return;
-    }
-
-    // Legacy format: { type, data, success }
-    switch (result.type) {
-      case "success":
-        addSuccess(result.data);
-        break;
-      case "error":
-        addError(result.data);
-        break;
-      case "info":
-        addInfo(result.data);
-        break;
-      case "snapshot":
-        for (const line of result.data.split("\n")) {
+    if (result.isError) {
+      addError(result.text);
+    } else {
+      const text = result.text;
+      if (text.startsWith("data:image/png;base64,")) {
+        addScreenshot(text.slice("data:image/png;base64,".length));
+      } else if (text.includes("[ref=") || text.startsWith("- ")) {
+        for (const line of text.split("\n")) {
           addSnapshot(line);
         }
-        break;
-      case "screenshot":
-        addScreenshot(result.data);
-        break;
-      default:
-        addInfo(result.data || "Done.");
+      } else {
+        addSuccess(text);
+      }
     }
   } catch (e) {
-    addError(`Error: ${e.message}`);
+    addError("Not connected to server. Run: playwright-repl --extension");
   }
 }
 
@@ -498,82 +466,33 @@ async function executeCommandForRun(raw) {
   addCommand(trimmed);
 
   try {
-    const result = await chrome.runtime.sendMessage({
-      type: "pw-command",
-      raw: trimmed,
-      tabId: inspectedTabId,
+    const res = await fetch(`${SERVER_URL}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ raw: trimmed }),
     });
+    const result = await res.json();
 
-    if (!result) {
-      addError("No response from background worker.");
+    if (result.isError) {
+      addError(result.text);
       lineResults[currentRunLine] = "fail";
       runFailCount++;
-      updateConsoleStats();
-      updateLineNumbers();
-      return;
-    }
-
-    // Handle Engine result format: { text, isError }
-    if (result.text !== undefined) {
-      if (result.isError) {
-        addError(result.text);
-        lineResults[currentRunLine] = "fail";
-        runFailCount++;
-      } else {
-        const text = result.text;
-        if (text.startsWith("data:image/png;base64,")) {
-          addScreenshot(text.slice("data:image/png;base64,".length));
-        } else if (text.includes("[ref=") || text.startsWith("- ")) {
-          for (const line of text.split("\n")) {
-            addSnapshot(line);
-          }
-        } else {
-          addSuccess(text);
-        }
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
-      }
-      updateConsoleStats();
-      updateLineNumbers();
-      return;
-    }
-
-    // Legacy format: { type, data, success }
-    switch (result.type) {
-      case "success":
-        addSuccess(result.data);
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
-        break;
-      case "error":
-        addError(result.data);
-        lineResults[currentRunLine] = "fail";
-        runFailCount++;
-        break;
-      case "info":
-        addInfo(result.data);
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
-        break;
-      case "snapshot":
-        for (const line of result.data.split("\n")) {
+    } else {
+      const text = result.text;
+      if (text.startsWith("data:image/png;base64,")) {
+        addScreenshot(text.slice("data:image/png;base64,".length));
+      } else if (text.includes("[ref=") || text.startsWith("- ")) {
+        for (const line of text.split("\n")) {
           addSnapshot(line);
         }
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
-        break;
-      case "screenshot":
-        addScreenshot(result.data);
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
-        break;
-      default:
-        addInfo(result.data || "Done.");
-        lineResults[currentRunLine] = "pass";
-        runPassCount++;
+      } else {
+        addSuccess(text);
+      }
+      lineResults[currentRunLine] = "pass";
+      runPassCount++;
     }
   } catch (e) {
-    addError(`Error: ${e.message}`);
+    addError("Not connected to server. Run: playwright-repl --extension");
     lineResults[currentRunLine] = "fail";
     runFailCount++;
   }
@@ -905,68 +824,10 @@ copyBtn.addEventListener("click", () => {
 
 consoleClearBtn.addEventListener("click", clearConsole);
 
-// --- Record button ---
+// --- Record button (deferred — recording not yet supported in v3) ---
 
-recordBtn.addEventListener("click", async () => {
-  recordBtn.classList.toggle("recording");
-  const isRecording = recordBtn.classList.contains("recording");
-  recordBtn.textContent = isRecording ? "\u23F9 Stop" : "\u23FA Record";
-
-  if (isRecording) {
-    try {
-      const result = await chrome.runtime.sendMessage({
-        type: "pw-record-start",
-        tabId: inspectedTabId,
-      });
-      if (result?.success) {
-        addInfo("Recording started. Interact with the page...");
-      } else {
-        addError("Failed to start recording: " + (result?.error || "unknown"));
-        recordBtn.classList.remove("recording");
-        recordBtn.textContent = "\u23FA Record";
-      }
-    } catch (e) {
-      addError("Record error: " + e.message);
-      recordBtn.classList.remove("recording");
-      recordBtn.textContent = "\u23FA Record";
-    }
-  } else {
-    await chrome.runtime.sendMessage({
-      type: "pw-record-stop",
-      tabId: inspectedTabId,
-    });
-    addInfo("Recording stopped.");
-  }
-});
-
-// --- Port connection for recorded commands ---
-// Service workers in Manifest V3 can terminate and restart at any time.
-// When that happens, the port disconnects and panelPorts is lost.
-// We reconnect automatically so recording keeps working.
-
-let port = null;
-
-function connectPort() {
-  // chrome.runtime.id is undefined when the extension context is invalidated
-  // (e.g., after extension reload/update). Stop retrying in that case.
-  if (!chrome.runtime?.id) return;
-  try {
-    port = chrome.runtime.connect({ name: `pw-panel-${inspectedTabId}` });
-  } catch (e) {
-    return;
-  }
-  port.onMessage.addListener((message) => {
-    if (message.type === "pw-recorded-command") {
-      appendToEditor(message.command);
-    }
-  });
-  port.onDisconnect.addListener(() => {
-    if (!chrome.runtime?.id) return;
-    setTimeout(connectPort, 500);
-  });
-}
-
-connectPort();
+recordBtn.disabled = true;
+recordBtn.title = "Recording not available in side panel mode";
 
 // --- Draggable splitter ---
 
@@ -1044,4 +905,17 @@ updateButtonStates();
 editor.focus();
 
 addInfo("Playwright REPL v1.0.0");
-addInfo('Type commands below or open a .pw file in the editor.');
+
+// Health check — verify server is running
+(async () => {
+  try {
+    const res = await fetch(`${SERVER_URL}/health`);
+    if (res.ok) {
+      addInfo("Connected to server on port " + SERVER_PORT);
+    } else {
+      addError("Server returned status " + res.status);
+    }
+  } catch {
+    addError("Server not running. Start with: playwright-repl --extension");
+  }
+})();

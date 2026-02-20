@@ -28,7 +28,6 @@ function loadDeps() {
   _deps = {
     BrowserServerBackend:     pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
     contextFactory:           pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
-    CDPRelayServer:           pwReq('lib/mcp/extension/cdpRelay.js').CDPRelayServer,
     playwright:               pwReq('node_modules/playwright-core'),
     registry:                 pwReq('node_modules/playwright-core/lib/server/registry/index.js').registry,
     resolveConfig:            pwReq('lib/mcp/browser/config.js').resolveConfig,
@@ -74,59 +73,66 @@ export class Engine {
     // Choose context factory based on mode.
     let factory;
     if (opts.extension) {
-      // Start CommandServer for panel HTTP commands.
+      const serverPort = opts.port || 6781;
+      const cdpPort = opts.cdpPort || 9222;
+
+      // 1. Start CommandServer for panel HTTP commands.
       const { CommandServer } = await import('./extension-server.mjs');
       this._commandServer = new CommandServer(this);
-      await this._commandServer.start(opts.port || 3000);
+      await this._commandServer.start(serverPort);
+      console.log(`CommandServer listening on http://localhost:${serverPort}`);
 
-      // Use Playwright's own CDPRelayServer (proven to work).
-      const { createServer } = await import('node:http');
-      const relayHttp = createServer();
-      const relayPort = (opts.port || 3000) + 1;
-      await new Promise(r => relayHttp.listen(relayPort, '127.0.0.1', r));
-      const relay = new deps.CDPRelayServer(relayHttp, opts.browser || 'chrome');
-      this._relayHttp = relayHttp;
-      this._commandServer.relay = relay;
-
-      // Spawn Chrome with our extension's connect.html pointing at CDPRelayServer.
-      const extensionId = opts.extensionId || 'hofgdkanlhhkikiomnnndihbefnjhlmp';
-      const connectUrl = new URL(`chrome-extension://${extensionId}/connect.html`);
-      connectUrl.searchParams.set('mcpRelayUrl', relay.extensionEndpoint());
-      connectUrl.searchParams.set('client', JSON.stringify({ name: 'playwright-repl', version: replVersion }));
-
-      if (opts.spawn !== false) {
+      // 2. Spawn Chrome (only with --spawn).
+      if (opts.spawn) {
+        const extPath = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../../extension');
         const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
         const execPath = execInfo?.executablePath();
         if (!execPath)
           throw new Error('Chrome executable not found. Make sure Chrome is installed.');
 
+        // Chrome 136+ requires --user-data-dir for CDP. Use a dedicated profile dir.
+        const os = await import('node:os');
+        const fs = await import('node:fs');
+        const userDataDir = opts.profile || path.join(os.default.homedir(), '.playwright-repl', 'chrome-profile');
+        fs.default.mkdirSync(userDataDir, { recursive: true });
+
+        const chromeArgs = [
+          `--remote-debugging-port=${cdpPort}`,
+          `--user-data-dir=${userDataDir}`,
+          `--load-extension=${extPath}`,
+          '--no-first-run',
+          '--no-default-browser-check',
+        ];
+
         const { spawn } = await import('node:child_process');
-        spawn(execPath, [connectUrl.toString()], {
-          detached: true, stdio: 'ignore', windowsHide: true,
+        const chromeProc = spawn(execPath, chromeArgs, {
+          detached: true, stdio: 'ignore',
         });
-
-        console.log('Waiting for extension to connect...');
-        await Promise.race([
-          relay._extensionConnectionPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (30s)')), 30000)),
-        ]);
+        chromeProc.unref();
+        this._chromeProc = chromeProc;
+        console.log(`Chrome profile: ${userDataDir}`);
       } else {
-        console.log('Waiting for DevTools panel to connect... Open DevTools on any tab.');
-        await Promise.race([
-          relay._extensionConnectionPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Extension connection timeout (120s). No DevTools panel connected.')), 120000)),
-        ]);
+        console.log('Connecting to existing Chrome on port ' + cdpPort + ' (use --spawn to launch Chrome automatically)');
       }
-      console.log('Extension connected. Connecting Playwright...');
 
-      // Connect Playwright through CDPRelayServer — exactly like ExtensionContextFactory.
-      const browser = await deps.playwright.chromium.connectOverCDP(relay.cdpEndpoint(), { isLocal: true });
-      const browserContext = browser.contexts()[0];
-      const close = async () => {
-        await browser.close();
-        relay.stop();
-        relayHttp.close();
-      };
+      // 3. Wait for Chrome CDP to be ready (no timeout — waits until available).
+      console.log('Waiting for Chrome CDP...');
+      const cdpUrl = `http://localhost:${cdpPort}`;
+      while (true) {
+        try {
+          const res = await fetch(`${cdpUrl}/json/version`);
+          if (res.ok) break;
+        } catch {}
+        await new Promise(r => setTimeout(r, 500));
+      }
+      console.log('Chrome CDP ready. Connecting Playwright...');
+
+      // 4. Connect Playwright via CDP.
+      config.browser.cdpEndpoint = cdpUrl;
+      factory = deps.contextFactory(config);
+      const { browserContext, close } = await factory.createContext(
+        clientInfo, new AbortController().signal, {},
+      );
       this._close = close;
 
       const existingContextFactory = {
@@ -135,6 +141,20 @@ export class Engine {
       this._backend = new deps.BrowserServerBackend(config, existingContextFactory, { allTools: true });
       await this._backend.initialize?.(clientInfo);
       this._connected = true;
+
+      // 5. Auto-select the active (visible) tab so commands target what the user sees.
+      const pages = browserContext.pages();
+      for (let i = 0; i < pages.length; i++) {
+        try {
+          const state = await pages[i].evaluate(() => document.visibilityState);
+          if (state === 'visible' && i > 0) {
+            await this._backend.callTool('browser_tabs', { action: 'select', index: i });
+            break;
+          }
+        } catch {}
+      }
+
+      console.log('Ready! Side panel can send commands.');
 
       browserContext.on('close', () => {
         this._connected = false;
@@ -201,6 +221,10 @@ export class Engine {
     if (this._close) {
       await this._close();
       this._close = null;
+    }
+    if (this._chromeProc) {
+      try { this._chromeProc.kill(); } catch {}
+      this._chromeProc = null;
     }
   }
 
