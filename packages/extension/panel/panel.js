@@ -30,6 +30,51 @@ const dropdown = document.getElementById("autocomplete-dropdown");
 const SERVER_PORT = 6781;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
+// --- Response history (full responses stored for reference) ---
+const responseHistory = [];
+
+/**
+ * Filter verbose response for panel display.
+ *
+ * Playwright MCP responses follow a consistent structure:
+ *   <result text>        ← the actual outcome (e.g. "Clicked", "Navigated to...")
+ *   ### Section 1        ← supplementary context (code, tabs, page info, etc.)
+ *   ### Section 2
+ *   ...
+ *
+ * Generic strategy:
+ *   - Always store the full response in responseHistory
+ *   - For "snapshot": show the ### Snapshot section (that's the whole point)
+ *   - For everything else: show only the result text (before the first ### header)
+ */
+function filterResponse(command, text) {
+  responseHistory.push({ command, text, timestamp: Date.now() });
+
+  const cmdName = command.trim().split(/\s+/)[0];
+
+  // snapshot: return full response (the whole point is to see the tree)
+  if (cmdName === 'snapshot') return text;
+
+  // Extract text before the first ### header (if any)
+  const firstSectionIdx = text.indexOf('### ');
+  const preamble = firstSectionIdx > 0 ? text.slice(0, firstSectionIdx).trim() : '';
+
+  // Extract content from useful ### sections (Result, Error, Snapshot)
+  const sections = text.split(/^### /m).slice(1);
+  const kept = [];
+  for (const section of sections) {
+    const nl = section.indexOf('\n');
+    if (nl === -1) continue;
+    const title = section.substring(0, nl).trim();
+    const content = section.substring(nl + 1).trim();
+    if (title === 'Result' || title === 'Error') kept.push(content);
+  }
+
+  if (preamble) return preamble;
+  if (kept.length > 0) return kept.join('\n');
+  return 'Done';
+}
+
 // --- Theme detection ---
 if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
   document.body.classList.add("theme-dark");
@@ -363,6 +408,16 @@ function exportFromLines(cmds) {
   addCodeBlock(code);
 }
 
+// --- Active tab detection ---
+
+async function getActiveTabUrl() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    console.log('[panel] activeTab:', tab?.id, tab?.url);
+    return tab?.url || null;
+  } catch (e) { console.error('[panel] tabs.query failed:', e); return null; }
+}
+
 // --- Command execution (REPL ad-hoc) ---
 
 async function executeCommand(raw) {
@@ -425,17 +480,18 @@ async function executeCommand(raw) {
   addCommand(trimmed);
 
   try {
+    const activeTabUrl = await getActiveTabUrl();
     const res = await fetch(`${SERVER_URL}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: trimmed }),
+      body: JSON.stringify({ raw: trimmed, activeTabUrl }),
     });
     const result = await res.json();
 
     if (result.isError) {
       addError(result.text);
     } else {
-      const text = result.text;
+      const text = filterResponse(trimmed, result.text);
       if (text.startsWith("data:image/png;base64,")) {
         addScreenshot(text.slice("data:image/png;base64,".length));
       } else if (text.includes("[ref=") || text.startsWith("- ")) {
@@ -466,10 +522,11 @@ async function executeCommandForRun(raw) {
   addCommand(trimmed);
 
   try {
+    const activeTabUrl = await getActiveTabUrl();
     const res = await fetch(`${SERVER_URL}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: trimmed }),
+      body: JSON.stringify({ raw: trimmed, activeTabUrl }),
     });
     const result = await res.json();
 
@@ -478,7 +535,7 @@ async function executeCommandForRun(raw) {
       lineResults[currentRunLine] = "fail";
       runFailCount++;
     } else {
-      const text = result.text;
+      const text = filterResponse(trimmed, result.text);
       if (text.startsWith("data:image/png;base64,")) {
         addScreenshot(text.slice("data:image/png;base64,".length));
       } else if (text.includes("[ref=") || text.startsWith("- ")) {

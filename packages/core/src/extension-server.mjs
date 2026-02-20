@@ -68,7 +68,14 @@ export class CommandServer {
     if (req.method === 'POST' && urlPath === '/run') {
       try {
         const body = await readBody(req);
-        const { raw } = JSON.parse(body);
+        const { raw, activeTabUrl } = JSON.parse(body);
+        console.log(`[server] ${raw} | ${activeTabUrl || 'no-url'}`);
+
+        // Auto-select the tab matching the panel's active tab.
+        if (activeTabUrl) {
+          await this._engine.selectPageByUrl(activeTabUrl);
+        }
+
         let args = parseInput(raw);
         if (!args) {
           res.writeHead(400, { 'Content-Type': 'application/json' });

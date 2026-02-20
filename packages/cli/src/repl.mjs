@@ -380,6 +380,10 @@ export function startCommandLoop(ctx) {
 
   let lastSigint = 0;
   ctx.rl.on('SIGINT', () => {
+    if (ctx.opts?.extension) {
+      ctx.conn.close();
+      process.exit(0);
+    }
     const now = Date.now();
     if (now - lastSigint < 500) {
       ctx.conn.close();
@@ -394,6 +398,7 @@ export function startCommandLoop(ctx) {
 // ─── Prompt string ──────────────────────────────────────────────────────────
 
 export function promptStr(ctx) {
+  if (ctx.opts?.extension) return '';
   const mode = ctx.session.mode;
   const prefix = mode === 'recording' ? `${c.red}⏺${c.reset} `
                : mode === 'paused'    ? `${c.yellow}⏸${c.reset} `

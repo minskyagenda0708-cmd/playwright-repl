@@ -46,6 +46,7 @@ export class Engine {
   constructor(deps) {
     this._deps = deps;
     this._backend = null;
+    this._browserContext = null;
     this._close = null;
     this._connected = false;
   }
@@ -133,6 +134,7 @@ export class Engine {
       const { browserContext, close } = await factory.createContext(
         clientInfo, new AbortController().signal, {},
       );
+      this._browserContext = browserContext;
       this._close = close;
 
       const existingContextFactory = {
@@ -165,6 +167,7 @@ export class Engine {
       const { browserContext, close } = await factory.createContext(
         clientInfo, new AbortController().signal, {},
       );
+      this._browserContext = browserContext;
       this._close = close;
 
       const existingContextFactory = {
@@ -203,6 +206,19 @@ export class Engine {
 
     const response = await this._backend.callTool(toolName, toolParams);
     return formatResult(response);
+  }
+
+  /**
+   * Select the Playwright page matching the given URL.
+   * Uses browserContext.pages() directly — no text parsing.
+   */
+  async selectPageByUrl(targetUrl) {
+    if (!this._browserContext || !this._backend) return;
+    const pages = this._browserContext.pages();
+    const page = pages.find(p => p.url() === targetUrl);
+    if (page) {
+      await page.bringToFront();
+    }
   }
 
   /**
