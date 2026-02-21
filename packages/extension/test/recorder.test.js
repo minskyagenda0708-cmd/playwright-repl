@@ -198,6 +198,109 @@ describe("recorder.js", () => {
     });
   });
 
+  // ─── Non-interactive elements (isClickable) ────────────────────────────
+
+  it("skips clicks on plain span without role", async () => {
+    document.body.innerHTML = '<span>just text</span>';
+    await loadRecorder();
+    document.querySelector("span").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).not.toHaveBeenCalled();
+  });
+
+  it("skips clicks on paragraph text", async () => {
+    document.body.innerHTML = '<p>paragraph content</p>';
+    await loadRecorder();
+    document.querySelector("p").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).not.toHaveBeenCalled();
+  });
+
+  it("skips clicks on heading text", async () => {
+    document.body.innerHTML = '<h2>Section Title</h2>';
+    await loadRecorder();
+    document.querySelector("h2").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).not.toHaveBeenCalled();
+  });
+
+  it("records click on child of a link", async () => {
+    document.body.innerHTML = '<a href="#"><span>inner text</span></a>';
+    await loadRecorder();
+    document.querySelector("span").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pw-recorded-command" }),
+    );
+  });
+
+  it("records click on child of a button", async () => {
+    document.body.innerHTML = '<button><span>icon</span></button>';
+    await loadRecorder();
+    document.querySelector("span").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pw-recorded-command" }),
+    );
+  });
+
+  it("records click on element with onclick attribute", async () => {
+    document.body.innerHTML = '<div onclick="void(0)">clickable div</div>';
+    await loadRecorder();
+    document.querySelector("div").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pw-recorded-command" }),
+    );
+  });
+
+  // ─── Nth suffix (uniqueness check) ────────────────────────────────────
+
+  it("appends --nth when multiple buttons share the same text", async () => {
+    document.body.innerHTML = '<button>OK</button><button>OK</button><button>OK</button>';
+    await loadRecorder();
+    const buttons = document.querySelectorAll("button");
+    buttons[1].click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: 'click "OK" --nth 1',
+    });
+  });
+
+  it("appends --nth 0 for the first of multiple matching elements", async () => {
+    document.body.innerHTML = '<button>Save</button><button>Save</button>';
+    await loadRecorder();
+    document.querySelectorAll("button")[0].click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: 'click "Save" --nth 0',
+    });
+  });
+
+  it("does not append --nth when text is unique", async () => {
+    document.body.innerHTML = '<button>Submit</button><button>Cancel</button>';
+    await loadRecorder();
+    document.querySelector("button").click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: 'click "Submit"',
+    });
+  });
+
+  it("appends --nth for duplicate links", async () => {
+    document.body.innerHTML = '<a href="#">Read more</a><a href="#">Read more</a>';
+    await loadRecorder();
+    document.querySelectorAll("a")[1].click();
+    vi.advanceTimersByTime(300);
+    expect(sendMessageSpy).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: 'click "Read more" --nth 1',
+    });
+  });
+
   // ─── Checkbox ───────────────────────────────────────────────────────────
 
   it("records check command on checkbox", async () => {

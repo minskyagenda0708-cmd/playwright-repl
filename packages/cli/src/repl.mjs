@@ -260,12 +260,14 @@ export async function processLine(ctx, line) {
     const textArg = args._[1];
     const extraArgs = args._.slice(2);
     const fn = textFns[cmdName];
+    const nth = args.nth !== undefined ? parseInt(args.nth, 10) : undefined;
     let runCodeArgs;
-    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName);
-    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '');
-    else runCodeArgs = buildRunCode(fn, textArg);
+    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName, nth);
+    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '', nth);
+    else runCodeArgs = buildRunCode(fn, textArg, nth);
     const argsHint = extraArgs.length > 0 ? ` ${extraArgs.join(' ')}` : '';
-    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint} (via run-code)${c.reset}`);
+    const nthHint = nth !== undefined ? ` --nth ${nth}` : '';
+    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint}${nthHint} (via run-code)${c.reset}`);
     args = runCodeArgs;
   }
 

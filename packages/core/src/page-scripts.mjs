@@ -16,7 +16,8 @@
  * So `code` must be a function expression, not an IIFE.
  */
 export function buildRunCode(fn, ...args) {
-  const serialized = args.map(a => JSON.stringify(a)).join(', ');
+  const filtered = args.filter(a => a !== undefined);
+  const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
   return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
 }
 
@@ -49,39 +50,52 @@ export async function verifyList(page, ref, items) {
 
 // ─── Text locator actions ───────────────────────────────────────────────────
 
-export async function actionByText(page, text, action) {
+export async function actionByText(page, text, action, nth) {
   let loc = page.getByText(text, { exact: true });
   if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
   if (await loc.count() === 0) loc = page.getByRole('link', { name: text });
   if (await loc.count() === 0) loc = page.getByText(text);
+  if (nth !== undefined) loc = loc.nth(nth);
   await loc[action]();
 }
 
-export async function fillByText(page, text, value) {
+export async function fillByText(page, text, value, nth) {
   let loc = page.getByLabel(text);
   if (await loc.count() === 0) loc = page.getByPlaceholder(text);
   if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+  if (nth !== undefined) loc = loc.nth(nth);
   await loc.fill(value);
 }
 
-export async function selectByText(page, text, value) {
+export async function selectByText(page, text, value, nth) {
   let loc = page.getByLabel(text);
   if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+  if (nth !== undefined) loc = loc.nth(nth);
   await loc.selectOption(value);
 }
 
-export async function checkByText(page, text) {
+export async function checkByText(page, text, nth) {
   const item = page.getByRole('listitem').filter({ hasText: text });
-  if (await item.count() > 0) { await item.getByRole('checkbox').check(); return; }
+  if (await item.count() > 0) {
+    const target = nth !== undefined ? item.nth(nth) : item;
+    await target.getByRole('checkbox').check();
+    return;
+  }
   let loc = page.getByLabel(text);
   if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  if (nth !== undefined) loc = loc.nth(nth);
   await loc.check();
 }
 
-export async function uncheckByText(page, text) {
+export async function uncheckByText(page, text, nth) {
   const item = page.getByRole('listitem').filter({ hasText: text });
-  if (await item.count() > 0) { await item.getByRole('checkbox').uncheck(); return; }
+  if (await item.count() > 0) {
+    const target = nth !== undefined ? item.nth(nth) : item;
+    await target.getByRole('checkbox').uncheck();
+    return;
+  }
   let loc = page.getByLabel(text);
   if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  if (nth !== undefined) loc = loc.nth(nth);
   await loc.uncheck();
 }

@@ -142,9 +142,10 @@ function resolveArgs(args) {
     const textArg = args._[1];
     const extraArgs = args._.slice(2);
     const fn = textFns[cmdName];
-    if (fn === actionByText) args = buildRunCode(fn, textArg, cmdName);
-    else if (cmdName === 'fill' || cmdName === 'select') args = buildRunCode(fn, textArg, extraArgs[0] || '');
-    else args = buildRunCode(fn, textArg);
+    const nth = args.nth !== undefined ? parseInt(args.nth, 10) : undefined;
+    if (fn === actionByText) args = buildRunCode(fn, textArg, cmdName, nth);
+    else if (cmdName === 'fill' || cmdName === 'select') args = buildRunCode(fn, textArg, extraArgs[0] || '', nth);
+    else args = buildRunCode(fn, textArg, nth);
   }
 
   // ── go-back / go-forward → evaluate history.back/forward ──

@@ -49,6 +49,25 @@
     return '"' + s.replace(/"/g, '\\"') + '"';
   }
 
+  // Check if the locator text matches multiple interactive elements on the page.
+  // Returns ' --nth N' suffix if ambiguous, '' if unique.
+  function nthSuffix(el, locator) {
+    var selector = 'a, button, input, textarea, select, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [role=option], [aria-label]';
+    var candidates = document.querySelectorAll(selector);
+    var matches = [];
+    for (var i = 0; i < candidates.length; i++) {
+      if (getLocator(candidates[i]) === locator) matches.push(candidates[i]);
+    }
+    if (matches.length <= 1) return '';
+    var idx = matches.indexOf(el);
+    if (idx === -1) {
+      for (var j = 0; j < matches.length; j++) {
+        if (matches[j].contains(el)) { idx = j; break; }
+      }
+    }
+    return idx >= 0 ? ' --nth ' + idx : '';
+  }
+
   function send(command) {
     chrome.runtime.sendMessage({ type: "pw-recorded-command", command });
   }
@@ -60,15 +79,28 @@
   function flushFill() {
     if (fillTarget && fillValue) {
       const locator = getLocator(fillTarget);
-      send('fill ' + locator + ' "' + fillValue.replace(/"/g, '\\"') + '"');
+      send('fill ' + locator + nthSuffix(fillTarget, locator) + ' "' + fillValue.replace(/"/g, '\\"') + '"');
     }
     fillTimer = null;
     fillTarget = null;
     fillValue = "";
   }
 
-  // Elements that are non-interactive containers — skip recording clicks on these
-  var skipTags = new Set(["HTML", "BODY", "MAIN", "FOOTER", "HEADER", "NAV", "SECTION", "ARTICLE", "DIV", "UL", "OL", "FORM", "FIELDSET", "TABLE", "TBODY", "THEAD", "TR"]);
+  // Only record clicks on interactive elements (or their children)
+  var clickableTags = new Set(["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY", "DETAILS"]);
+  var clickableRoles = new Set(["button", "link", "tab", "menuitem", "checkbox", "option", "switch", "radio", "treeitem"]);
+
+  function isClickable(el) {
+    var node = el;
+    while (node && node !== document.body) {
+      if (clickableTags.has(node.tagName)) return true;
+      var role = node.getAttribute && node.getAttribute("role");
+      if (role && clickableRoles.has(role)) return true;
+      if (node.getAttribute && node.getAttribute("onclick")) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
 
   function findCheckbox(el) {
     if (el.tagName === "INPUT" && el.type === "checkbox") return el;
@@ -98,8 +130,8 @@
       // Skip text inputs and textareas — handled by handleInput
       if ((el.tagName === "INPUT" && el.type !== "checkbox" && el.type !== "radio") || el.tagName === "TEXTAREA") return;
 
-      // Skip clicks on non-interactive container elements
-      if (skipTags.has(el.tagName) && !el.getAttribute("role") && !el.getAttribute("onclick")) return;
+      // Skip clicks on non-interactive elements
+      if (!isClickable(el)) return;
 
       // Links: emit immediately (page navigates before debounce timer fires)
       if (el.closest && el.closest("a[href]")) {
@@ -130,15 +162,19 @@
       if (checkbox) {
         var cbLabel = getItemContext(checkbox) || "";
         if (cbLabel) {
-          send(checkbox.checked ? 'check "' + cbLabel + '"' : 'uncheck "' + cbLabel + '"');
+          var cbLocator = quote(cbLabel);
+          var cbNth = nthSuffix(checkbox, cbLocator);
+          send(checkbox.checked ? 'check ' + cbLocator + cbNth : 'uncheck ' + cbLocator + cbNth);
         } else {
           var loc = getLocator(checkbox);
-          send(checkbox.checked ? 'check ' + loc : 'uncheck ' + loc);
+          var locNth = nthSuffix(checkbox, loc);
+          send(checkbox.checked ? 'check ' + loc + locNth : 'uncheck ' + loc + locNth);
         }
         return;
       }
 
       var locator = getLocator(el);
+      var nth = nthSuffix(el, locator);
       var actionWords = new Set(["delete", "remove", "edit", "close", "destroy", "\u00d7", "\u2715", "\u2716", "\u2717", "\u2718", "x"]);
       var elText = (el.textContent || "").trim().toLowerCase();
       var elClass = (el.className || "").toLowerCase();
@@ -152,10 +188,10 @@
         if (ctx && isAction) {
           send('click ' + locator + ' "' + ctx.replace(/"/g, '\\"') + '"');
         } else {
-          send('click ' + locator);
+          send('click ' + locator + nth);
         }
       } catch(ce) {
-        send('click ' + locator);
+        send('click ' + locator + nth);
       }
     } catch(err) {
       send("# click recording error: " + err.message);
@@ -169,9 +205,9 @@
       if (fillTimer) { clearTimeout(fillTimer); flushFill(); }
       var el = e.target;
       if (!el || !el.tagName) return;
-      if (skipTags.has(el.tagName) && !el.getAttribute("role") && !el.getAttribute("onclick")) return;
+      if (!isClickable(el)) return;
       var locator = getLocator(el);
-      send('dblclick ' + locator);
+      send('dblclick ' + locator + nthSuffix(el, locator));
     } catch(err) {
       send("# dblclick recording error: " + err.message);
     }
@@ -181,9 +217,9 @@
     try {
       var el = e.target;
       if (!el || !el.tagName) return;
-      if (skipTags.has(el.tagName) && !el.getAttribute("role") && !el.getAttribute("onclick")) return;
+      if (!isClickable(el)) return;
       var locator = getLocator(el);
-      send('click ' + locator + ' --button right');
+      send('click ' + locator + nthSuffix(el, locator) + ' --button right');
     } catch(err) {
       send("# contextmenu recording error: " + err.message);
     }
@@ -204,7 +240,8 @@
     if (el.tagName === "SELECT") {
       const opt = el.options[el.selectedIndex];
       const optText = opt ? opt.text.trim() : el.value;
-      send('select ' + getLocator(el) + ' "' + optText.replace(/"/g, '\\"') + '"');
+      const locator = getLocator(el);
+      send('select ' + locator + nthSuffix(el, locator) + ' "' + optText.replace(/"/g, '\\"') + '"');
     }
   }
 

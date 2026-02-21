@@ -35,6 +35,18 @@ describe('buildRunCode', () => {
     expect(result._[1]).toContain('["item1","item2"]');
   });
 
+  it('filters out undefined args', () => {
+    const result = buildRunCode(actionByText, 'Submit', 'click', undefined);
+    expect(result._[1]).toContain('(page, "Submit", "click")');
+    // Args should end with just the three values, no trailing undefined/comma
+    expect(result._[1]).toMatch(/\(page, "Submit", "click"\)$/);
+  });
+
+  it('includes nth arg when defined', () => {
+    const result = buildRunCode(actionByText, 'Submit', 'click', 2);
+    expect(result._[1]).toContain('(page, "Submit", "click", 2)');
+  });
+
   it('produces code callable as (code)(page) by daemon', async () => {
     const result = buildRunCode(verifyText, 'hello');
     const code = result._[1];
@@ -154,6 +166,31 @@ describe('actionByText', () => {
     const page = mockPage(1);
     await actionByText(page, 'Menu', 'hover');
     expect(page._loc.hover).toHaveBeenCalled();
+  });
+
+  it('chains .nth() when nth is provided', async () => {
+    const nthLoc = mockLocator(1);
+    const loc = mockLocator(3);
+    loc.nth = vi.fn().mockReturnValue(nthLoc);
+    const page = {
+      getByText: vi.fn().mockReturnValue(loc),
+      getByRole: vi.fn().mockReturnValue(loc),
+    };
+    await actionByText(page, 'Learn more', 'click', 1);
+    expect(loc.nth).toHaveBeenCalledWith(1);
+    expect(nthLoc.click).toHaveBeenCalled();
+  });
+
+  it('does not chain .nth() when nth is undefined', async () => {
+    const loc = mockLocator(1);
+    loc.nth = vi.fn();
+    const page = {
+      getByText: vi.fn().mockReturnValue(loc),
+      getByRole: vi.fn().mockReturnValue(loc),
+    };
+    await actionByText(page, 'Submit', 'click');
+    expect(loc.nth).not.toHaveBeenCalled();
+    expect(loc.click).toHaveBeenCalled();
   });
 });
 
