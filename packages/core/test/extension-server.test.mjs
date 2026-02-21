@@ -15,7 +15,6 @@ function createMockEngine() {
 describe('CommandServer', () => {
   let server;
   let engine;
-  const TEST_PORT = 13579;
 
   beforeEach(() => {
     engine = createMockEngine();
@@ -28,12 +27,12 @@ describe('CommandServer', () => {
 
   describe('lifecycle', () => {
     it('starts and listens on the given port', async () => {
-      await server.start(TEST_PORT);
-      expect(server.port).toBe(TEST_PORT);
+      await server.start(0);
+      expect(server.port).toBeGreaterThan(0);
     });
 
     it('close() is idempotent', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
       await server.close();
       await server.close(); // Should not throw
     });
@@ -45,9 +44,9 @@ describe('CommandServer', () => {
 
   describe('POST /run', () => {
     it('runs command through engine and returns result', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw: 'click e5' }),
@@ -61,9 +60,9 @@ describe('CommandServer', () => {
     });
 
     it('returns 400 for unknown commands', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw: '' }),
@@ -76,9 +75,9 @@ describe('CommandServer', () => {
 
     it('returns 500 when engine throws', async () => {
       engine.run.mockRejectedValueOnce(new Error('Engine exploded'));
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw: 'click e5' }),
@@ -93,9 +92,9 @@ describe('CommandServer', () => {
 
   describe('CORS', () => {
     it('responds to OPTIONS preflight with CORS headers', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`, {
         method: 'OPTIONS',
       });
 
@@ -105,9 +104,9 @@ describe('CommandServer', () => {
     });
 
     it('includes CORS headers on POST responses', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw: 'click e5' }),
@@ -119,9 +118,9 @@ describe('CommandServer', () => {
 
   describe('GET /health', () => {
     it('returns 200 with status ok', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/health`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/health`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.status).toBe('ok');
@@ -130,16 +129,16 @@ describe('CommandServer', () => {
 
   describe('other routes', () => {
     it('returns 404 for unknown paths', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/unknown`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/unknown`);
       expect(res.status).toBe(404);
     });
 
     it('returns 404 for GET /run', async () => {
-      await server.start(TEST_PORT);
+      await server.start(0);
 
-      const res = await fetch(`http://localhost:${TEST_PORT}/run`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/run`);
       expect(res.status).toBe(404);
     });
   });
