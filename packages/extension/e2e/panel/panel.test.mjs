@@ -5,7 +5,7 @@
  * and uses page.route() to intercept HTTP calls to the CommandServer.
  */
 
-import { test, expect } from './helpers.mjs';
+import { test, expect } from './fixtures.mjs';
 
 // ─── Initialization ────────────────────────────────────────────────────────
 

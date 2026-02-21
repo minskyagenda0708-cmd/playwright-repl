@@ -26,11 +26,13 @@ export class CommandServer {
   get port() { return this._port; }
 
   async start(port = 6781) {
-    this._port = port;
     this._server = createServer((req, res) => this._handleHttp(req, res));
 
     return new Promise((resolve, reject) => {
-      this._server.listen(port, () => resolve());
+      this._server.listen(port, () => {
+        this._port = this._server.address().port;
+        resolve();
+      });
       this._server.on('error', reject);
     });
   }

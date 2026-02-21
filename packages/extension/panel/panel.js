@@ -491,10 +491,11 @@ async function executeCommand(raw) {
     if (result.isError) {
       addError(result.text);
     } else {
+      if (result.image) {
+        addScreenshot(result.image.replace(/^data:image\/\w+;base64,/, ''));
+      }
       const text = filterResponse(trimmed, result.text);
-      if (text.startsWith("data:image/png;base64,")) {
-        addScreenshot(text.slice("data:image/png;base64,".length));
-      } else if (text.includes("[ref=") || text.startsWith("- ")) {
+      if (text.includes("[ref=") || text.startsWith("- ")) {
         for (const line of text.split("\n")) {
           addSnapshot(line);
         }
@@ -535,10 +536,11 @@ async function executeCommandForRun(raw) {
       lineResults[currentRunLine] = "fail";
       runFailCount++;
     } else {
+      if (result.image) {
+        addScreenshot(result.image.replace(/^data:image\/\w+;base64,/, ''));
+      }
       const text = filterResponse(trimmed, result.text);
-      if (text.startsWith("data:image/png;base64,")) {
-        addScreenshot(text.slice("data:image/png;base64,".length));
-      } else if (text.includes("[ref=") || text.startsWith("- ")) {
+      if (text.includes("[ref=") || text.startsWith("- ")) {
         for (const line of text.split("\n")) {
           addSnapshot(line);
         }

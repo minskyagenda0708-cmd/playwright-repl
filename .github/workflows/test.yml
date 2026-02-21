@@ -32,6 +32,10 @@ jobs:
         run: npx playwright install chromium
         working-directory: packages/extension
 
-      - name: Run extension E2E tests
-        run: npx playwright test
+      - name: Run extension panel tests
+        run: npx playwright test --project=panel
+        working-directory: packages/extension
+
+      - name: Run command integration tests
+        run: npx playwright test --project=commands
         working-directory: packages/extension

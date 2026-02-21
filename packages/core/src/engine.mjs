@@ -308,6 +308,11 @@ export class Engine {
 
 function formatResult(result) {
   const isError = result.isError;
-  const text = result.content[0].type === 'text' ? result.content[0].text : undefined;
-  return { isError, text };
+  let text;
+  let image;
+  for (const item of result.content) {
+    if (item.type === 'text' && !text) text = item.text;
+    if (item.type === 'image' && !image) image = `data:${item.mimeType || 'image/png'};base64,${item.data}`;
+  }
+  return { isError, text, image };
 }

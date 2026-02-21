@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     setupFiles: "./test/setup.js",
     environment: "happy-dom",
+    exclude: ["e2e/**", "node_modules/**"],
     coverage: {
       provider: "v8",
       include: ["lib/**/*.js", "panel/**/*.js", "background.js"],
