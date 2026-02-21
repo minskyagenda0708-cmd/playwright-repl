@@ -44,20 +44,6 @@ async function stopRecordingOn(sw, targetPage) {
 }
 
 /**
- * Wait for a command matching a pattern to appear in the panel's editor.
- */
-async function waitForRecordedCommand(panelPage, pattern, timeoutMs = 10000) {
-  await panelPage.waitForFunction(
-    ([pat]) => {
-      const editor = document.getElementById('editor');
-      return editor && new RegExp(pat).test(editor.value);
-    },
-    [pattern],
-    { timeout: timeoutMs },
-  );
-}
-
-/**
  * Wait for a command matching a pattern to appear in the panel's console output.
  */
 async function waitForConsoleCommand(panelPage, pattern, timeoutMs = 10000) {
@@ -91,6 +77,55 @@ test('recorder injects and captures a click on a link', async ({ recordingPages 
   // Verify it also appeared in the editor
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).toContain('click');
+
+  await stopRecordingOn(sw, targetPage);
+});
+
+test('recorder appends --nth for ambiguous locators', async ({ recordingPages }) => {
+  const { panelPage, targetPage, sw } = recordingPages;
+
+  // Navigate to a page with multiple duplicate tab buttons (npm/yarn tabs)
+  await targetPage.goto('https://playwright.dev/docs/intro');
+  await targetPage.waitForLoadState('domcontentloaded');
+
+  const result = await startRecordingOn(sw, targetPage);
+  expect(result.ok).toBe(true);
+
+  // Click the second "npm" tab — multiple tab buttons share the same "npm" text.
+  // The recorder's nthSuffix only counts interactive elements (role=tab, button, a, etc.)
+  // so non-clickable "npm" text in code blocks is ignored.
+  await targetPage.bringToFront();
+  const npmTabs = targetPage.locator('role=tab', { hasText: /^npm$/ });
+  const count = await npmTabs.count();
+  expect(count).toBeGreaterThan(1);  // confirm duplicates exist
+  await npmTabs.nth(1).click();
+
+  await panelPage.bringToFront();
+  await waitForConsoleCommand(panelPage, 'click.*--nth 1');
+
+  const editorValue = await panelPage.locator('#editor').inputValue();
+  expect(editorValue).toContain('--nth 1');
+  await stopRecordingOn(sw, targetPage);
+});
+
+test('recorder ignores clicks on non-interactive elements', async ({ recordingPages }) => {
+  const { panelPage, targetPage, sw } = recordingPages;
+
+  await targetPage.goto('https://playwright.dev/docs/intro');
+  await targetPage.waitForLoadState('domcontentloaded');
+
+  const result = await startRecordingOn(sw, targetPage);
+  expect(result.ok).toBe(true);
+
+  // Click a heading — non-interactive, recorder should ignore it
+  await targetPage.bringToFront();
+  await targetPage.locator('h1').first().click();
+
+  // Wait and verify no command was recorded
+  await panelPage.bringToFront();
+  await panelPage.waitForTimeout(2000);
+  const editorValue = await panelPage.locator('#editor').inputValue();
+  expect(editorValue).not.toContain('click');
 
   await stopRecordingOn(sw, targetPage);
 });
