@@ -33,7 +33,7 @@ jobs:
         working-directory: packages/extension
 
       - name: Install Playwright Chromium (command tests)
-        run: npx playwright install chromium
+        run: node node_modules/playwright/cli.js install chromium
 
       - name: Run extension panel tests
         run: npx playwright test --project=panel
