@@ -6,9 +6,11 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:e2e": "npx playwright test",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.0.18",
     "happy-dom": "^20.6.1",
     "vitest": "^4.0.18",

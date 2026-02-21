@@ -8,6 +8,7 @@
 
 import { createServer } from 'node:http';
 import { parseInput } from './parser.mjs';
+import { replVersion } from './resolve.mjs';
 import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
@@ -60,7 +61,7 @@ export class CommandServer {
     // Health check endpoint
     if (req.method === 'GET' && urlPath === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok' }));
+      res.end(JSON.stringify({ status: 'ok', version: replVersion }));
       return;
     }
 

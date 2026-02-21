@@ -961,13 +961,13 @@ updateFileInfo();
 updateButtonStates();
 editor.focus();
 
-addInfo("Playwright REPL v1.0.0");
-
-// Health check — verify server is running
+// Health check — verify server is running and show version
 (async () => {
   try {
     const res = await fetch(`${SERVER_URL}/health`);
     if (res.ok) {
+      const data = await res.json();
+      addInfo(`Playwright REPL v${data.version || '?'}`);
       addInfo("Connected to server on port " + SERVER_PORT);
     } else {
       addError("Server returned status " + res.status);

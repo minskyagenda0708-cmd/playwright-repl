@@ -27,3 +27,11 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+        working-directory: packages/extension
+
+      - name: Run extension E2E tests
+        run: npx playwright test
+        working-directory: packages/extension
