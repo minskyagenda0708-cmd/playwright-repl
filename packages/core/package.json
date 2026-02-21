@@ -13,6 +13,9 @@
   "dependencies": {
     "minimist": "^1.2.8"
   },
+  "peerDependencies": {
+    "playwright": ">=1.59.0-alpha-2026-02-01"
+  },
   "devDependencies": {
     "vitest": "^4.0.18"
   }

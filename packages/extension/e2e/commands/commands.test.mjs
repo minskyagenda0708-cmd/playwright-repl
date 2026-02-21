@@ -229,6 +229,94 @@ test('alias c for click', async ({ run }) => {
   expect(result.isError).toBeFalsy();
 });
 
+// ─── Tab commands ────────────────────────────────────────────────────────────
+
+/**
+ * Count tab entries in tab-list output.
+ * Format: "- N: [Title](URL)" or "- N: (current) [Title](URL)"
+ */
+function countTabs(tabListText) {
+  return tabListText.split('\n').filter(l => /^- \d+:/.test(l)).length;
+}
+
+test('tab-list shows open tabs', async ({ run }) => {
+  await run('goto https://example.com');
+  const result = await run('tab-list');
+  expect(result.isError).toBeFalsy();
+  expect(result.text).toContain('example.com');
+  expect(result.text).toMatch(/- 0:.*\(current\)/);
+});
+
+test('tab-new opens a new tab', async ({ run }) => {
+  await run('goto https://example.com');
+  const before = await run('tab-list');
+  const tabsBefore = countTabs(before.text);
+
+  const result = await run('tab-new');
+  expect(result.isError).toBeFalsy();
+
+  const after = await run('tab-list');
+  const tabsAfter = countTabs(after.text);
+  expect(tabsAfter).toBe(tabsBefore + 1);
+  // New tab becomes current
+  expect(after.text).toMatch(/- 1:.*\(current\)/);
+});
+
+test('tab-select switches to a tab by index', async ({ run }) => {
+  await run('goto https://example.com');
+  await run('tab-new');
+  // New tab is current — switch back to first tab
+  const result = await run('tab-select 0');
+  expect(result.isError).toBeFalsy();
+
+  // Verify first tab is now current
+  const list = await run('tab-list');
+  expect(list.text).toMatch(/- 0:.*\(current\).*example\.com/);
+});
+
+test('tab-close closes the current tab', async ({ run }) => {
+  await run('goto https://example.com');
+  await run('tab-new');
+  const before = await run('tab-list');
+  const tabsBefore = countTabs(before.text);
+
+  // Close the current tab (the new one)
+  const result = await run('tab-close');
+  expect(result.isError).toBeFalsy();
+
+  const after = await run('tab-list');
+  const tabsAfter = countTabs(after.text);
+  expect(tabsAfter).toBe(tabsBefore - 1);
+});
+
+test('tab-new then goto navigates in the new tab', async ({ run }) => {
+  await run('goto https://example.com');
+  await run('tab-new');
+  await run('goto https://www.iana.org');
+
+  const list = await run('tab-list');
+  expect(list.text).toContain('example.com');
+  expect(list.text).toContain('iana.org');
+});
+
+test('tab aliases tl, tn, tc, ts work', async ({ run }) => {
+  await run('goto https://example.com');
+
+  const list = await run('tl');
+  expect(list.isError).toBeFalsy();
+  expect(list.text).toContain('example.com');
+
+  const newTab = await run('tn');
+  expect(newTab.isError).toBeFalsy();
+
+  const select = await run('ts 0');
+  expect(select.isError).toBeFalsy();
+
+  const close = await run('ts 1');
+  expect(close.isError).toBeFalsy();
+  await run('tc');
+});
+
 // ─── Errors ─────────────────────────────────────────────────────────────────
 
 test('unknown command returns error', async ({ run }) => {

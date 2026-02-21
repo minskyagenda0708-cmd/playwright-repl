@@ -25,11 +25,13 @@ function loadDeps() {
   // Resolve absolute paths to bypass Playwright's exports map.
   const pwDir = path.dirname(require.resolve('playwright/package.json'));
   const pwReq = (sub) => require(path.join(pwDir, sub));
+  const pwCoreDir = path.dirname(require.resolve('playwright-core/package.json'));
+  const pwCoreReq = (sub) => require(path.join(pwCoreDir, sub));
   _deps = {
     BrowserServerBackend:     pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
     contextFactory:           pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
-    playwright:               pwReq('node_modules/playwright-core'),
-    registry:                 pwReq('node_modules/playwright-core/lib/server/registry/index.js').registry,
+    playwright:               require('playwright-core'),
+    registry:                 pwCoreReq('lib/server/registry/index.js').registry,
     resolveConfig:            pwReq('lib/mcp/browser/config.js').resolveConfig,
     commands:                 pwReq('lib/cli/daemon/commands.js').commands,
     parseCommand:             pwReq('lib/cli/daemon/command.js').parseCommand,

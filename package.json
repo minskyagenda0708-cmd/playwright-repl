@@ -12,8 +12,5 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
     "vitest": "^4.0.18"
-  },
-  "dependencies": {
-    "playwright": "^1.59.0-alpha-1771104257000"
   }
 }

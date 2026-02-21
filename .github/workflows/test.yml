@@ -28,17 +28,10 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Install Playwright Chromium (panel tests)
+      - name: Install Playwright Chromium
         run: npx playwright install chromium
         working-directory: packages/extension
 
-      - name: Install Playwright Chromium (command tests)
-        run: node node_modules/playwright/cli.js install chromium
-
-      - name: Run extension panel tests
-        run: npx playwright test --project=panel
-        working-directory: packages/extension
-
-      - name: Run command integration tests
-        run: npx playwright test --project=commands
+      - name: Run E2E tests
+        run: npx playwright test
         working-directory: packages/extension
