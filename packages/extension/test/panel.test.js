@@ -57,10 +57,18 @@ describe("panel.js", () => {
     // Mock window.matchMedia for theme detection
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
 
-    // Mock fetch — default to successful response
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ text: "OK", isError: false }),
+    // Mock fetch — route-aware: /health returns version, /run returns command result
+    global.fetch = vi.fn((url) => {
+      if (url && url.includes("/health")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: "ok", version: "1.0.0" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ text: "OK", isError: false }),
+      });
     });
   });
 
@@ -176,7 +184,7 @@ describe("panel.js", () => {
         expect.stringContaining("/run"),
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ raw: "click e5" }),
+          body: JSON.stringify({ raw: "click e5", activeTabUrl: null }),
         })
       );
     });
@@ -210,9 +218,21 @@ describe("panel.js", () => {
   // --- Response display ---
 
   it("displays success response in output", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ text: "Navigated", isError: false }),
+    global.fetch = vi.fn((url) => {
+      if (url && url.includes("/health")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: "ok", version: "1.0.0" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            text: "Navigated\n### Page\n- Page URL: https://example.com",
+            isError: false,
+          }),
+      });
     });
     await import("../panel/panel.js");
     const input = document.getElementById("command-input");
@@ -270,13 +290,22 @@ describe("panel.js", () => {
   });
 
   it("displays screenshot as image in output", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          text: "data:image/png;base64,fakebase64",
-          isError: false,
-        }),
+    global.fetch = vi.fn((url) => {
+      if (url && url.includes("/health")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: "ok", version: "1.0.0" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            text: "Screenshot saved\n### Page\n- Page URL: https://example.com",
+            image: "data:image/png;base64,fakebase64",
+            isError: false,
+          }),
+      });
     });
     await import("../panel/panel.js");
     const input = document.getElementById("command-input");
@@ -565,7 +594,7 @@ describe("panel.js", () => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/run"),
         expect.objectContaining({
-          body: JSON.stringify({ raw: "goto https://example.com" }),
+          body: JSON.stringify({ raw: "goto https://example.com", activeTabUrl: null }),
         })
       );
     });
