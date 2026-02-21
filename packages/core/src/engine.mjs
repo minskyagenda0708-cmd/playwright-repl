@@ -144,16 +144,22 @@ export class Engine {
       await this._backend.initialize?.(clientInfo);
       this._connected = true;
 
-      // 5. Auto-select the active (visible) tab so commands target what the user sees.
+      // 5. Auto-select the first visible web page.
       const pages = browserContext.pages();
+      const INTERNAL = /^(chrome|devtools|chrome-extension|about):/;
+      let selectedIdx = -1;
       for (let i = 0; i < pages.length; i++) {
+        const pageUrl = pages[i].url();
+        if (!pageUrl || INTERNAL.test(pageUrl)) continue;
         try {
           const state = await pages[i].evaluate(() => document.visibilityState);
-          if (state === 'visible' && i > 0) {
-            await this._backend.callTool('browser_tabs', { action: 'select', index: i });
-            break;
+          if (state === 'visible' && selectedIdx === -1) {
+            selectedIdx = i;
           }
         } catch {}
+      }
+      if (selectedIdx > 0) {
+        await this._backend.callTool('browser_tabs', { action: 'select', index: selectedIdx });
       }
 
       console.log('Ready! Side panel can send commands.');
@@ -210,14 +216,20 @@ export class Engine {
 
   /**
    * Select the Playwright page matching the given URL.
-   * Uses browserContext.pages() directly — no text parsing.
+   * Uses backend.callTool('browser_tabs') to properly update the tab tracker.
    */
   async selectPageByUrl(targetUrl) {
-    if (!this._browserContext || !this._backend) return;
+    if (!this._browserContext || !this._backend || !targetUrl) return;
     const pages = this._browserContext.pages();
-    const page = pages.find(p => p.url() === targetUrl);
-    if (page) {
-      await page.bringToFront();
+    const normalize = (u) => u.replace(/\/+$/, '');
+    const target = normalize(targetUrl);
+    for (let i = 0; i < pages.length; i++) {
+      if (normalize(pages[i].url()) === target) {
+        try {
+          await this._backend.callTool('browser_tabs', { action: 'select', index: i });
+        } catch {}
+        return;
+      }
     }
   }
 
@@ -263,7 +275,7 @@ export class Engine {
       network: {},
       timeouts: {
         action: opts.extension ? 30000 : 5000,
-        navigation: 60000,
+        navigation: opts.extension ? 15000 : 60000,
       },
     };
 

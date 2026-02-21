@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**"],
     coverage: {
       provider: "v8",
-      include: ["lib/**/*.js", "panel/**/*.js", "background.js"],
+      include: ["lib/**/*.js", "panel/**/*.js", "content/**/*.js", "background.js"],
       reporter: ["text", "html"],
     },
   },

@@ -883,10 +883,50 @@ copyBtn.addEventListener("click", () => {
 
 consoleClearBtn.addEventListener("click", clearConsole);
 
-// --- Record button (deferred — recording not yet supported in v3) ---
+// --- Record button ---
 
-recordBtn.disabled = true;
-recordBtn.title = "Recording not available in side panel mode";
+let isRecording = false;
+
+recordBtn.addEventListener("click", async () => {
+  if (isRecording) {
+    // Stop recording
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      chrome.runtime.sendMessage({ type: "pw-record-stop", tabId: tab.id });
+    }
+    recordBtn.classList.remove("recording");
+    recordBtn.textContent = "Record";
+    recordBtn.title = "Start recording user interactions";
+    isRecording = false;
+    addInfo("Recording stopped");
+  } else {
+    // Start recording
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      addError("No active tab found");
+      return;
+    }
+    const result = await chrome.runtime.sendMessage({ type: "pw-record-start", tabId: tab.id });
+    if (result && !result.ok) {
+      addError("Recording failed: " + (result.error || "unknown error"));
+      return;
+    }
+    recordBtn.classList.add("recording");
+    recordBtn.textContent = "Stop";
+    recordBtn.title = "Stop recording";
+    isRecording = true;
+    addInfo("Recording on " + (tab.title || tab.url));
+  }
+});
+
+// --- Receive recorded commands from content script ---
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "pw-recorded-command" && msg.command) {
+    addCommand(msg.command);
+    appendToEditor(msg.command);
+  }
+});
 
 // --- Draggable splitter ---
 

@@ -127,9 +127,9 @@ describe("panel.js", () => {
     expect(document.getElementById("open-btn").disabled).toBe(false);
   });
 
-  it("record button is disabled in side panel mode", async () => {
+  it("record button is enabled", async () => {
     await import("../panel/panel.js");
-    expect(document.getElementById("record-btn").disabled).toBe(true);
+    expect(document.getElementById("record-btn").disabled).toBe(false);
   });
 
   // --- Theme ---

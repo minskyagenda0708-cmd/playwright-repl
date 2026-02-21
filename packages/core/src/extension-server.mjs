@@ -76,7 +76,7 @@ export class CommandServer {
 
         // Auto-select the tab matching the panel's active tab.
         if (activeTabUrl) {
-          await this._engine.selectPageByUrl(activeTabUrl);
+          await withTimeout(this._engine.selectPageByUrl(activeTabUrl), 5000).catch(() => {});
         }
 
         let args = parseInput(raw);
@@ -86,7 +86,7 @@ export class CommandServer {
           return;
         }
         args = resolveArgs(args);
-        const result = await this._engine.run(args);
+        const result = await withTimeout(this._engine.run(args), 30000);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (e) {
@@ -147,6 +147,16 @@ function resolveArgs(args) {
     else args = buildRunCode(fn, textArg);
   }
 
+  // ── go-back / go-forward → evaluate history.back/forward ──
+  // Playwright's page.goBack() waits for load which can hang with bfcache in CDP mode.
+  // Use history API directly — the user sees the browser live, no need to wait.
+  if (cmdName === 'go-back') {
+    args = { _: ['run-code', 'async (page) => { await page.evaluate(() => history.back()); return "Navigated back"; }'] };
+  }
+  if (cmdName === 'go-forward') {
+    args = { _: ['run-code', 'async (page) => { await page.evaluate(() => history.forward()); return "Navigated forward"; }'] };
+  }
+
   // ── Auto-wrap run-code body with async (page) => { ... } ──
   if (cmdName === 'run-code' && args._[1] && !args._[1].startsWith('async')) {
     const STMT = /^(await|return|const|let|var|for|if|while|throw|try)\b/;
@@ -167,4 +177,14 @@ function readBody(req) {
     req.on('data', (chunk) => data += chunk);
     req.on('end', () => resolve(data));
   });
+}
+
+function withTimeout(promise, ms) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Command timed out after ${ms / 1000}s`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }

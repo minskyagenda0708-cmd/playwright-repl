@@ -6,7 +6,9 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "scripting",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
