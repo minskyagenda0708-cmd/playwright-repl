@@ -110,8 +110,8 @@ test('clear empties the output', async ({ panelPage }) => {
   await input.fill('clear');
   await input.press('Enter');
 
-  const lines = panelPage.locator('#output .line');
-  expect(await lines.count()).toBe(0);
+  // Wait for the output to be cleared
+  await expect(panelPage.locator('#output .line')).toHaveCount(0);
 });
 
 test('comments display without server call', async ({ panelPage }) => {
