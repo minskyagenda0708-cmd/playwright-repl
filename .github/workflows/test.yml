@@ -28,6 +28,14 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Lint extension
+        run: npm run lint
+        working-directory: packages/extension
+
+      - name: Build extension
+        run: npm run build
+        working-directory: packages/extension
+
       - name: Install Playwright Chromium
         run: npx playwright install chromium
         working-directory: packages/extension

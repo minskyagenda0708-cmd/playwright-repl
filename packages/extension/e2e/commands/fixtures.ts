@@ -6,10 +6,19 @@
  */
 
 import { test as base } from '@playwright/test';
+// @ts-expect-error — core package has no .d.ts; typed via EngineContext below
 import { Engine } from '../../../core/src/engine.mjs';
+// @ts-expect-error — core package has no .d.ts; typed via EngineContext below
 import { CommandServer } from '../../../core/src/extension-server.mjs';
 
-export const test = base.extend({
+type EngineContext = { engine: Engine; server: CommandServer; port: number };
+type RunResult = { text: string; isError: boolean; image?: string };
+type RunFn = (command: string) => Promise<RunResult>;
+
+export const test = base.extend<
+  { run: RunFn },
+  { engineContext: EngineContext }
+>({
   // Worker-scoped: one Engine + CommandServer per worker
   engineContext: [async ({}, use) => {
     const engine = new Engine();
@@ -28,7 +37,7 @@ export const test = base.extend({
   run: async ({ engineContext }, use) => {
     const { port } = engineContext;
 
-    const run = async (command) => {
+    const run = async (command: string): Promise<RunResult> => {
       const res = await fetch(`http://localhost:${port}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
