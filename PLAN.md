@@ -81,21 +81,22 @@ The foundation — a persistent REPL connected to the Playwright MCP daemon.
 - [ ] **#16 Chaining selectors** — support combining locators (e.g., `click "Delete" "Buy groceries"`)
 - [ ] **#15 Add `clear` command** — clear the REPL console
 - [ ] **#14 Add `highlight` command** — visually highlight elements on the page
-- [ ] **#5 Convert to Playwright tests** — export `.pw` files as Playwright TypeScript test suites
 - [ ] **#4 CSV/Excel/Markdown export** — save session data in tabular formats
 
-### CI/CD
+### Done (moved from backlog)
 
-- [ ] **Reuse test workflow in release** — make `test.yml` callable via `workflow_call` so `release.yml` reuses it instead of duplicating steps (adds E2E tests + linting to release pipeline)
+- [x] **#5 Convert to Playwright tests** — export `.pw` files as Playwright TypeScript tests (v0.5 extension export)
+- [x] **Reuse test workflow in release** — `test.yml` callable via `workflow_call`, `release.yml` uses it (v0.6)
+- [x] **CLI replay regression tests** — multi-file `--replay` with pass/fail reporting and log file (v0.6)
 
 ### Future Ideas
 
+- [ ] Convert extension command E2E tests (Playwright Test) to vitest integration tests — they only use HTTP fetch, no browser UI
+- [ ] Migrate extension panel to React (replace vanilla DOM manipulation in panel.ts with React components)
 - [ ] Replace custom recorder with Playwright's recording infrastructure (battle-tested locator generation)
 - [ ] Variable substitution in .pw files (e.g., `${URL}`, `${USER}`)
 - [ ] CLI strict mode violation hint — suggest `--nth` when multiple elements match
-- [ ] CLI replay regression tests — run `.pw` folders as test suites with pass/fail reporting
 - [ ] Add missing commands: keydown, keyup, mousemove, mousedown, mouseup, mousewheel, tracing, video
-- [ ] npx support (`npx playwright-repl`)
 - [ ] Config file support (.playwright-repl.json)
 - [ ] Plugin system for custom commands
 
