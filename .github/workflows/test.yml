@@ -37,8 +37,11 @@ jobs:
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium
-        working-directory: packages/extension
 
-      - name: Run E2E tests
+      - name: Run CLI E2E tests
+        run: node dist/playwright-repl.js --replay examples/ --silent
+        working-directory: packages/cli
+
+      - name: Run extension E2E tests
         run: npx playwright test
         working-directory: packages/extension

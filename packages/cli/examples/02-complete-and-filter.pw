@@ -19,3 +19,6 @@ click "All"
 click "Clear completed"
 verify-text "Write tests"
 verify-text "Deploy to production"
+
+# Cleanup
+localstorage-clear

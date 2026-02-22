@@ -11,3 +11,6 @@ check "Buy groceries"
 verify-text "1 item left"
 click "Clear completed"
 verify-text "Write tests"
+
+# Cleanup
+localstorage-clear

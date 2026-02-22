@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.6.0 — Multi-file Replay & Log Reports
+
+**2026-02-22**
+
+### Features
+
+- **Multi-file replay**: `--replay` now accepts multiple files and/or folders. Files run sequentially in a shared browser session; on failure, continues to the next file and reports a summary at the end.
+  ```bash
+  playwright-repl --replay examples/             # all .pw files in folder
+  playwright-repl --replay a.pw b.pw c.pw        # specific files
+  playwright-repl --replay examples/ extra.pw    # mix folders and files
+  ```
+- **Replay log file**: Every multi-file replay writes a `replay-<timestamp>.log` with per-command OK/FAIL results and a summary. The log file is the test report.
+- **Error tracking**: `isError` results from the engine (e.g., `verify-text` failures) are now correctly counted. Previously only thrown exceptions were tracked.
+
+### Examples
+
+- Added `localstorage-clear` cleanup to all TodoMVC examples (01–06) so they work in multi-file replay without state leaking between files.
+- New `07-test-click-nth.pw` — tests `--nth` disambiguation on playwright.dev.
+- New `08-localstorage.pw` — tests `localstorage-list`, `localstorage-clear`, and `reload` to verify storage commands work correctly.
+
+### CI
+
+- Added CLI E2E step to GitHub Actions: runs `playwright-repl --replay examples/` alongside unit tests.
+
+### Tests
+
+- 9 new unit tests for `resolveReplayFiles` and `runMultiReplayMode` (157 CLI tests total).
+- 399 total tests across all packages (157 CLI + 82 core + 160 extension).
+
+---
+
 ## v0.5.0 — Extension Mode & TypeScript
 
 **2026-02-22**

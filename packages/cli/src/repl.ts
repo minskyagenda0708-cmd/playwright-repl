@@ -22,7 +22,7 @@ import type { CompletionItem } from '@playwright-repl/core';
 
 export interface ReplOpts extends EngineOpts {
   session?: string;
-  replay?: string;
+  replay?: string[];
   record?: string;
   step?: boolean;
   silent?: boolean;
@@ -36,6 +36,7 @@ export interface ReplContext {
   log: (...args: unknown[]) => void;
   historyFile: string;
   commandCount: number;
+  errors: number;
 }
 
 // ─── Response filtering ─────────────────────────────────────────────────────
@@ -314,6 +315,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
       const filtered = filterResponse(result.text, cmdName);
       if (filtered !== null) console.log(filtered);
     }
+    if (result?.isError) ctx.errors++;
     ctx.commandCount++;
     ctx.session.record(line);
 
@@ -321,6 +323,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
       ctx.log(`${c.dim}(${elapsed}ms)${c.reset}`);
     }
   } catch (err: unknown) {
+    ctx.errors++;
     console.error(`${c.red}Error:${c.reset} ${(err as Error).message}`);
     if (!ctx.conn.connected) {
       console.log(`${c.yellow}Browser disconnected. Trying to restart...${c.reset}`);
@@ -332,6 +335,24 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
       }
     }
   }
+}
+
+// ─── Resolve replay targets (files and folders → .pw file list) ──────────────
+
+export function resolveReplayFiles(targets: string[]): string[] {
+  const files: string[] = [];
+  for (const target of targets) {
+    if (fs.statSync(target).isDirectory()) {
+      const entries = fs.readdirSync(target)
+        .filter(f => f.endsWith('.pw'))
+        .sort()
+        .map(f => path.join(target, f));
+      files.push(...entries);
+    } else {
+      files.push(target);
+    }
+  }
+  return files;
 }
 
 // ─── Replay mode (non-interactive, --replay flag) ───────────────────────────
@@ -364,6 +385,109 @@ export async function runReplayMode(ctx: ReplContext, replayFile: string, step: 
     ctx.conn.close();
     process.exit(1);
   }
+}
+
+// ─── Multi-file replay mode (--replay with multiple files/folders) ───────────
+
+interface FileResult {
+  file: string;
+  passed: boolean;
+  commands: number;
+  error?: string;
+}
+
+export async function runMultiReplayMode(ctx: ReplContext, targets: string[], step: boolean): Promise<void> {
+  const files = resolveReplayFiles(targets);
+  if (files.length === 0) {
+    console.error(`${c.red}Error:${c.reset} No .pw files found`);
+    ctx.conn.close();
+    process.exit(1);
+  }
+
+  // Single file → delegate to existing replay mode
+  if (files.length === 1) {
+    return runReplayMode(ctx, files[0], step);
+  }
+
+  const logFile = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+  const logLines: string[] = [];
+  const log = (line: string) => logLines.push(line);
+
+  console.log(`${c.blue}▶${c.reset} Running ${c.bold}${files.length}${c.reset} files\n`);
+  log(`Replay started ${new Date().toISOString()}`);
+  log(`Files: ${files.length}\n`);
+
+  const results: FileResult[] = [];
+
+  for (const file of files) {
+    const basename = path.basename(file);
+    log(`=== ${basename} ===`);
+    console.log(`${c.blue}▶${c.reset} ${c.bold}${basename}${c.reset}`);
+
+    let passed = true;
+    let commandsRun = 0;
+    let errorMsg: string | undefined;
+
+    try {
+      const player = ctx.session.startReplay(file, step);
+      const total = player.commands.length;
+
+      while (!player.done) {
+        const cmd = player.next()!;
+        commandsRun++;
+        const errsBefore = ctx.errors;
+
+        log(`[${commandsRun}/${total}] ${cmd}`);
+        console.log(`  ${c.dim}[${commandsRun}/${total}]${c.reset} ${cmd}`);
+        await processLine(ctx, cmd);
+
+        if (ctx.errors > errsBefore) {
+          passed = false;
+          errorMsg = `failed at command ${commandsRun}/${total}: ${cmd}`;
+          log(`  FAIL`);
+          break;
+        }
+        log(`  OK`);
+      }
+      ctx.session.endReplay();
+    } catch (err: unknown) {
+      passed = false;
+      errorMsg = (err as Error).message;
+      log(`  FAIL: ${errorMsg}`);
+      try { ctx.session.endReplay(); } catch { /* ignore */ }
+    }
+
+    const status = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
+    log(passed ? `PASS ${basename} (${commandsRun} commands)` : `FAIL ${basename} (${errorMsg})`);
+    console.log(`  ${status} ${basename}\n`);
+    log('');
+
+    results.push({ file: basename, passed, commands: commandsRun, error: errorMsg });
+  }
+
+  // Summary
+  const passCount = results.filter(r => r.passed).length;
+  const failCount = results.filter(r => !r.passed).length;
+
+  log(`=== Summary ===`);
+  console.log(`${c.bold}─── Results ───${c.reset}`);
+  for (const r of results) {
+    const icon = r.passed ? `${c.green}✓${c.reset}` : `${c.red}✗${c.reset}`;
+    const suffix = r.error ? ` — ${r.error}` : '';
+    console.log(`  ${icon} ${r.file}${suffix}`);
+    log(`${r.passed ? 'PASS' : 'FAIL'} ${r.file}${r.error ? ` — ${r.error}` : ''}`);
+  }
+
+  const summary = `\n${passCount} passed, ${failCount} failed (${results.length} total)`;
+  console.log(summary);
+  log(summary);
+
+  // Write log file
+  fs.writeFileSync(logFile, logLines.join('\n') + '\n', 'utf-8');
+  console.log(`${c.dim}Log: ${logFile}${c.reset}`);
+
+  ctx.conn.close();
+  process.exit(failCount > 0 ? 1 : 0);
 }
 
 // ─── Command loop (interactive) ─────────────────────────────────────────────
@@ -555,7 +679,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   const session = new SessionManager();
   const historyDir = path.join(os.homedir(), '.playwright-repl');
   const historyFile = path.join(historyDir, '.repl-history');
-  const ctx: ReplContext = { conn, session, rl: null, opts, log, historyFile, commandCount: 0 };
+  const ctx: ReplContext = { conn, session, rl: null, opts, log, historyFile, commandCount: 0, errors: 0 };
 
   // Auto-start recording if --record was passed
   if (opts.record) {
@@ -580,8 +704,8 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   // ─── Start ───────────────────────────────────────────────────────
 
-  if (opts.replay) {
-    await runReplayMode(ctx, opts.replay, opts.step || false);
+  if (opts.replay && opts.replay.length > 0) {
+    await runMultiReplayMode(ctx, opts.replay, opts.step || false);
   } else {
     startCommandLoop(ctx);
   }

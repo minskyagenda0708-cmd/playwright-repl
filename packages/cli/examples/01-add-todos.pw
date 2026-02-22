@@ -12,3 +12,6 @@ verify-text "Buy groceries"
 verify-text "Write tests"
 verify-text "Deploy to production"
 verify-text "3 items left"
+
+# Cleanup
+localstorage-clear

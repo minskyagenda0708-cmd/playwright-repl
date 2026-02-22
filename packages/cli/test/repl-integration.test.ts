@@ -15,6 +15,8 @@ import {
   handleClose,
   startCommandLoop,
   runReplayMode,
+  resolveReplayFiles,
+  runMultiReplayMode,
 } from '../src/repl.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ function makeCtx(overrides = {}) {
     log: vi.fn(),
     historyFile: path.join(os.tmpdir(), 'pw-test-history-' + Date.now()),
     commandCount: 0,
+    errors: 0,
     ...overrides,
   };
 }
@@ -335,5 +338,154 @@ describe('runReplayMode', () => {
 
     await runReplayMode(ctx, filePath, false);
     expect(modesDuringReplay).toContain('replaying');
+  });
+});
+
+// ─── resolveReplayFiles ────────────────────────────────────────────────────
+
+describe('resolveReplayFiles', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-resolve-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns single file as-is', () => {
+    const file = path.join(tmpDir, 'test.pw');
+    fs.writeFileSync(file, 'snapshot\n');
+    expect(resolveReplayFiles([file])).toEqual([file]);
+  });
+
+  it('expands directory to sorted .pw files', () => {
+    fs.writeFileSync(path.join(tmpDir, '02-b.pw'), 'click e5\n');
+    fs.writeFileSync(path.join(tmpDir, '01-a.pw'), 'snapshot\n');
+    fs.writeFileSync(path.join(tmpDir, 'readme.txt'), 'not a pw file\n');
+
+    const result = resolveReplayFiles([tmpDir]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toContain('01-a.pw');
+    expect(result[1]).toContain('02-b.pw');
+  });
+
+  it('handles mix of files and directories', () => {
+    const file = path.join(tmpDir, 'extra.pw');
+    fs.writeFileSync(file, 'snapshot\n');
+    const subdir = path.join(tmpDir, 'sub');
+    fs.mkdirSync(subdir);
+    fs.writeFileSync(path.join(subdir, 'test.pw'), 'click e5\n');
+
+    const result = resolveReplayFiles([file, subdir]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe(file);
+    expect(result[1]).toContain('test.pw');
+  });
+
+  it('returns empty array for directory with no .pw files', () => {
+    expect(resolveReplayFiles([tmpDir])).toEqual([]);
+  });
+});
+
+// ─── runMultiReplayMode ────────────────────────────────────────────────────
+
+describe('runMultiReplayMode', () => {
+  let tmpDir, logSpy, errorSpy, exitSpy;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-multi-'));
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    // Clean up any replay log files
+    for (const f of fs.readdirSync(process.cwd())) {
+      if (f.startsWith('replay-') && f.endsWith('.log')) {
+        fs.unlinkSync(f);
+      }
+    }
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it('delegates to runReplayMode for single file', async () => {
+    const file = path.join(tmpDir, 'test.pw');
+    fs.writeFileSync(file, 'snapshot\n');
+
+    const ctx = makeCtx();
+    await runMultiReplayMode(ctx, [file], false);
+
+    expect(ctx.conn.run).toHaveBeenCalledTimes(1);
+    expect(logSpy.mock.calls.map(c => c.join(' ')).join('\n')).toContain('Replay complete');
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('runs multiple files and reports pass/fail', async () => {
+    fs.writeFileSync(path.join(tmpDir, '01.pw'), 'snapshot\n');
+    fs.writeFileSync(path.join(tmpDir, '02.pw'), 'click e5\n');
+
+    const ctx = makeCtx();
+    await runMultiReplayMode(ctx, [tmpDir], false);
+
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('2 passed');
+    expect(output).toContain('Results');
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('detects errors and marks file as failed', async () => {
+    fs.writeFileSync(path.join(tmpDir, '01.pw'), 'snapshot\n');
+    fs.writeFileSync(path.join(tmpDir, '02.pw'), 'snapshot\n');
+
+    const ctx = makeCtx();
+    let callCount = 0;
+    ctx.conn.run = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 2) return { text: '### Error\nfailed', isError: true };
+      return { text: '### Result\nOK' };
+    });
+
+    await runMultiReplayMode(ctx, [tmpDir], false);
+
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('1 passed');
+    expect(output).toContain('1 failed');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('writes a log file', async () => {
+    fs.writeFileSync(path.join(tmpDir, '01.pw'), 'snapshot\n');
+    fs.writeFileSync(path.join(tmpDir, '02.pw'), 'click e5\n');
+
+    const ctx = makeCtx();
+    await runMultiReplayMode(ctx, [tmpDir], false);
+
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('Log:');
+
+    // Find the log file
+    const logFiles = fs.readdirSync(process.cwd()).filter(f => f.startsWith('replay-') && f.endsWith('.log'));
+    expect(logFiles.length).toBeGreaterThan(0);
+
+    const logContent = fs.readFileSync(logFiles[0], 'utf-8');
+    expect(logContent).toContain('Summary');
+    expect(logContent).toContain('PASS');
+  });
+
+  it('exits with 1 when no .pw files found', async () => {
+    const emptyDir = path.join(tmpDir, 'empty');
+    fs.mkdirSync(emptyDir);
+
+    const ctx = makeCtx();
+    await runMultiReplayMode(ctx, [emptyDir], false);
+
+    expect(errorSpy).toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

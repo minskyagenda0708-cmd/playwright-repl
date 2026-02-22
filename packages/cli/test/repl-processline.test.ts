@@ -29,6 +29,7 @@ function makeCtx(overrides = {}) {
     log: vi.fn(),
     historyFile: '/tmp/test-history',
     commandCount: 0,
+    errors: 0,
     ...overrides,
   };
 }

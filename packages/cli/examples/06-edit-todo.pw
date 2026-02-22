@@ -9,3 +9,6 @@ press Control+a
 type "Buy organic groceries"
 press Enter
 verify-text "Buy organic groceries"
+
+# Cleanup
+localstorage-clear

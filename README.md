@@ -117,6 +117,12 @@ playwright-repl [options]
 # Replay a recorded session
 playwright-repl --replay session.pw
 
+# Replay all .pw files in a folder
+playwright-repl --replay examples/
+
+# Replay multiple files
+playwright-repl --replay a.pw b.pw c.pw
+
 # Step through replay (pause between commands)
 playwright-repl --replay session.pw --step
 
@@ -147,7 +153,7 @@ playwright-repl --extension --port 4000  # custom command server port
 | `--extension` | Launch Chrome with side panel extension and command server |
 | `--port <number>` | Command server port (default: `3000`) |
 | `--config <file>` | Path to config file |
-| `--replay <file>` | Replay a `.pw` session file |
+| `--replay <files...>` | Replay `.pw` file(s) or folder(s) |
 | `--record <file>` | Start REPL with recording to file |
 | `--step` | Pause between commands during replay |
 | `-q, --silent` | Suppress banner and status messages |
@@ -305,9 +311,14 @@ playwright-repl --replay my-test.pw
 # Step-through (press Enter between commands)
 playwright-repl --replay my-test.pw --step --headed
 
+# Replay all .pw files in a folder (multi-file mode)
+playwright-repl --replay examples/ --silent
+
 # Or inside the REPL
 pw> .replay my-test.pw
 ```
+
+Multi-file replay runs all files sequentially, writes a `replay-<timestamp>.log` with per-command results, and prints a pass/fail summary. Exit code 0 if all pass, 1 if any fail.
 
 #### File Format
 
@@ -420,7 +431,7 @@ playwright-repl --connect 9222
 
 ## Examples
 
-All examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and can be run directly:
+Examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and [playwright.dev](https://playwright.dev/). All can be run directly or together via multi-file replay:
 
 | File | Description |
 |------|-------------|
@@ -430,6 +441,8 @@ All examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and ca
 | [04-replay-session.pw](packages/cli/examples/04-replay-session.pw) | Replay with step-through |
 | [05-ci-pipe.pw](packages/cli/examples/05-ci-pipe.pw) | CI smoke test |
 | [06-edit-todo.pw](packages/cli/examples/06-edit-todo.pw) | Double-click to edit a todo |
+| [07-test-click-nth.pw](packages/cli/examples/07-test-click-nth.pw) | `--nth` disambiguation on playwright.dev |
+| [08-localstorage.pw](packages/cli/examples/08-localstorage.pw) | localStorage commands: list, clear, reload |
 
 Try one:
 
@@ -442,6 +455,9 @@ playwright-repl --replay packages/cli/examples/04-replay-session.pw --step --hea
 
 # Run as a CI smoke test (headless, silent)
 playwright-repl --replay packages/cli/examples/05-ci-pipe.pw --silent
+
+# Run all examples (multi-file replay with log report)
+playwright-repl --replay packages/cli/examples/ --silent
 ```
 
 ## Monorepo Structure

@@ -7,6 +7,8 @@
  *   playwright-repl [options]
  *   playwright-repl --replay session.pw
  *   playwright-repl --replay session.pw --step
+ *   playwright-repl --replay file1.pw file2.pw
+ *   playwright-repl --replay examples/
  *   playwright-repl --record my-test.pw
  */
 
@@ -43,7 +45,7 @@ Options:
   --port <number>        Extension server port (default: 6781)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --config <file>        Path to config file
-  --replay <file>        Replay a .pw session file
+  --replay <files...>   Replay .pw file(s) or folder(s)
   --record <file>        Start REPL with recording to file
   --step                 Pause between commands during replay
   -q, --silent           Suppress banner and status messages
@@ -72,9 +74,18 @@ Examples:
   playwright-repl --extension --cdp-port 9333  # custom CDP port
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
+  playwright-repl --replay tests/         # replay all .pw files in folder
+  playwright-repl --replay a.pw b.pw      # replay multiple files
   echo "open https://example.com" | playwright-repl  # pipe commands
 `);
   process.exit(0);
+}
+
+// Collect replay targets: --replay value + any remaining positional args
+const replayFiles: string[] = [];
+if (args.replay) {
+  replayFiles.push(args.replay as string);
+  for (const a of args._ as string[]) replayFiles.push(String(a));
 }
 
 startRepl({
@@ -89,7 +100,7 @@ startRepl({
   port: args.port ? parseInt(args.port as string, 10) : undefined,
   cdpPort: args['cdp-port'] ? parseInt(args['cdp-port'] as string, 10) : undefined,
   config: args.config as string,
-  replay: args.replay as string,
+  replay: replayFiles.length > 0 ? replayFiles : undefined,
   record: args.record as string,
   step: args.step as boolean,
   silent: args.silent as boolean,

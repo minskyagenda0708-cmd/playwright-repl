@@ -84,6 +84,10 @@ The foundation — a persistent REPL connected to the Playwright MCP daemon.
 - [ ] **#5 Convert to Playwright tests** — export `.pw` files as Playwright TypeScript test suites
 - [ ] **#4 CSV/Excel/Markdown export** — save session data in tabular formats
 
+### CI/CD
+
+- [ ] **Reuse test workflow in release** — make `test.yml` callable via `workflow_call` so `release.yml` reuses it instead of duplicating steps (adds E2E tests + linting to release pipeline)
+
 ### Future Ideas
 
 - [ ] Replace custom recorder with Playwright's recording infrastructure (battle-tested locator generation)
