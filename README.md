@@ -23,37 +23,54 @@ Key features:
 
 ## Architecture
 
-Both CLI and Extension are frontends to the Engine. Neither directly accesses Chrome.
+The CLI and Extension use different execution paths.
 
+**CLI** — commands execute in-process via the Engine:
 ```
-┌──────────────┐     ┌───────────────────────┐
-│   CLI (REPL) │     │       Extension        │
-│  packages/cli│     │  (Side Panel / Popup)  │
-└──────┬───────┘     └──────────┬─────────────┘
-       │                        │ fetch POST /run
-       │                        ▼
-       │              ┌─────────────────┐
-       └──────────────►     Engine      │
-                      │  (in-process)   │
-                      └──────┬──────────┘
-                             │ CDP
-                             ▼
-                      ┌─────────────┐
-                      │   Chrome    │
-                      └─────────────┘
+┌──────────────┐
+│   CLI (REPL) │
+│  packages/cli│
+└──────┬───────┘
+       │
+       ▼
+┌─────────────────┐
+│     Engine      │  (BrowserServerBackend in-process)
+└──────┬──────────┘
+       │ CDP
+       ▼
+┌─────────────┐
+│   Chrome    │
+└─────────────┘
 ```
 
-### Three Connection Modes
+**Extension** — commands execute in the service worker via `playwright-crx`:
+```
+┌─────────────────────────┐
+│  Extension (Side Panel) │
+│  chrome.runtime.sendMessage({ type: 'run', command })
+└────────────┬────────────┘
+             │
+             ▼
+┌──────────────────────────────┐
+│  background.ts               │
+│  (playwright-crx service worker)
+│  crxApp.attach(tabId)        │
+└────────────┬─────────────────┘
+             │ chrome.debugger API (CDP)
+             ▼
+┌─────────────┐
+│   Chrome    │
+└─────────────┘
+```
+
+The extension is **self-contained** — no external server or CLI process is required.
+
+### CLI Connection Modes
 
 | Mode | Flag | Browser Source | Use Case |
 |------|------|---------------|----------|
 | **Launch** | `--headed` (default) | Launches new Chromium via Playwright | General automation |
 | **Connect** | `--connect [port]` | Existing Chrome with `--remote-debugging-port` | Debug running app |
-| **Extension** | `--extension` | Chrome launched with CDP port; side panel sends commands via HTTP | DevTools panel REPL |
-
-### Extension Mode
-
-The extension is a Chrome side panel. The CLI starts Chrome with `--remote-debugging-port`, and the Engine connects directly via CDP. The panel sends commands to a local CommandServer (`POST /run`), which routes them through the Engine.
 
 ## Quick Start — CLI
 
@@ -84,14 +101,21 @@ pw> verify-text "1 item left"
 
 ## Quick Start — Extension
 
+The extension works without any external server. Just load it in Chrome:
+
 ```bash
-# 1. Start in extension mode (launches Chrome with extension loaded)
-playwright-repl --extension
+# Build the extension
+cd packages/extension && npm run build
 
-# 2. Click the extension icon to open the "Playwright REPL" side panel
-
-# 3. Type commands in the panel — same syntax as CLI
+# Load in Chrome: chrome://extensions → Enable Developer mode → Load unpacked → select packages/extension/dist/
 ```
+
+Or install from the Chrome Web Store (coming soon).
+
+Once loaded:
+1. Click the extension icon to open the **Playwright REPL** side panel
+2. The panel auto-attaches to the active tab — the status dot turns green
+3. Type commands in the panel — same syntax as CLI
 
 The extension panel includes a REPL input, script editor, visual recorder, and export to Playwright tests.
 
@@ -138,9 +162,6 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 playwright-repl --connect         # default port 9222
 playwright-repl --connect 9333    # custom port
 
-# Extension mode (launches Chrome with side panel)
-playwright-repl --extension              # default port 6781
-playwright-repl --extension --port 4000  # custom command server port
 ```
 
 ### CLI Options
@@ -152,8 +173,8 @@ playwright-repl --extension --port 4000  # custom command server port
 | `--persistent` | Use persistent browser profile |
 | `--profile <dir>` | Persistent profile directory |
 | `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
-| `--extension` | Launch Chrome with side panel extension and command server |
-| `--port <number>` | Command server port (default: `6781`) |
+| `--extension` | Launch Chrome with side panel extension and HTTP command server (legacy) |
+| `--port <number>` | Command server port for `--extension` mode (default: `6781`) |
 | `--config <file>` | Path to config file |
 | `--replay <files...>` | Replay `.pw` file(s) or folder(s) |
 | `--record <file>` | Start REPL with recording to file |
@@ -402,13 +423,14 @@ The panel UI is the same in both modes:
 
 ### Recording in Extension
 
-Click the Record button in the toolbar, then interact with the page normally. The recorder captures:
+Click the **Record** button in the toolbar, then interact with the page normally. The recorder uses playwright-crx's built-in CDP recorder to capture:
 
-- **Clicks** — with text locators and context (e.g., `click "Delete" "Buy groceries"`)
-- **Form input** — debounced fill commands (e.g., `fill "Email" "test@example.com"`)
-- **Selections** — dropdown changes (e.g., `select "Country" "United States"`)
-- **Checkboxes** — check/uncheck with label context
+- **Navigation** — `goto` commands on page load
+- **Clicks** — with text and ARIA role locators
+- **Form input** — fill commands
 - **Key presses** — Enter, Tab, Escape
+
+Recorded commands appear in the script editor in real time. Click **Stop** when done.
 
 ### Export to Playwright
 
@@ -472,7 +494,7 @@ packages/
 ├── core/           # Engine + shared utilities (TypeScript, tsc)
 │   └── src/
 │       ├── engine.ts             # Wraps BrowserServerBackend in-process
-│       ├── extension-server.ts   # HTTP server for extension commands
+│       ├── extension-server.ts   # HTTP server (CLI --extension mode)
 │       ├── parser.ts             # Command parsing and alias resolution
 │       ├── page-scripts.ts       # Text locator and assertion helpers
 │       ├── completion-data.ts    # Ghost completion items
@@ -486,20 +508,20 @@ packages/
 │       └── index.ts              # Public API exports
 └── extension/      # Chrome side panel extension (React, Vite, Tailwind)
     ├── src/
-    │   ├── background.ts         # Side panel behavior + recording handlers
+    │   ├── background.ts         # Service worker — playwright-crx command execution + recording
+    │   ├── commands.ts           # Keyword → Playwright function mapping
+    │   ├── page-scripts.ts       # Text locator and assertion helpers (extension)
     │   ├── panel/                # Side panel UI (React)
     │   │   ├── panel.html
     │   │   ├── panel.tsx         # React entry point
     │   │   ├── panel.css         # Theme variables + residual styles
-    │   │   ├── App.tsx           # Root component
+    │   │   ├── App.tsx           # Root component (auto-attach, tab listener)
     │   │   ├── reducer.ts        # useReducer state management
     │   │   ├── types.ts          # TypeScript types
     │   │   ├── components/       # Toolbar, CommandInput, EditorPane, ConsolePane, etc.
-    │   │   └── lib/              # server, run, commands, autocomplete, command-history, etc.
-    │   └── content/
-    │       └── recorder.ts       # Event recorder injected into pages
+    │   │   └── lib/              # bridge, run, commands, autocomplete, command-history, etc.
     └── public/
-        └── manifest.json         # Manifest V3 config
+        └── manifest.json         # Manifest V3 config (requires "debugger" permission)
 ```
 
 ## Requirements

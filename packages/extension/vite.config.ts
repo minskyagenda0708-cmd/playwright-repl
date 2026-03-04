@@ -20,8 +20,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background.ts"),
-        "content/recorder": resolve(__dirname, "src/content/recorder.ts"),
-        "panel/panel": resolve(__dirname, "src/panel/panel.html"),
+"panel/panel": resolve(__dirname, "src/panel/panel.html"),
         "preferences/preferences": resolve(__dirname, "src/preferences/preferences.html"),
       },
       output: {

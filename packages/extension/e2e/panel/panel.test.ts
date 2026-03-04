@@ -2,7 +2,7 @@
  * E2E tests for the extension side panel UI.
  *
  * Launches Chromium with the extension loaded, navigates to panel.html,
- * and uses page.route() to intercept HTTP calls to the CommandServer.
+ * and mocks chrome.runtime.sendMessage to isolate the UI from the background.
  */
 
 import { test, expect } from './fixtures.js';
@@ -21,14 +21,6 @@ async function fillInput(page: Page, text: string) {
 }
 
 // ─── Initialization ────────────────────────────────────────────────────────
-
-test('shows version from health endpoint', async ({ panelPage }) => {
-  await expect(panelPage.getByTestId('output')).toContainText('Playwright REPL v0.4.0-test');
-});
-
-test('shows connected status', async ({ panelPage }) => {
-  await expect(panelPage.getByTestId('output')).toContainText('Connected to localhost');
-});
 
 test('has record button enabled', async ({ panelPage }) => {
   await expect(panelPage.getByTestId('record-btn')).toBeEnabled();
@@ -169,37 +161,17 @@ test('shows fail stats when command errors', async ({ panelPage, mockResponse })
 // ─── Recording UI ─────────────────────────────────────────────────────────
 
 test('record button toggles to Stop when recording starts', async ({ panelPage }) => {
-  // Mock chrome APIs so we don't need a real tab to inject into
-  await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }] as chrome.tabs.Tab[];
-    const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg: any) => {
-      if (msg.type === 'pw-record-start' || msg.type === 'pw-record-stop') return { ok: true };
-      return origSend(msg);
-    };
-  });
-
+  // The fixture already mocks record-start → { ok: true } and connect() → stub port
   const btn = panelPage.getByTestId('record-btn');
 
-  // Click to start recording
   await btn.click();
   await expect(btn).toHaveAttribute('title', 'Stop recording');
   await expect(btn).toHaveClass(/recording/);
 });
 
 test('record button toggles back to Record when stopped', async ({ panelPage }) => {
-  await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }] as chrome.tabs.Tab[];
-    const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg: any) => {
-      if (msg.type === 'pw-record-start' || msg.type === 'pw-record-stop') return { ok: true };
-      return origSend(msg);
-    };
-  });
-
   const btn = panelPage.getByTestId('record-btn');
 
-  // Start then stop
   await btn.click();
   await expect(btn).toHaveAttribute('title', 'Stop recording');
   await btn.click();
@@ -207,12 +179,11 @@ test('record button toggles back to Record when stopped', async ({ panelPage }) 
   await expect(btn).not.toHaveClass(/recording/);
 });
 
-test('record button shows error when injection fails', async ({ panelPage }) => {
+test('record button shows error when record-start fails', async ({ panelPage }) => {
   await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "chrome://settings" }] as chrome.tabs.Tab[];
-    const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg: any) => {
-      if (msg.type === 'pw-record-start') return { ok: false, error: 'Cannot access chrome:// URLs' };
+    const origSend = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
+    (chrome.runtime as any).sendMessage = async (msg: any) => {
+      if (msg.type === 'record-start') return { ok: false, error: 'Cannot access chrome:// URLs' };
       return origSend(msg);
     };
   });
@@ -220,25 +191,6 @@ test('record button shows error when injection fails', async ({ panelPage }) => 
   const btn = panelPage.getByTestId('record-btn');
   await btn.click();
 
-  // Should show error
   await expect(panelPage.locator('[data-type="error"]')).toContainText('Cannot access');
-
-  // Button should NOT be in recording state
   await expect(btn).not.toHaveClass(/recording/);
-});
-
-test('received recorded commands appear in editor', async ({ panelPage }) => {
-  // Send a message from the service worker to simulate a recorded command
-  const context = panelPage.context();
-  const sw = context.serviceWorkers()[0];
-
-  await sw.evaluate(() => {
-    chrome.runtime.sendMessage({ type: 'pw-recorded-command', command: 'click "Submit"' });
-  });
-
-  // Verify command appears in the console output
-  await expect(panelPage.locator('[data-type="command"]')).toContainText('click "Submit"');
-
-  // Verify command is also appended to the editor
-  await expect(panelPage.getByTestId('editor').getByRole('textbox')).toContainText('click "Submit"');
 });

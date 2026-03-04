@@ -105,4 +105,37 @@ describe('Reducer tests', () => {
      const newState = panelReducer(initialState, {type: 'invalid_event'});
      expect(newState).toEqual(initialState);
    })
+
+   // ─── Attach lifecycle ────────────────────────────────────────────────────
+
+   it('should process event ATTACH_START', () => {
+     const newState = panelReducer(initialState, { type: 'ATTACH_START' });
+     expect(newState.isAttaching).toBe(true);
+   });
+
+   it('should process event ATTACH_SUCCESS', () => {
+     const newState = panelReducer(
+       { ...initialState, isAttaching: true },
+       { type: 'ATTACH_SUCCESS', url: 'https://example.com' }
+     );
+     expect(newState.isAttaching).toBe(false);
+     expect(newState.attachedUrl).toBe('https://example.com');
+   });
+
+   it('should process event ATTACH_FAIL', () => {
+     const newState = panelReducer(
+       { ...initialState, isAttaching: true, attachedUrl: 'https://old.com' },
+       { type: 'ATTACH_FAIL' }
+     );
+     expect(newState.isAttaching).toBe(false);
+     expect(newState.attachedUrl).toBeNull();
+   });
+
+   it('should process event DETACH', () => {
+     const newState = panelReducer(
+       { ...initialState, attachedUrl: 'https://example.com' },
+       { type: 'DETACH' }
+     );
+     expect(newState.attachedUrl).toBeNull();
+   });
 })

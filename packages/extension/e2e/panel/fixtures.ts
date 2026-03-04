@@ -1,6 +1,7 @@
 /**
  * E2E test fixtures — launches Chromium with the extension loaded,
- * sets up page.route() mocking, and provides fixtures to tests.
+ * intercepts chrome.runtime.sendMessage to mock the background service worker,
+ * and provides fixtures to tests.
  */
 
 import { test as base, chromium, type BrowserContext, type Page } from '@playwright/test';
@@ -41,33 +42,42 @@ export const test = base.extend<
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
 
-    // Context-level route: applies to all pages, set up once
-    await context.route('**/health', (route) => {
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'ok', version: '0.4.0-test' }),
-      });
-    });
-
     await use({ context, extensionId });
     await context.close();
   }, { scope: 'worker' }],
 
-  // Test-scoped: fresh panelPage with route mocking for each test
+  // Test-scoped: fresh panelPage with mocked chrome.runtime.sendMessage
   panelPage: async ({ extensionContext }, use) => {
     const { context, extensionId } = extensionContext;
     const page = await context.newPage();
 
-    (page as any)._runResponse = { text: 'OK', isError: false };
-
-    await page.route('**/run', async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify((page as any)._runResponse),
-      });
+    // Install init script so the mock is in place before any panel JS runs
+    await page.addInitScript(() => {
+      // @ts-ignore
+      window.__testRunResponse = { text: 'OK', isError: false };
     });
 
     await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+
+    // Override chrome.runtime.sendMessage after page load
+    await page.evaluate(() => {
+      const orig = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
+      (chrome.runtime as any).sendMessage = async (msg: any) => {
+        if (msg.type === 'health') return { ok: true };
+        if (msg.type === 'attach') return { ok: true, url: 'https://example.com' };
+        if (msg.type === 'record-start') return { ok: true, url: 'https://example.com' };
+        if (msg.type === 'record-stop') return { ok: true };
+        if (msg.type === 'run') return (window as any).__testRunResponse;
+        return orig(msg);
+      };
+      // Mock connect() so recording tests can toggle without a real port
+      (chrome.runtime as any).connect = () => ({
+        onMessage: { addListener: () => {} },
+        onDisconnect: { addListener: () => {} },
+        disconnect: () => {},
+      });
+    });
+
     await page.waitForSelector('#input-bar', { timeout: 10000 });
 
     await use(page);
@@ -76,7 +86,9 @@ export const test = base.extend<
 
   mockResponse: async ({ panelPage }, use) => {
     await use((response: { text: string; isError: boolean }) => {
-      (panelPage as any)._runResponse = response;
+      panelPage.evaluate((r) => {
+        (window as any).__testRunResponse = r;
+      }, response);
     });
   },
 });

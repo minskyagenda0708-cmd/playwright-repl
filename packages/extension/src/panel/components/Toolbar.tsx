@@ -1,30 +1,25 @@
-import { useRef, useMemo, useState, useEffect } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { PanelState, Action } from "@/reducer";
-import type { RecordedMessage } from '@/types';
 import { exportToPlaywright } from '@/lib/converter';
-import { checkHealth, setServerPort, executeCommand } from '@/lib/server';
+import { jsonlToRepl } from '@/lib/converter';
+import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch } from '@/lib/run';
-import { getServerPort } from '@/lib/server';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine' | 'attachedUrl' | 'isAttaching'> {
     dispatch: React.Dispatch<Action>,
-    attachedTabUrl?: string,
-    onTabChange?: (url: string) => void,
 };
 
-function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, onTabChange = () => {} }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const [isRecording, setIsRecording] = useState(false);
-    const [isConnected, setIsConnected] = useState(false);
-    const [serverVersion, setServerVersion] = useState('');
-    const [port, setPort] = useState(getServerPort());
-    const [editingPort, setEditingPort] = useState(false);
-    const [isDarkMode, setIsDarkMode] = useState(()=> localStorage.getItem("theme") === 'dark');
+    const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
+    const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
-;
-    const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
+
+    // ─── Tab switcher ───
 
     async function loadTabs() {
         if (!chrome.tabs?.query) return;
@@ -37,34 +32,39 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, 
         ));
     }
 
+    useEffect(() => { loadTabs(); }, []);
+
+    async function handleTabChange(tabId: number) {
+        dispatch({ type: 'ATTACH_START' });
+        const res = await attachToTab(tabId);
+        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+        else dispatch({ type: 'ATTACH_FAIL' });
+    }
+
+    // ─── File operations ───
+
     function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
         if (!file) return;
-
         const fileReader = new FileReader();
-
         fileReader.onload = () => {
             dispatch({ type: 'EDIT_EDITOR_CONTENT', content: fileReader.result as string })
             dispatch({ type: 'SET_FILENAME', fileName: file.name })
         }
-
         fileReader.onerror = () => {
             dispatch({ type: 'ADD_LINE', line: { text: 'Failed to read file', type: 'error' } })
         }
         fileReader.readAsText(file);
     }
+
     function handleFileOpen() {
         fileInputRef.current!.click();
     }
+
     async function handleSave() {
         const opts = {
             suggestedName: fileName || "commands-" + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + ".pw",
-            types: [
-                {
-                    description: "PW command files",
-                    accept: { "text/plain": [".pw"] },
-                },
-            ],
+            types: [{ description: "PW command files", accept: { "text/plain": [".pw"] } }],
         };
         try {
             const fileHandle: FileSystemFileHandle = await window.showSaveFilePicker(opts);
@@ -79,10 +79,10 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, 
         }
     }
 
-    async function runCommand(index: number, command: string) {
-        // set current run line
-        dispatch({ type: 'SET_RUN_LINE', currentRunLine: index });
+    // ─── Run / Step ───
 
+    async function runCommand(index: number, command: string) {
+        dispatch({ type: 'SET_RUN_LINE', currentRunLine: index });
         const result = await runAndDispatch(command, dispatch);
         dispatch({ type: 'SET_LINE_RESULT', index: index, result: result.isError ? 'fail' : 'pass' });
     }
@@ -109,122 +109,93 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, 
         }
         return executableIndex;
     }
+
     async function handleStep() {
         if (stepLine === -1) {
             const nextStepLine = findExecutableIndex(0);
-            if (nextStepLine !== -1) {
-                dispatch({ type: 'STEP_INIT', stepLine: nextStepLine });
-            }
+            if (nextStepLine !== -1) dispatch({ type: 'STEP_INIT', stepLine: nextStepLine });
             return;
         }
         await runCommand(stepLine, lines[stepLine].trim());
         const nextStepLine = findExecutableIndex(stepLine + 1);
         dispatch({ type: 'STEP_ADVANCE', stepLine: nextStepLine });
-
     }
+
+    // ─── Recording (crx port-based) ───
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleRecordedSources = useCallback((sources: any[]) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const source = sources.find((s: any) => s.id === 'jsonl') || sources[0];
+        if (!source?.actions?.length) return;
+        const replLines = (source.actions as string[])
+            .map((a: string) => jsonlToRepl(a, false))
+            .filter(Boolean) as string[];
+        if (replLines.length > 0) {
+            dispatch({ type: 'EDIT_EDITOR_CONTENT', content: replLines.join('\n') });
+        }
+    }, [dispatch]);
+
     async function handleRecord() {
         if (!chrome.tabs?.query) return;
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const tab = tabs[0];
-        if (!tab?.id) return;
 
         if (isRecording) {
-            chrome.runtime.sendMessage({ type: "pw-record-stop", tabId: tab.id });
+            const port = recorderPortRef.current;
+            recorderPortRef.current = null;
             setIsRecording(false);
-        } else {
-            const result = await chrome.runtime.sendMessage({ type: "pw-record-start", tabId: tab.id });
-            if (result && !result.ok) {
-                dispatch({ type: 'ADD_LINE', line: { text: 'Recording failed: ' + result.error, type: 'error' } });
-                return;
-            }
-            setIsRecording(true);
+            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
+            port?.disconnect();
+            dispatch({ type: 'ADD_LINE', line: { text: 'Recording stopped.', type: 'command' } });
+            return;
         }
+
+        const result = await chrome.runtime.sendMessage({ type: 'record-start' });
+        if (!result?.ok) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Recording failed: ${result?.error ?? 'unknown error'}`, type: 'error' } });
+            return;
+        }
+
+        try {
+            recorderPortRef.current = await connectWithRetry();
+        } catch {
+            dispatch({ type: 'ADD_LINE', line: { text: 'Recording failed: could not connect to recorder.', type: 'error' } });
+            return;
+        }
+
+        setIsRecording(true);
+
+        if (result.url && result.url !== 'about:blank') {
+            dispatch({ type: 'APPEND_EDITOR_CONTENT', command: `goto "${result.url}"` });
+        }
+
+        dispatch({ type: 'ADD_LINE', line: { text: 'Recording started. Interact with the page...', type: 'command' } });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recorderPortRef.current!.onMessage.addListener((msg: any) => {
+            if (msg.type === 'recorder' && msg.method === 'setSources') {
+                handleRecordedSources(msg.sources);
+            }
+        });
+
+        recorderPortRef.current!.onDisconnect.addListener(() => {
+            recorderPortRef.current = null;
+            setIsRecording(false);
+        });
     }
+
+    // ─── Export ───
 
     function handleExport() {
         const code = exportToPlaywright(lines);
         dispatch({ type: 'ADD_LINE', line: { text: code, type: 'code-block' } })
     }
 
-    function commitPort(e: React.SyntheticEvent<HTMLInputElement>) {
-        const val = parseInt(e.currentTarget.value, 10);
-        if(val > 0 && val <= 65535) {
-            setPort(val);
-            setServerPort(val);
-        }
-        setEditingPort(false);
-    }
-
-    useEffect(() => {
-        const listener = (msg: RecordedMessage) => {
-            if (msg.type === "pw-recorded-command" && msg.command) {
-                dispatch({ type: 'ADD_LINE', line: { text: msg.command, type: 'command' } });
-                dispatch({ type: 'APPEND_EDITOR_CONTENT', command: msg.command });
-            }
-            if (msg.type === "pw-tab-activated" && msg.url) {
-                // Pass the new tab URL as activeTabUrl so the server auto-selects it in Playwright,
-                // then parse the (current) index from tab-list output to record tab-select N
-                executeCommand('tab-list', msg.url).then(result => {
-                    const match = result.text.match(/^- (\d+): \(current\)/m);
-                    if (match) {
-                        const cmd = `tab-select ${match[1]}`;
-                        dispatch({ type: 'ADD_LINE', line: { text: cmd, type: 'command' } });
-                        dispatch({ type: 'APPEND_EDITOR_CONTENT', command: cmd });
-                    }
-                }).catch(() => {});
-            }
-        };
-        if (!chrome.runtime?.onMessage) return;
-        chrome.runtime.onMessage.addListener(listener);
-        return () => chrome.runtime.onMessage.removeListener(listener);
-    }, []);
-
-    useEffect(() => {
-        async function initialCheck() {
-            try {
-                const result = await checkHealth();
-                const connected = result.browserConnected !== false;
-                setIsConnected(connected);
-                setServerVersion(result.version);
-                dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } });
-                if (connected) {
-                    dispatch({ type: 'ADD_LINE', line: { text: `Connected to localhost:${port}`, type: 'success' } });
-                } else {
-                    dispatch({ type: 'ADD_LINE', line: { text: 'Server running but browser not connected.', type: 'error' } });
-                }
-            } catch {
-                setIsConnected(false);
-                setServerVersion('');
-                dispatch({ type: 'ADD_LINE', line: { text: 'Server not running.', type: 'error' } });
-                dispatch({ type: 'ADD_LINE', line: { text: 'Start with: playwright-repl --extension', type: 'error' } });
-            }
-        }
-        initialCheck();
-    }, []);
-
-    useEffect(() => {
-        async function poll() {
-            try {
-                const result = await checkHealth();
-                setIsConnected(result.browserConnected !== false);
-                setServerVersion(result.version);
-            } catch {
-               setIsConnected(false);
-               setServerVersion('');
-            }
-        }
-        const timer = setInterval(poll, 5000);
-        return () => clearInterval(timer);
-    }, [port]);
+    // ─── Theme toggle ───
 
     useEffect(() => {
         document.documentElement.classList.toggle('theme-dark', isDarkMode);
         localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
     }, [isDarkMode]);
-
-    useEffect(() => {
-        loadTabs();
-    }, []);
 
     return (
         <div id="toolbar" className="flex flex-wrap gap-1 justify-between items-center py-1 px-2 bg-(--bg-toolbar) border-b border-solid border-(--border-primary) shrink-0">
@@ -248,53 +219,43 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, 
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
-                <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim() || !isConnected} onClick={handleRun}>&#9654;</button>
-                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || !isConnected} onClick={handleStep}>&#9655;</button>
+                <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
+                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim()} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}><ExportIcon /></button>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                     {isDarkMode ? <SunIcon /> : <MoonIcon />}
                 </button>
             </div>
-            <div id="toolbar-right" className="flex items-center">
+            <div id="toolbar-right" className="flex items-center gap-2">
                 <select
-                    value={attachedTabUrl ?? ''}
+                    value={attachedUrl ?? ''}
                     title="Switch tab"
                     onFocus={loadTabs}
-                    onChange={e => onTabChange(e.target.value)}
+                    onChange={e => {
+                        const tabId = availableTabs.find(t => t.url === e.target.value)?.id;
+                        if (tabId) handleTabChange(tabId);
+                    }}
                 >
                     {availableTabs.map(tab => (
                         <option key={tab.id} value={tab.url}>{new URL(tab.url!).hostname}</option>
                     ))}
                 </select>
-                <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
-                <span className="w-[1px] h-[18px] bg-(--color-toolbar-sep) mx-1"></span>
-                <span
-                    className="flex items-center gap-1 cursor-pointer py-[2px] px-[6px] rounded-[3px] mr-2 hover:bg-(--bg-button)"
-                    title={isConnected ? `v${serverVersion} - localhost:${port}` : `Disconnected - click to change port`}
-                    onClick={() => setEditingPort(true)}
+                <div
+                    className="flex items-center gap-1 text-[11px] text-(--text-dim)"
                     data-testid="status-indicator"
                 >
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0  ${isConnected ? 'bg-(--color-success)' : 'bg-(--color-error)'}`} data-testid="status-dot" data-status={isConnected ? 'connected' : 'disconnected'} />
-                    { editingPort ? (
-                        <input
-                            className="w-[50px] bg-(--bg-editor) text-(--text-default) border border-solid border-(--border-primary) rounded-[3px] font-[inherit] text-[11px] py-[1px] px-1 outline-none"
-                            data-testid="port-input"
-                            type="number"
-                            defaultValue={port}
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={(e) => commitPort(e)}
-                            onKeyDown={(e) => {
-                                if(e.key === "Enter") commitPort(e);
-                                if(e.key === "Escape")setEditingPort(false);
-                            }}
-
-                        />
-                    ) 
-                    : (
-                    <span className="text-(--text-dim) text-[11px]">:{port}</span>
-                    )}
-                </span>
+                    <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${isAttaching ? 'bg-yellow-400' : attachedUrl ? 'bg-(--color-success)' : 'bg-(--color-error)'}`}
+                        data-testid="status-dot"
+                        data-status={isAttaching ? 'attaching' : attachedUrl ? 'connected' : 'disconnected'}
+                        title={isAttaching ? 'Connecting...' : attachedUrl ? `Attached: ${attachedUrl}` : 'Not attached'}
+                    />
+                    {attachedUrl
+                        ? <span className="max-w-[160px] truncate" title={attachedUrl}>{attachedUrl.replace(/^https?:\/\//, '')}</span>
+                        : <span>{isAttaching ? 'Connecting...' : 'Not attached'}</span>
+                    }
+                </div>
+                <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
             </div>
         </div>
     )

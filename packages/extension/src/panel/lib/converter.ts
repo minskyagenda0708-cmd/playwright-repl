@@ -152,6 +152,70 @@ export function pwToPlaywright(cmd: string): string | null {
   }
 }
 
+// ─── JSONL → REPL conversion (for port-based recorder) ───
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractNth(action: any): string {
+  let node = action.locator?.next;
+  while (node) {
+    if (node.kind === 'nth') return ` --nth ${node.body}`;
+    if (node.kind === 'first') return ' --nth 0';
+    if (node.kind === 'last') return ' --nth -1';
+    node = node.next;
+  }
+  const sel = action.selector || '';
+  const nthMatch = sel.match(/>> nth=(-?\d+)/);
+  if (nthMatch) return ` --nth ${nthMatch[1]}`;
+  return '';
+}
+
+/**
+ * Converts a Playwright recorder JSONL action string to a REPL command.
+ * Returns null if the action should be skipped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
+  try {
+    const a = JSON.parse(jsonStr);
+    const name = a.locator?.options?.name;
+    const q = (s: string) => `"${s}"`;
+    const nth = extractNth(a);
+
+    switch (a.name) {
+      case 'navigate':
+        if (isFirst) return null;
+        return `goto ${q(a.url)}`;
+      case 'openPage':
+        return a.url && a.url !== 'about:blank' && a.url !== 'chrome://newtab/'
+          ? `goto ${q(a.url)}`
+          : '# new tab opened';
+      case 'closePage':
+        return '# tab closed';
+      case 'click':
+        return name ? `click ${q(name)}${nth}` : null;
+      case 'fill':
+        return name ? `fill ${q(name)} ${a.text ?? ''}${nth}` : null;
+      case 'press':
+        return name ? `press ${q(name)} ${a.key}${nth}` : null;
+      case 'hover':
+        return name ? `hover ${q(name)}${nth}` : null;
+      case 'check':
+        return name ? `check ${q(name)}${nth}` : null;
+      case 'uncheck':
+        return name ? `uncheck ${q(name)}${nth}` : null;
+      case 'selectOption':
+      case 'select':
+        return name ? `select ${q(name)} ${a.options?.[0] ?? ''}${nth}` : null;
+      case 'setInputFiles':
+        return '# file upload (unsupported)';
+      default:
+        return `# ${a.name} (unsupported)`;
+    }
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Converts an array of .pw commands into a complete Playwright test file.
  */

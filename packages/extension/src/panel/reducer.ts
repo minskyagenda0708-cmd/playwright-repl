@@ -10,9 +10,11 @@ export type PanelState = {
   passCount: number
   failCount: number
   lineResults: ('pass' | 'fail' | null)[]
+  attachedUrl: string | null
+  isAttaching: boolean
 }
 
-export type Action = 
+export type Action =
      { type: 'ADD_LINE', line: OutputLine}
    | { type: 'CLEAR_CONSOLE'}
    | { type: 'COMMAND_SUBMITTED', line: OutputLine}
@@ -27,6 +29,10 @@ export type Action =
    | { type: 'STEP_INIT', stepLine: number }
    | { type: 'STEP_ADVANCE', stepLine: number }
    | { type: 'SET_LINE_RESULT', index: number, result: 'pass' | 'fail'}
+   | { type: 'ATTACH_START' }
+   | { type: 'ATTACH_SUCCESS', url: string }
+   | { type: 'ATTACH_FAIL' }
+   | { type: 'DETACH' }
 
 export const initialState : PanelState = {
     outputLines: [],
@@ -37,7 +43,9 @@ export const initialState : PanelState = {
     stepLine: -1,
     passCount: 0,
     failCount: 0,
-    lineResults: []
+    lineResults: [],
+    attachedUrl: null,
+    isAttaching: false,
 }
 
 export function panelReducer(state: PanelState, action: Action): PanelState {
@@ -53,14 +61,14 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
         case 'COMMAND_ERROR':
             return { ...state, outputLines: [ ...state.outputLines, action.line]}
         case 'EDIT_EDITOR_CONTENT':
-            return { 
-                ...state, 
+            return {
+                ...state,
                 editorContent: action.content,
                 lineResults: [],
                 currentRunLine: -1,
                 stepLine: -1,
                 passCount: 0,
-                failCount: 0 
+                failCount: 0
             }
         case 'APPEND_EDITOR_CONTENT': {
             const separator = state.editorContent && !state.editorContent.endsWith('\n') ? '\n' : '';
@@ -70,10 +78,10 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, fileName: action.fileName }
         case 'RUN_START': {
             const lineCount = state.editorContent.split('\n').length;
-            return { 
-                ...state, 
-                isRunning: true, 
-                currentRunLine: 0, 
+            return {
+                ...state,
+                isRunning: true,
+                currentRunLine: 0,
                 passCount: 0,
                 failCount: 0,
                 lineResults: new Array(lineCount).fill(null)
@@ -81,20 +89,20 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
         }
         case 'RUN_STOP':
             return { ...state, isRunning: false, currentRunLine: -1}
-        case 'SET_RUN_LINE': 
+        case 'SET_RUN_LINE':
             return { ...state, currentRunLine: action.currentRunLine}
         case 'STEP_INIT': {
             const lineCount = state.editorContent.split('\n').length;
-            return { 
-                ...state, 
-                stepLine: action.stepLine, 
+            return {
+                ...state,
+                stepLine: action.stepLine,
                 currentRunLine: action.stepLine,
                 passCount: 0,
                 failCount: 0,
-                lineResults: new Array(lineCount).fill(null) 
+                lineResults: new Array(lineCount).fill(null)
             }
         }
-        case 'STEP_ADVANCE': 
+        case 'STEP_ADVANCE':
             return { ...state, stepLine: action.stepLine, currentRunLine: action.stepLine }
         case 'SET_LINE_RESULT': {
             const newLineResults = state.lineResults.map((result, i) => i === action.index ? action.result : result);
@@ -102,7 +110,15 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             const newFailCount = action.result === 'fail' ? state.failCount + 1 : state.failCount;
             return { ...state, lineResults: newLineResults, passCount: newPassCount, failCount: newFailCount}
         }
+        case 'ATTACH_START':
+            return { ...state, isAttaching: true }
+        case 'ATTACH_SUCCESS':
+            return { ...state, isAttaching: false, attachedUrl: action.url }
+        case 'ATTACH_FAIL':
+            return { ...state, isAttaching: false, attachedUrl: null }
+        case 'DETACH':
+            return { ...state, attachedUrl: null }
         default:
-            return state 
+            return state
     }
 }

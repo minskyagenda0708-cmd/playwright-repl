@@ -1,12 +1,18 @@
-
+import { crx } from 'playwright-crx';
+import type { CrxApplication } from 'playwright-crx';
+import type { Page } from 'playwright-crx/test';
+import { parseReplCommand } from './commands';
+import type { TabOperation } from './commands';
 import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
+
+// ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
 
-let cachedSettings: PwReplSettings = { openAs: 'sidepanel'};
-loadSettings().then(s => cachedSettings = s ).catch(()=> {});
+let cachedSettings: PwReplSettings = { openAs: 'sidepanel' };
+loadSettings().then(s => cachedSettings = s).catch(() => {});
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.openAs) {
@@ -27,175 +33,164 @@ chrome.action.onClicked.addListener(async (tab) => {
     });
   }
 });
-// ─── Recording State ───────────────────────────────────────────────────────
 
-let recordingTabId: number | null = null;
-let tabUpdateListener: ((tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => void) | null = null;
-let navCommittedListener: ((details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => void) | null = null;
-let lastRecordedUrl: string | null = null;
-let urlStack: string[] = [];
-let stackIndex: number = -1;
-let pendingUrlChange: string | null = null;
-let pendingUrlTimer: ReturnType<typeof setTimeout> | null = null;
+// ─── playwright-crx State ────────────────────────────────────────────────────
 
-// ─── Centralized URL Change Handler ──────────────────────────────────────────
+let crxApp: CrxApplication | null = null;
+let currentPage: Page | null = null;
+let activeTabId: number | null = null;
 
-function handleUrlChange(url: string, isTyped: boolean) {
-  if (url === lastRecordedUrl) return;
-
-  // Back/forward detection (checked before isTyped — Chrome can misreport SPA back as "typed")
-  if (stackIndex > 0 && url === urlStack[stackIndex - 1]) {
-    stackIndex--;
-    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "go-back" }).catch(() => {});
-  } else if (stackIndex < urlStack.length - 1 && url === urlStack[stackIndex + 1]) {
-    stackIndex++;
-    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "go-forward" }).catch(() => {});
-  } else if (isTyped) {
-    // User typed URL in address bar
-    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "goto " + url }).catch(() => {});
-    urlStack = urlStack.slice(0, stackIndex + 1);
-    urlStack.push(url);
-    stackIndex = urlStack.length - 1;
-  } else {
-    // Link click, SPA navigation — update stack, no command (click already recorded)
-    urlStack = urlStack.slice(0, stackIndex + 1);
-    urlStack.push(url);
-    stackIndex = urlStack.length - 1;
-  }
-
-  lastRecordedUrl = url;
+async function getActiveTabId(): Promise<number | null> {
+  if (activeTabId) return activeTabId;
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab?.id ?? null;
 }
 
-// ─── Message Handler ────────────────────────────────────────────────────────
+// ─── Tab Attachment ───────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg: { type: string; tabId?: number }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
-  if (msg.type === "pw-record-start") {
-    startRecording(msg.tabId!).then(sendResponse);
-    return true;
-  }
-  if (msg.type === "pw-record-stop") {
-    stopRecording(msg.tabId!).then(sendResponse);
-    return true;
-  }
-});
-
-// ─── Tab Activation (follow active tab) ─────────────────────────────────────
-
-chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
-  if (recordingTabId === null) return;
-  recordingTabId = activeInfo.tabId;
-  injectRecorder(activeInfo.tabId).catch(() => {});
-  // Notify panel to record tab-select N (panel resolves index via tab-list)
-  chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (chrome.runtime.lastError || !tab.url) return;
-    chrome.runtime.sendMessage({ type: "pw-tab-activated", url: tab.url }).catch(() => {});
-  });
-});
-
-// ─── Recording Functions ────────────────────────────────────────────────────
-
-async function startRecording(tabId: number): Promise<{ ok: boolean; error?: string }> {
+async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
-    await injectRecorder(tabId);
-    recordingTabId = tabId;
-
-    // Store the initial URL and initialize history stack
     const tab = await chrome.tabs.get(tabId);
-    lastRecordedUrl = tab.url ?? null;
-    urlStack = [tab.url ?? ""];
-    stackIndex = 0;
+    if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
+      return { ok: false, error: 'Cannot attach to internal pages. Navigate to a regular webpage first.' };
+    }
 
-    // Listen for navigation commits — only used to detect typed URLs (for goto)
-    navCommittedListener = (details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
-      if (details.tabId !== recordingTabId) return;
-      if (details.frameId !== 0) return; // main frame only
+    if (!crxApp) crxApp = await crx.start();
 
-      // Cancel pending tabUpdate handler — onCommitted has transition info, so it takes priority
-      if (pendingUrlTimer) {
-        clearTimeout(pendingUrlTimer);
-        pendingUrlTimer = null;
-        pendingUrlChange = null;
-      }
+    if (activeTabId !== null && activeTabId !== tabId) {
+      await crxApp.detach(activeTabId).catch(() => {});
+      currentPage = null;
+    }
 
-      const qualifiers = details.transitionQualifiers || [];
-      const isTyped = (details.transitionType === "typed" || qualifiers.includes("from_address_bar"))
-        && !qualifiers.includes("forward_back");
-      handleUrlChange(details.url, isTyped);
-    };
-    chrome.webNavigation.onCommitted.addListener(navCommittedListener);
-
-    // Listen for tab URL changes — catches SPA (pushState) and BFCache navigations
-    // that onCommitted misses. Uses a short timer so onCommitted can take priority.
-    tabUpdateListener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-      if (updatedTabId !== recordingTabId) return;
-      if (changeInfo.status === "complete") {
-        injectRecorder(updatedTabId).catch((err: unknown) => {
-          console.warn("[recorder] re-injection failed:", (err as Error).message);
-        });
-      }
-      if (changeInfo.url && changeInfo.url !== lastRecordedUrl) {
-        pendingUrlChange = changeInfo.url;
-        if (pendingUrlTimer) clearTimeout(pendingUrlTimer);
-        pendingUrlTimer = setTimeout(() => {
-          if (pendingUrlChange && pendingUrlChange !== lastRecordedUrl) {
-            handleUrlChange(pendingUrlChange, false);
-          }
-          pendingUrlChange = null;
-          pendingUrlTimer = null;
-        }, 100);
-      }
-    };
-    chrome.tabs.onUpdated.addListener(tabUpdateListener);
-
-    return { ok: true };
-  } catch (err: unknown) {
-    return { ok: false, error: (err as Error).message };
+    currentPage = await crxApp.attach(tabId);
+    activeTabId = tabId;
+    return { ok: true, url: currentPage.url() };
+  } catch (e) {
+    activeTabId = null;
+    currentPage = null;
+    return { ok: false, error: String(e) };
   }
 }
 
-async function stopRecording(tabId: number): Promise<{ ok: boolean }> {
+async function ensurePage(): Promise<Page | null> {
+  if (currentPage) return currentPage;
+  const tabId = await getActiveTabId();
+  if (tabId) {
+    const result = await attachToTab(tabId);
+    if (result.ok) return currentPage;
+  }
+  return null;
+}
+
+// ─── Command Execution ───────────────────────────────────────────────────────
+
+interface CommandResult {
+  text: string;
+  isError: boolean;
+  image?: string;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Command timed out after ${ms / 1000}s`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer!));
+}
+
+async function handleTabOp(op: string, tabArgs: Record<string, unknown>): Promise<CommandResult> {
   try {
-    // Remove navigation listeners
-    if (navCommittedListener) {
-      chrome.webNavigation.onCommitted.removeListener(navCommittedListener);
-      navCommittedListener = null;
+    if (op === 'list') {
+      const tabs = await chrome.tabs.query({});
+      const list = tabs.map(t => `[${t.id}] ${t.title ?? ''} — ${t.url ?? ''}`).join('\n');
+      return { text: list || '(no tabs)', isError: false };
     }
-    if (tabUpdateListener) {
-      chrome.tabs.onUpdated.removeListener(tabUpdateListener);
-      tabUpdateListener = null;
+    if (op === 'new') {
+      const tab = await chrome.tabs.create({ url: (tabArgs.url as string) || 'about:blank' });
+      return { text: `Opened tab ${tab.id}`, isError: false };
     }
-    recordingTabId = null;
-    urlStack = [];
-    stackIndex = -1;
-    if (pendingUrlTimer) {
-      clearTimeout(pendingUrlTimer);
-      pendingUrlTimer = null;
-      pendingUrlChange = null;
+    if (op === 'close') {
+      const tabId = (tabArgs.tabId as number) ?? activeTabId;
+      if (!tabId) return { text: 'No tab id specified', isError: true };
+      await chrome.tabs.remove(tabId);
+      if (tabId === activeTabId) { activeTabId = null; currentPage = null; }
+      return { text: `Closed tab ${tabId}`, isError: false };
     }
-
-    // Run cleanup on the tab
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        if (typeof window.__pwRecorderCleanup === "function") {
-          window.__pwRecorderCleanup();
-        }
-      },
-    });
-
-    return { ok: true };
-  } catch (_err) {
-    // Cleanup failure is non-fatal (tab may have closed)
-    return { ok: true };
+    if (op === 'select') {
+      const tabId = tabArgs.tabId as number;
+      if (!tabId) return { text: 'No tab id specified', isError: true };
+      await chrome.tabs.update(tabId, { active: true });
+      activeTabId = tabId;
+      return { text: `Selected tab ${tabId}`, isError: false };
+    }
+    return { text: `Unknown tab op: ${op}`, isError: true };
+  } catch (e) {
+    return { text: String(e), isError: true };
   }
 }
 
-async function injectRecorder(tabId: number): Promise<void> {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["content/recorder.js"],
-  });
+async function handleCommand(command: string): Promise<CommandResult> {
+  const parsed = parseReplCommand(command);
+
+  if ('help' in parsed) return { text: parsed.help, isError: false };
+  if ('error' in parsed) return { text: parsed.error, isError: true };
+
+  if ('tabOp' in parsed) {
+    return handleTabOp((parsed as TabOperation).tabOp, (parsed as TabOperation).tabArgs);
+  }
+
+  const page = await ensurePage();
+  if (!page) {
+    return { text: 'Not attached to any tab. Click Attach to connect.', isError: true };
+  }
+
+  try {
+    const result = await withTimeout(parsed.fn(page, ...parsed.fnArgs), 15000);
+    if (result && typeof result === 'object' && '__image' in result) {
+      return { text: '', image: `data:${result.mimeType};base64,${result.__image}`, isError: false };
+    }
+    return { text: result != null ? String(result) : 'Done', isError: false };
+  } catch (e) {
+    return { text: String(e), isError: true };
+  }
 }
 
-export { startRecording, stopRecording, injectRecorder };
+// ─── Recording ───────────────────────────────────────────────────────────────
 
+async function startRecording(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    if (!crxApp) crxApp = await crx.start();
+
+    const tabId = await getActiveTabId();
+    if (tabId && crxApp.context().pages().length === 0) await attachToTab(tabId);
+
+    const url = crxApp.context().pages()[0]?.url();
+
+    crxApp.recorder.show({
+      mode: 'recording',
+      language: 'javascript',
+      window: { type: 'sidepanel', url: 'panel/panel.html' },
+    }).catch(() => {});
+
+    return { ok: true, url };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+async function stopRecording(): Promise<{ ok: boolean }> {
+  await crxApp?.recorder.hide().catch(() => {});
+  return { ok: true };
+}
+
+// ─── Message Handler ─────────────────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'run')          { handleCommand(msg.command).then(sendResponse); return true; }
+  if (msg.type === 'attach')       { attachToTab(msg.tabId).then(sendResponse); return true; }
+  if (msg.type === 'health')       { sendResponse({ ok: !!crxApp }); return false; }
+  if (msg.type === 'record-start') { startRecording().then(sendResponse); return true; }
+  if (msg.type === 'record-stop')  { stopRecording().then(sendResponse); return true; }
+});

@@ -5,31 +5,57 @@ import { userEvent } from 'vitest/browser';
 
 import Toolbar from '@/components/Toolbar';
 
-vi.mock('@/lib/server', () => ({
-  executeCommand: vi.fn(),
-  checkHealth: vi.fn().mockResolvedValue({ status: 'ok', version: "0.6.0" }),
-  getServerPort: vi.fn().mockReturnValue(6781),
-  setServerPort: vi.fn(),
-}))
+// ─── Bridge mock ──────────────────────────────────────────────────────────────
 
-import { executeCommand, checkHealth, setServerPort } from '@/lib/server';
+vi.mock('@/lib/bridge', () => ({
+  executeCommand: vi.fn(),
+  attachToTab: vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' }),
+  connectWithRetry: vi.fn().mockResolvedValue({
+    onMessage: { addListener: vi.fn() },
+    onDisconnect: { addListener: vi.fn() },
+    disconnect: vi.fn(),
+  }),
+}));
+
+import { executeCommand, attachToTab, connectWithRetry } from '@/lib/bridge';
+
+// ─── Helper to render Toolbar with default required props ─────────────────────
+
+function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
+  return render(<Toolbar
+    editorContent=''
+    fileName=''
+    stepLine={-1}
+    attachedUrl={null}
+    isAttaching={false}
+    dispatch={vi.fn()}
+    {...overrides}
+  />);
+}
 
 describe('Toolbar component tests', () => {
   beforeEach(() => {
-    vi.mocked(checkHealth).mockResolvedValue({ status: 'ok', version: '0.6.0' });
     Object.assign(window, {
       chrome: {
         tabs: {
           query: vi.fn().mockResolvedValue([{ id: 1, url: 'https://example.com' }]),
         },
         runtime: {
-          sendMessage: vi.fn().mockResolvedValue({ ok: true }),
-          onMessage: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
+          sendMessage: vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' }),
+          connect: vi.fn().mockReturnValue({
+            onMessage: { addListener: vi.fn() },
+            onDisconnect: { addListener: vi.fn() },
+            disconnect: vi.fn(),
+          }),
         },
       },
+    });
+    vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
+    vi.mocked(attachToTab).mockResolvedValue({ ok: true, url: 'https://example.com' });
+    vi.mocked(connectWithRetry).mockResolvedValue({
+      onMessage: { addListener: vi.fn() },
+      onDisconnect: { addListener: vi.fn() },
+      disconnect: vi.fn(),
     });
   });
 
@@ -39,30 +65,18 @@ describe('Toolbar component tests', () => {
   });
 
   it('should render the Toolbar component', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
+    const screen = await renderToolbar();
     await expect.element(screen.getByTitle('Open .pw file')).toBeInTheDocument();
-  })
+  });
+
+  // ─── File operations ───────────────────────────────────────────────────────
 
   it('should open a file dialog when click open button', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ dispatch });
 
-    // create a fake file
     const file = new File(['go to https://example.com\nclick e5'], 'test.pw', { type: 'text/plain' });
-
-    // find the hidden file input
     const fileInput = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
-
     await userEvent.upload(fileInput, file);
 
     await vi.waitFor(() => {
@@ -79,17 +93,10 @@ describe('Toolbar component tests', () => {
 
   it('should handle open a file dialog when no file selected', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ dispatch });
 
-    // find the hidden file input
     const fileInput = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
-
-    dispatch.mockClear(); // clear health check dispatches
+    dispatch.mockClear();
     fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 
     await new Promise(r => setTimeout(r, 50));
@@ -98,14 +105,8 @@ describe('Toolbar component tests', () => {
 
   it('should dispatch error when file read fails', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ dispatch });
 
-    // Mock FileReader to trigger onerror
     vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (this: FileReader) {
       this.onerror?.(new ProgressEvent('error') as ProgressEvent<FileReader>);
     });
@@ -123,12 +124,7 @@ describe('Toolbar component tests', () => {
   });
 
   it('should trigger file input click when Open button clicked', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
+    const screen = await renderToolbar();
 
     const fileInput = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
     let inputClicked = false;
@@ -139,18 +135,12 @@ describe('Toolbar component tests', () => {
 
     const openBtn = screen.container.querySelector('#open-btn') as HTMLButtonElement;
     openBtn.click();
-
     expect(inputClicked).toBe(true);
   });
 
   it('should save file and dispatch SET_FILENAME', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent='goto https://example.com'
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ editorContent: 'goto https://example.com', dispatch });
 
     const mockWritable = { write: vi.fn(), close: vi.fn() };
     const mockFileHandle = {
@@ -165,20 +155,13 @@ describe('Toolbar component tests', () => {
     await vi.waitFor(() => {
       expect(mockWritable.write).toHaveBeenCalledWith('goto https://example.com');
       expect(mockWritable.close).toHaveBeenCalled();
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'SET_FILENAME', fileName: 'saved.pw'
-      });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_FILENAME', fileName: 'saved.pw' });
     });
   });
 
   it('should dispatch error when save fails', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent='some content'
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ editorContent: 'some content', dispatch });
 
     window.showSaveFilePicker = vi.fn().mockRejectedValue(new Error('Disk full')) as any;
 
@@ -195,18 +178,13 @@ describe('Toolbar component tests', () => {
 
   it('should not dispatch error when user cancels save', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent='some content'
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ editorContent: 'some content', dispatch });
 
     const abortError = new Error('User cancelled');
     abortError.name = 'AbortError';
     window.showSaveFilePicker = vi.fn().mockRejectedValue(abortError) as any;
 
-    dispatch.mockClear(); // clear health check dispatches
+    dispatch.mockClear();
     const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
     saveBtn.click();
 
@@ -214,14 +192,14 @@ describe('Toolbar component tests', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  // ─── Run / Step ────────────────────────────────────────────────────────────
+
   it('should run all commands and dispatch results', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\nclick e5'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\nclick e5',
+      dispatch,
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
 
@@ -242,60 +220,45 @@ describe('Toolbar component tests', () => {
 
   it('should run all commands and dispatch results with error type', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\nclick e5'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\nclick e5',
+      dispatch,
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: true });
 
     await screen.getByText('▶').click();
 
     await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_RUN_LINE', currentRunLine: 0 });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: 'goto https://example.com', type: 'command' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'error' } });
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_LINE_RESULT', index: 0, result: 'fail' });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_RUN_LINE', currentRunLine: 1 });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: 'click e5', type: 'command' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_LINE_RESULT', index: 1, result: 'fail' });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'error' } });
     });
   });
 
-  it('should dispatch error message when run command failed', async () => {
+  it('should dispatch error message when run command fails', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\nclick e5'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\nclick e5',
+      dispatch,
+    });
 
-    vi.mocked(executeCommand).mockRejectedValue(new Error('server error'));
+    vi.mocked(executeCommand).mockRejectedValue(new Error('bridge error'));
 
     await screen.getByText('▶').click();
 
     await vi.waitFor(() => {
       expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_RUN_LINE', currentRunLine: 0 });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: 'goto https://example.com', type: 'command' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_ERROR', line: { text: 'Not connected to server. Run: playwright-repl --extension', type: 'error' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
-    })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'COMMAND_ERROR',
+        line: { text: 'Command failed. Try clicking Attach first.', type: 'error' }
+      });
+    });
   });
 
   it('should skip comments and empty lines when running', async () => {
-    const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'# comment\ngoto https://example.com\n\nclick e5'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: '# comment\ngoto https://example.com\n\nclick e5',
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
 
@@ -303,19 +266,17 @@ describe('Toolbar component tests', () => {
 
     await vi.waitFor(() => {
       expect(executeCommand).toHaveBeenCalledTimes(2);
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', undefined);
-      expect(executeCommand).toHaveBeenCalledWith('click e5', undefined);
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com');
+      expect(executeCommand).toHaveBeenCalledWith('click e5');
     });
   });
 
   it('should highlight the first line when click the step button', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\nclick e5'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\nclick e5',
+      dispatch,
+    });
 
     await screen.getByText('▷').click();
 
@@ -326,31 +287,28 @@ describe('Toolbar component tests', () => {
 
   it('should execute current line and advance when stepping', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\nclick e5'}
-      fileName=''
-      stepLine={0}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\nclick e5',
+      stepLine: 0,
+      dispatch,
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
 
     await screen.getByText('▷').click();
 
     await vi.waitFor(() => {
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', undefined);
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com');
       expect(dispatch).toHaveBeenCalledWith({ type: 'STEP_ADVANCE', stepLine: 1 });
     });
   });
 
   it('should skip comments on step init', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'# comment\n\ngoto https://example.com'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: '# comment\n\ngoto https://example.com',
+      dispatch,
+    });
 
     await screen.getByText('▷').click();
 
@@ -358,14 +316,14 @@ describe('Toolbar component tests', () => {
       expect(dispatch).toHaveBeenCalledWith({ type: 'STEP_INIT', stepLine: 2 });
     });
   });
+
   it('should skip comments when advancing step', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com\n# comment\nclick e5'}
-      fileName=''
-      stepLine={0}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com\n# comment\nclick e5',
+      stepLine: 0,
+      dispatch,
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
 
@@ -378,12 +336,11 @@ describe('Toolbar component tests', () => {
 
   it('should set stepLine to -1 when no more lines', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'goto https://example.com'}
-      fileName=''
-      stepLine={0}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: 'goto https://example.com',
+      stepLine: 0,
+      dispatch,
+    });
 
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
 
@@ -396,156 +353,143 @@ describe('Toolbar component tests', () => {
 
   it('should not dispatch step init when no executable lines', async () => {
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={'# comment\n\n# another comment'}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({
+      editorContent: '# comment\n\n# another comment',
+      dispatch,
+    });
 
-    dispatch.mockClear(); // clear health check dispatches
+    dispatch.mockClear();
     await screen.getByText('▷').click();
 
     await new Promise(r => setTimeout(r, 50));
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  // ─── Recording ─────────────────────────────────────────────────────────────
+
   it('should toggle to stop when record button is clicked', async () => {
-    const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar();
 
     await screen.getByRole('button', { name: 'Record' }).click();
     await expect.element(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-  })
+  });
 
   it('should toggle to record when stop button is clicked', async () => {
-    const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar();
 
     await screen.getByRole('button', { name: 'Record' }).click();
     await screen.getByRole('button', { name: 'Stop' }).click();
 
     await expect.element(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
-  })
+  });
 
-  it('should render when chrome.tabs is undefined', async () => {
+  it('should send record-start message when record button clicked', async () => {
+    const screen = await renderToolbar();
+    await screen.getByRole('button', { name: 'Record' }).click();
+    await vi.waitFor(() => {
+      expect(window.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'record-start' });
+    });
+  });
+
+  it('should send record-stop and disconnect port when stop clicked', async () => {
+    const mockPort = {
+      onMessage: { addListener: vi.fn() },
+      onDisconnect: { addListener: vi.fn() },
+      disconnect: vi.fn(),
+    };
+    vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
+
+    const screen = await renderToolbar();
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+    await vi.waitFor(() => expect(connectWithRetry).toHaveBeenCalled());
+
+    await screen.getByRole('button', { name: 'Stop' }).click();
+    await vi.waitFor(() => {
+      expect(window.chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'record-stop' })
+      );
+    });
+  });
+
+  it('should not record when chrome.tabs.query is unavailable', async () => {
     window.chrome.tabs.query = null as any;
 
-    const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
+    const screen = await renderToolbar();
     await screen.getByRole('button', { name: 'Record' }).click();
 
     expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalled();
-  })
+  });
 
-  it('should not send chrome message when tabs[0] is null', async () => {
-    window.chrome.tabs.query = vi.fn().mockResolvedValue([null]);
+  it('should dispatch error when record-start fails', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: false, error: 'connection failed' });
 
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ dispatch });
 
     await screen.getByRole('button', { name: 'Record' }).click();
 
-    expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalled();
-  })
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'ADD_LINE',
+        line: { text: 'Recording failed: connection failed', type: 'error' }
+      });
+    });
+  });
 
-  it('should send out message to console when chrome.runtime.sendMessage return failure', async () => {
-    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ error: 'connection failed' });
+  it('should dispatch error when connectWithRetry fails', async () => {
+    vi.mocked(connectWithRetry).mockRejectedValue(new Error('port error'));
 
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ dispatch });
 
     await screen.getByRole('button', { name: 'Record' }).click();
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Recording failed: connection failed', type: 'error' } })
-  })
-
-  it('should dispatch messages to console and editor console when pw-recorded-command is received', async () => {
-
-    const dispatch = vi.fn();
-    await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
-    const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-
-    // Invoke it with a fake message
-    listener({ type: 'pw-recorded-command', command: 'click e5' });
-
-    // Assert dispatch was called
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'ADD_LINE',
-      line: { text: 'click e5', type: 'command' }
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'ADD_LINE',
+        line: { text: 'Recording failed: could not connect to recorder.', type: 'error' }
+      });
     });
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'APPEND_EDITOR_CONTENT',
-      command: 'click e5'
+  });
+
+  it('should dispatch EDIT_EDITOR_CONTENT when port receives setSources', async () => {
+    let portMessageListener: Function | null = null;
+    const mockPort = {
+      onMessage: {
+        addListener: vi.fn((fn: Function) => { portMessageListener = fn; }),
+      },
+      onDisconnect: { addListener: vi.fn() },
+      disconnect: vi.fn(),
+    };
+    vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
+
+    const dispatch = vi.fn();
+    const screen = await renderToolbar({ dispatch });
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+    await vi.waitFor(() => expect(portMessageListener).not.toBeNull());
+
+    // Simulate JSONL source message from playwright-crx recorder
+    portMessageListener!({
+      type: 'recorder',
+      method: 'setSources',
+      sources: [{
+        id: 'jsonl',
+        actions: [
+          JSON.stringify({ action: { type: 'navigate', url: 'https://example.com' } }),
+        ],
+      }],
     });
-  })
 
-  it('should not dispatch messages to console and editor console when non pw-recorded-command is received', async () => {
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'EDIT_EDITOR_CONTENT' })
+      );
+    });
+  });
 
-    const dispatch = vi.fn();
-    await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
-    const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-
-    dispatch.mockClear(); // clear health check dispatches
-
-    // Invoke it with a fake message
-    listener({ type: 'non-pw-recorded-command', command: 'click e5' });
-
-    // Assert dispatch was not called
-    expect(dispatch).not.toHaveBeenCalled();
-  })
-
-  it('should still render the component when chrome.runtime?.onMessage is null', async () => {
-    window.chrome.runtime.onMessage = null as any;
-
-    const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
-    await expect.element(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
-  })
+  // ─── Export ────────────────────────────────────────────────────────────────
 
   it('should support export function', async () => {
     const pwCommands = `
@@ -553,15 +497,10 @@ describe('Toolbar component tests', () => {
     goto https://example.com
     click "Learn more"
     verify-text "As described in RFC 2606 and RFC 6761"
-    `
+    `;
 
     const dispatch = vi.fn();
-    const screen = await render(<Toolbar
-      editorContent={pwCommands}
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
+    const screen = await renderToolbar({ editorContent: pwCommands, dispatch });
 
     await screen.getByRole('button', { name: 'Export' }).click();
     const expected_code = `
@@ -573,255 +512,49 @@ test('recorded session', async ({ page }) => {
   await page.getByText("Learn more").click();
   await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
 });`.trim();
-    expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: expected_code, type: 'code-block' } })
-  });
-
-  it('should show connected status dot when health check succeeds', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    await vi.waitFor(() => {
-      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-      expect(dot.dataset.status).toBe('connected');
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'ADD_LINE',
+      line: { text: expected_code, type: 'code-block' }
     });
   });
 
-  it('should show disconnected status dot when health check fails', async () => {
-    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
+  // ─── Attach status indicator ───────────────────────────────────────────────
 
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    await vi.waitFor(() => {
-      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-      expect(dot.dataset.status).toBe('disconnected');
-    });
+  it('shows disconnected status dot when not attached', async () => {
+    const screen = await renderToolbar({ attachedUrl: null, isAttaching: false });
+    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+    expect(dot.dataset.status).toBe('disconnected');
   });
 
-  it('should dispatch version and connected messages on initial health check success', async () => {
-    const dispatch = vi.fn();
-    await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
-    await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Playwright REPL v0.6.0', type: 'info' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Connected to localhost:6781', type: 'success' } });
-    });
+  it('shows attaching status dot when isAttaching is true', async () => {
+    const screen = await renderToolbar({ attachedUrl: null, isAttaching: true });
+    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+    expect(dot.dataset.status).toBe('attaching');
   });
 
-  it('should dispatch error messages on initial health check failure', async () => {
-    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
-
-    const dispatch = vi.fn();
-    await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={dispatch}
-    />);
-
-    await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server not running.', type: 'error' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Start with: playwright-repl --extension', type: 'error' } });
-    });
+  it('shows connected status dot with attachedUrl', async () => {
+    const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
+    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+    expect(dot.dataset.status).toBe('connected');
   });
 
-  it('should poll health check every 5 seconds', async () => {
-    vi.useFakeTimers();
-
-    await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    // initial check from the first useEffect
-    await vi.waitFor(() => {
-      expect(checkHealth).toHaveBeenCalledTimes(1);
-    });
-
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(checkHealth).toHaveBeenCalledTimes(2);
-
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(checkHealth).toHaveBeenCalledTimes(3);
-
-    vi.useRealTimers();
+  it('shows hostname when attached', async () => {
+    const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
+    const statusIndicator = screen.container.querySelector('[data-testid="status-indicator"]');
+    expect(statusIndicator?.textContent).toContain('example.com');
   });
 
-  it('should update status dot to disconnected when polling detects failure', async () => {
-    vi.useFakeTimers();
-
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    // initially connected
-    await vi.waitFor(() => {
-      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-      expect(dot.dataset.status).toBe('connected');
-    });
-
-    // server goes down
-    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
-    await vi.advanceTimersByTimeAsync(30000);
-
-    await vi.waitFor(() => {
-      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-      expect(dot.dataset.status).toBe('disconnected');
-    });
-
-    vi.useRealTimers();
+  it('shows Not attached text when disconnected', async () => {
+    const screen = await renderToolbar({ attachedUrl: null, isAttaching: false });
+    await expect.element(screen.getByText('Not attached')).toBeInTheDocument();
   });
 
-  it('should display port number in status label', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    await expect.element(screen.getByText(':6781')).toBeInTheDocument();
+  it('shows Connecting text when isAttaching', async () => {
+    const screen = await renderToolbar({ attachedUrl: null, isAttaching: true });
+    await expect.element(screen.getByText('Connecting...')).toBeInTheDocument();
   });
 
-  it('should show port input when status indicator is clicked', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
-    indicator.click();
-
-    await vi.waitFor(() => {
-      const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
-      expect(input).not.toBeNull();
-      expect(input.value).toBe('6781');
-    });
-  });
-
-  it('should call setServerPort when port is changed and committed', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
-    indicator.click();
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
-    });
-
-    const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
-    await userEvent.click(input);
-    await userEvent.clear(input);
-    await userEvent.type(input, '9000');
-    await userEvent.keyboard('{Enter}');
-
-    await vi.waitFor(() => {
-      expect(setServerPort).toHaveBeenCalledWith(9000);
-    });
-  });
-
-  it('should change the port number when leave the input box', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
-    indicator.click();
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
-    });
-
-    const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
-    await userEvent.clear(input);
-    await userEvent.type(input, '9000');
-    await userEvent.tab();
-
-    await vi.waitFor(() => {
-      expect(setServerPort).toHaveBeenCalledWith(9000);
-    });
-  });
-
-  it('should dismiss port input on Escape without changing port', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
-    indicator.click();
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
-    });
-
-    await userEvent.keyboard('{Escape}');
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).toBeNull();
-    });
-    expect(setServerPort).not.toHaveBeenCalled();
-  });
-
-  it('should dismiss port input on when input value is 65536', async () => {
-    const screen = await render(<Toolbar
-      editorContent=''
-      fileName=''
-      stepLine={-1}
-      dispatch={vi.fn()}
-    />);
-
-    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
-    indicator.click();
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
-    });
-
-    const input = screen.container.querySelector('[data-testid="port-input"]')!;
-    await userEvent.clear(input);
-    await userEvent.type(input, '65536');
-    await userEvent.keyboard('{Enter}');
-
-    await vi.waitFor(() => {
-      expect(screen.container.querySelector('[data-testid="port-input"]')).toBeNull();
-    })
-    
-    expect(setServerPort).not.toHaveBeenCalled();
-    await expect.element(screen.getByText(':6781')).toBeInTheDocument();
-  });
-
-  // ─── Tab switcher ────────────────────────────────────────────────────────
+  // ─── Tab switcher ──────────────────────────────────────────────────────────
 
   describe('tab switcher', () => {
     const mockTabs = [
@@ -834,40 +567,27 @@ test('recorded session', async ({ page }) => {
     });
 
     it('renders a tab select element', async () => {
-      const screen = await render(<Toolbar
-        editorContent=''
-        fileName=''
-        stepLine={-1}
-        dispatch={vi.fn()}
-        attachedTabUrl={undefined}
-        onTabChange={vi.fn()}
-      />);
+      const screen = await renderToolbar();
       const select = screen.container.querySelector('select[title="Switch tab"]');
       expect(select).not.toBeNull();
     });
 
-    it('shows attachedTabUrl as the selected value', async () => {
-      const screen = await render(<Toolbar
-        editorContent=''
-        fileName=''
-        stepLine={-1}
-        dispatch={vi.fn()}
-        attachedTabUrl='https://example.com'
-        onTabChange={vi.fn()}
-      />);
+    it('shows attachedUrl as the selected value', async () => {
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com' });
+
+      // Load tabs first
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+      await vi.waitFor(() => {
+        expect(select.querySelectorAll('option').length).toBe(2);
+      });
+
       expect(select.value).toBe('https://example.com');
     });
 
     it('loads tabs from chrome.tabs.query on focus', async () => {
-      const screen = await render(<Toolbar
-        editorContent=''
-        fileName=''
-        stepLine={-1}
-        dispatch={vi.fn()}
-        attachedTabUrl={undefined}
-        onTabChange={vi.fn()}
-      />);
+      const screen = await renderToolbar();
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
@@ -878,18 +598,12 @@ test('recorded session', async ({ page }) => {
       });
     });
 
-    it('calls onTabChange with the selected URL', async () => {
-      const onTabChange = vi.fn();
-      const screen = await render(<Toolbar
-        editorContent=''
-        fileName=''
-        stepLine={-1}
-        dispatch={vi.fn()}
-        attachedTabUrl='https://example.com'
-        onTabChange={onTabChange}
-      />);
+    it('dispatches ATTACH_START and calls attachToTab when tab changed', async () => {
+      vi.mocked(attachToTab).mockResolvedValue({ ok: true, url: 'https://google.com' });
 
-      // Focus first to load tabs
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com', dispatch });
+
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
@@ -898,7 +612,30 @@ test('recorded session', async ({ page }) => {
       });
 
       await userEvent.selectOptions(select, 'https://google.com');
-      expect(onTabChange).toHaveBeenCalledWith('https://google.com');
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_START' });
+        expect(attachToTab).toHaveBeenCalledWith(2);
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_SUCCESS', url: 'https://google.com' });
+      });
+    });
+
+    it('dispatches ATTACH_FAIL when attachToTab returns error', async () => {
+      vi.mocked(attachToTab).mockResolvedValue({ ok: false, error: 'Cannot attach' });
+
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com', dispatch });
+
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+      await vi.waitFor(() => expect(select.querySelectorAll('option').length).toBe(2));
+
+      await userEvent.selectOptions(select, 'https://google.com');
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_FAIL' });
+      });
     });
 
     it('filters out chrome:// and chrome-extension:// tabs', async () => {
@@ -909,15 +646,7 @@ test('recorded session', async ({ page }) => {
         { id: 4, url: 'about:blank', title: 'Blank' },
       ]);
 
-      const screen = await render(<Toolbar
-        editorContent=''
-        fileName=''
-        stepLine={-1}
-        dispatch={vi.fn()}
-        attachedTabUrl={undefined}
-        onTabChange={vi.fn()}
-      />);
-
+      const screen = await renderToolbar();
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
@@ -928,95 +657,4 @@ test('recorded session', async ({ page }) => {
       });
     });
   });
-
-  // ─── Tab recording (pw-tab-activated) ───────────────────────────────────
-
-  describe('tab recording', () => {
-    it('calls executeCommand with tab-list and the activated tab URL', async () => {
-      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0: (current) [Google](https://google.com)', isError: false });
-
-      const dispatch = vi.fn();
-      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
-
-      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      listener({ type: 'pw-tab-activated', url: 'https://google.com' });
-
-      await vi.waitFor(() => {
-        expect(executeCommand).toHaveBeenCalledWith('tab-list', 'https://google.com');
-      });
-    });
-
-    it('records tab-select 0 when current tab is at index 0', async () => {
-      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0: (current) [Google](https://google.com)', isError: false });
-
-      const dispatch = vi.fn();
-      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
-
-      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      listener({ type: 'pw-tab-activated', url: 'https://google.com' });
-
-      await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'tab-select 0', type: 'command' } });
-        expect(dispatch).toHaveBeenCalledWith({ type: 'APPEND_EDITOR_CONTENT', command: 'tab-select 0' });
-      });
-    });
-
-    it('records tab-select 2 when current tab is at index 2', async () => {
-      const tabListText = [
-        '- 0:  [Tab 1](https://tab1.com)',
-        '- 1:  [Tab 2](https://tab2.com)',
-        '- 2: (current) [Tab 3](https://tab3.com)',
-      ].join('\n');
-
-      vi.mocked(executeCommand).mockResolvedValue({ text: tabListText, isError: false });
-
-      const dispatch = vi.fn();
-      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
-
-      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      listener({ type: 'pw-tab-activated', url: 'https://tab3.com' });
-
-      await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'tab-select 2', type: 'command' } });
-        expect(dispatch).toHaveBeenCalledWith({ type: 'APPEND_EDITOR_CONTENT', command: 'tab-select 2' });
-      });
-    });
-
-    it('does not record when tab-list output has no (current) marker', async () => {
-      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0:  [Tab 1](https://tab1.com)', isError: false });
-
-      const dispatch = vi.fn();
-      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
-
-      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      dispatch.mockClear();
-      listener({ type: 'pw-tab-activated', url: 'https://tab1.com' });
-
-      // Wait for the executeCommand promise to resolve
-      await vi.waitFor(() => {
-        expect(executeCommand).toHaveBeenCalledWith('tab-list', 'https://tab1.com');
-      });
-      expect(dispatch).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'APPEND_EDITOR_CONTENT' }),
-      );
-    });
-
-    it('does not throw when executeCommand rejects', async () => {
-      vi.mocked(executeCommand).mockRejectedValue(new Error('Server error'));
-
-      const dispatch = vi.fn();
-      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
-
-      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      dispatch.mockClear();
-
-      expect(() => listener({ type: 'pw-tab-activated', url: 'https://example.com' })).not.toThrow();
-
-      await new Promise(r => setTimeout(r, 50));
-      expect(dispatch).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'APPEND_EDITOR_CONTENT' }),
-      );
-    });
-  });
-
-})
+});

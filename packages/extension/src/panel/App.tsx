@@ -1,56 +1,46 @@
-import { useReducer, useRef, useEffect, useState } from 'react'
+import { useReducer, useRef, useEffect } from 'react'
 import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
 import ConsolePane from './components/ConsolePane'
 import CommandInput, { CommandInputHandle } from './components/CommandInput'
 import { panelReducer, initialState } from './reducer'
-import { runAndDispatch, setTabUrl } from './lib/run'
-import { selectTab } from './lib/server'
+import { runAndDispatch } from './lib/run'
+import { attachToTab } from './lib/bridge'
 
 function App() {
-  const [state, dispatch ] = useReducer(panelReducer, initialState)
+  const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const cmdInputRef = useRef<CommandInputHandle>(null)
-  const [attachedTabUrl, setAttachedTabUrl] = useState<string | undefined>();
+
+  async function doAttach(tabId: number) {
+    dispatch({ type: 'ATTACH_START' });
+    const res = await attachToTab(tabId);
+    if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+    else dispatch({ type: 'ATTACH_FAIL' });
+  }
 
   useEffect(() => {
-    if (!chrome.tabs?.onActivated) return;
-    // In popup mode (?tabId=X), stay attached to the original tab — don't follow Chrome tab switches.
-    const isPopup = new URLSearchParams(window.location.search).has('tabId');
-    if (isPopup) return;
-    const onActivated = (info: chrome.tabs.TabActiveInfo) => {
-      chrome.tabs.get(info.tabId, (tab) => {
-        const url = tab?.url;
-        if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
-        setTabUrl(url);
-        setAttachedTabUrl(url);
-        selectTab(url);
-      });
-    };
+    if (!chrome.tabs?.query) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const tabIdParam = params.get('tabId');
+
+    if (tabIdParam) {
+      // Popup mode — attach to the specific tab passed in URL
+      doAttach(Number(tabIdParam));
+      return;
+    }
+
+    // Side panel mode — attach to current active tab, then follow tab switches
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId) doAttach(tabId);
+    });
+
+    const onActivated = (info: chrome.tabs.TabActiveInfo) => doAttach(info.tabId);
     chrome.tabs.onActivated.addListener(onActivated);
     return () => chrome.tabs.onActivated.removeListener(onActivated);
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tabId = params.get('tabId');
-    if (tabId) {
-      // Popup mode — attach to the tab passed in the URL
-      chrome.tabs.get(Number(tabId), (tab) => {
-        if (chrome.runtime.lastError || !tab?.url) return;
-        setTabUrl(tab.url);
-        setAttachedTabUrl(tab.url);
-      });
-    } else {
-      // Side panel mode — initialize from the currently active tab
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const url = tabs[0]?.url;
-        if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
-        setTabUrl(url);
-        setAttachedTabUrl(url);
-      });
-    }
   }, []);
 
   async function handleSubmit(command: string) {
@@ -66,9 +56,9 @@ function App() {
         editorContent={state.editorContent}
         fileName={state.fileName}
         stepLine={state.stepLine}
+        attachedUrl={state.attachedUrl}
+        isAttaching={state.isAttaching}
         dispatch={dispatch}
-        attachedTabUrl={attachedTabUrl}
-        onTabChange={(url: string) => { setTabUrl(url); setAttachedTabUrl(url); selectTab(url).then(() => window.focus()); }}
       />
 
       {/* Editor pane */}

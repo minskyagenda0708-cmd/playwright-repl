@@ -9,11 +9,11 @@ import type { OutputLine } from '@/types'
 import { panelReducer, initialState, PanelState } from '@/reducer';
 import { runAndDispatch } from '@/lib/run';
 
-vi.mock('@/lib/server', () => ({
+vi.mock('@/lib/bridge', () => ({
   executeCommand: vi.fn(),
 }));
 
-import { executeCommand } from '@/lib/server';
+import { executeCommand } from '@/lib/bridge';
 
 vi.mock('@/lib/file-utils', () => ({
   saveImageToFile: vi.fn(),
@@ -119,7 +119,7 @@ describe("ConsolePane component tests", () => {
     await screen.getByRole('textbox').fill('click e5');
     await userEvent.keyboard('{Enter}');
 
-    await expect.element(screen.getByText('Not connected to server. Run: playwright-repl --extension')).toBeInTheDocument();
+    await expect.element(screen.getByText('Command failed. Try clicking Attach first.')).toBeInTheDocument();
   })
 
   it('should not submit empty string on Enter', async () => {

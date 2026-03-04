@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.8.0 — playwright-crx Migration (No External Server)
+
+**2026-03-04**
+
+### Breaking Changes
+
+- **Extension no longer requires `playwright-repl --extension`** — The Chrome extension is now fully self-contained. It attaches directly to any Chrome tab via the `chrome.debugger` API using [`playwright-crx`](https://github.com/ruifigueiredo19/playwright-crx), with no external server or port needed. Load the extension in Chrome and start typing commands immediately.
+- **Content-script recorder removed** — Recording now uses playwright-crx's built-in recorder (CDP-based), delivering more reliable capture with fewer injected scripts.
+
+### Features
+
+- **Self-contained extension** — Commands execute inside the service worker via `playwright-crx`. No `playwright-repl --extension` process needed.
+- **Auto-attach** — Panel auto-attaches to the active tab when opened. Switching tabs automatically re-attaches.
+- **Attach status indicator** — Toolbar shows a colored status dot and hostname (e.g. `example.com`) or "Not attached" / "Connecting…".
+- **Tab switcher** — Dropdown lists all open tabs and re-attaches on selection, dispatching `ATTACH_START` / `ATTACH_SUCCESS` / `ATTACH_FAIL` through the reducer.
+- **playwright-crx recorder** — Recording connects via a Chrome runtime port and receives JSONL actions from playwright-crx's built-in recorder; commands are translated to `.pw` syntax and appended to the editor in real time.
+- **`"debugger"` permission** — Added to `manifest.json`; required for `chrome.debugger.attach()` used internally by playwright-crx.
+
+### Architecture
+
+Replaced the HTTP server IPC layer with `chrome.runtime.sendMessage`:
+
+| Message type | Handler |
+|---|---|
+| `attach` | `crxApp.attach(tabId)` — attach to tab via CDP |
+| `run` | `parseReplCommand(command)` → page function |
+| `health` | Returns `{ ok: !!crxApp }` |
+| `record-start` | `crxApp.recorder.show(...)` |
+| `record-stop` | `crxApp.recorder.hide()` |
+
+New source files: `commands.ts`, `page-scripts.ts` (ported from playwright-repl-crx), `panel/lib/bridge.ts`.
+Deleted: `panel/lib/server.ts`, `content/recorder.ts`.
+
+### Tests
+
+- Rewrote `test/background.test.ts` — 19 tests covering all 5 message handlers
+- Replaced `test/lib/server.test.ts` with `test/lib/bridge.test.ts` — 7 tests for `executeCommand`, `attachToTab`, `connectWithRetry`
+- Updated `test/components/Toolbar.browser.test.tsx` — replaced server/health/port tests with attach-status and port-based recording tests
+- Added 4 ATTACH\_\* tests to `test/reducer.test.ts`
+- Updated E2E fixtures to intercept `chrome.runtime.sendMessage` instead of HTTP routes
+- Deleted `e2e/recording/` (content-script recorder gone)
+
+---
+
 ## v0.7.16 — Tab Switch Recording
 
 **2026-03-04**
