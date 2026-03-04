@@ -154,7 +154,6 @@ export function pwToPlaywright(cmd: string): string | null {
 
 // ─── JSONL → REPL conversion (for port-based recorder) ───
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractNth(action: any): string {
   let node = action.locator?.next;
   while (node) {
@@ -173,7 +172,6 @@ function extractNth(action: any): string {
  * Converts a Playwright recorder JSONL action string to a REPL command.
  * Returns null if the action should be skipped.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
   try {
     const a = JSON.parse(jsonStr);

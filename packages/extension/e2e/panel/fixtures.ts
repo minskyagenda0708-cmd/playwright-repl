@@ -53,7 +53,7 @@ export const test = base.extend<
 
     // Install init script so the mock is in place before any panel JS runs
     await page.addInitScript(() => {
-      // @ts-ignore
+      // @ts-expect-error - test-only global injected before panel JS runs
       window.__testRunResponse = { text: 'OK', isError: false };
     });
 

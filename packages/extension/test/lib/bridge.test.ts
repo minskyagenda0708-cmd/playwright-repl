@@ -69,10 +69,10 @@ describe('bridge', () => {
   });
 
   it('connectWithRetry retries after immediate disconnect', async () => {
-    const disconnectListeners: Function[] = [];
+    const disconnectListeners: ((...args: unknown[]) => unknown)[] = [];
     const badPort = {
       onDisconnect: {
-        addListener: vi.fn((fn: Function) => {
+        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => {
           disconnectListeners.push(fn);
           // Simulate immediate disconnect
           setTimeout(() => fn(), 0);
@@ -105,10 +105,10 @@ describe('bridge', () => {
   });
 
   it('connectWithRetry rejects after max retries', async () => {
-    const disconnectListeners: Function[] = [];
+    const disconnectListeners: ((...args: unknown[]) => unknown)[] = [];
     const badPort = {
       onDisconnect: {
-        addListener: vi.fn((fn: Function) => {
+        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => {
           disconnectListeners.push(fn);
           setTimeout(() => fn(), 0);
         }),

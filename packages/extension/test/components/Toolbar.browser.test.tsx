@@ -454,10 +454,10 @@ describe('Toolbar component tests', () => {
   });
 
   it('should dispatch EDIT_EDITOR_CONTENT when port receives setSources', async () => {
-    let portMessageListener: Function | null = null;
+    let portMessageListener: ((...args: unknown[]) => unknown) | null = null;
     const mockPort = {
       onMessage: {
-        addListener: vi.fn((fn: Function) => { portMessageListener = fn; }),
+        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => { portMessageListener = fn; }),
       },
       onDisconnect: { addListener: vi.fn() },
       disconnect: vi.fn(),

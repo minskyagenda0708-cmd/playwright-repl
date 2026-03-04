@@ -45,7 +45,6 @@ export type ParseResult =
   | { help: string }
   | { error: string };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PageScriptFn = (...args: any[]) => Promise<any>;
 
 function isDirect(result: ParsedArgs | DirectExecution | TabOperation): result is DirectExecution {
@@ -293,7 +292,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution | TabOperat
   if (cmdName === 'highlight') {
     const loc = args._.slice(1).join(' ');
     if (loc) {
-      const isSelector = /[.#\[\]>:=]/.test(loc);
+      const isSelector = /[.#[\]>:=]/.test(loc);
       return isSelector
         ? { fn: highlightBySelector as PageScriptFn, fnArgs: [loc] }
         : { fn: highlightByText as PageScriptFn, fnArgs: [loc] };

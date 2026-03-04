@@ -21,4 +21,10 @@ export default tseslint.config(
       "no-var": "off",
     },
   },
+  {
+    files: ["src/page-scripts.ts"],
+    rules: {
+      "@typescript-eslint/ban-ts-comment": "off",
+    },
+  },
 );

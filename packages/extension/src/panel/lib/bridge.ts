@@ -20,7 +20,7 @@ export function connectWithRetry(maxRetries = 20, delay = 150): Promise<chrome.r
       const port = chrome.runtime.connect();
       let settled = false;
       port.onDisconnect.addListener(() => {
-        chrome.runtime.lastError?.message;
+        void chrome.runtime.lastError?.message;
         if (settled) return;
         settled = true;
         if (attempt < maxRetries) setTimeout(tryConnect, delay);
