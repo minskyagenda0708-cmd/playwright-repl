@@ -337,6 +337,74 @@ describe('Engine', () => {
     });
   });
 
+  // ─── selectPageByUrl ────────────────────────────────────────────────────
+
+  describe('selectPageByUrl', () => {
+    beforeEach(async () => {
+      mocks.browserContext.pages = vi.fn().mockReturnValue([]);
+      mocks.callTool.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }], isError: false });
+      await engine.start({});
+    });
+
+    it('selects page with exact URL match', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://example.com' },
+        { url: () => 'https://google.com' },
+      ]);
+      await engine.selectPageByUrl('https://example.com');
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_tabs', { action: 'select', index: 0 });
+    });
+
+    it('strips query params when matching', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://www.google.com/' },
+      ]);
+      await engine.selectPageByUrl('https://www.google.com/?zx=123&no_sw_cr=1');
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_tabs', { action: 'select', index: 0 });
+    });
+
+    it('strips trailing slash when matching', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://example.com/' },
+      ]);
+      await engine.selectPageByUrl('https://example.com');
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_tabs', { action: 'select', index: 0 });
+    });
+
+    it('strips hash fragment when matching', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://example.com/page' },
+      ]);
+      await engine.selectPageByUrl('https://example.com/page#section');
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_tabs', { action: 'select', index: 0 });
+    });
+
+    it('selects the correct index when multiple pages', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://example.com' },
+        { url: () => 'https://google.com' },
+        { url: () => 'https://github.com' },
+      ]);
+      await engine.selectPageByUrl('https://github.com');
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_tabs', { action: 'select', index: 2 });
+    });
+
+    it('does nothing when URL does not match any page', async () => {
+      mocks.browserContext.pages.mockReturnValue([
+        { url: () => 'https://example.com' },
+      ]);
+      await engine.selectPageByUrl('https://other.com');
+      expect(mocks.callTool).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when engine not started', async () => {
+      const { deps } = createMockDeps();
+      const fresh = new Engine(deps);
+      await fresh.selectPageByUrl('https://example.com'); // Should not throw
+      expect(mocks.callTool).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── close ──────────────────────────────────────────────────────────────
 
   describe('close', () => {

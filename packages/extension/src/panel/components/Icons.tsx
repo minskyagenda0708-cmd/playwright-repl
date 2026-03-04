@@ -65,3 +65,13 @@ export function ExportIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+export function TabsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="4" width="14" height="10" rx="1.5"/>
+      <path d="M1 7h14"/>
+      <rect x="3" y="1" width="6" height="4" rx="1"/>
+    </svg>
+  );
+}

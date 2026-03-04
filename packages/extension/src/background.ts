@@ -1,6 +1,32 @@
-// background.js — Opens side panel when extension icon is clicked + recording handlers.
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+import { loadSettings } from './panel/lib/settings';
+import type { PwReplSettings } from './panel/lib/settings';
+
+// Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+
+let cachedSettings: PwReplSettings = { openAs: 'sidepanel'};
+loadSettings().then(s => cachedSettings = s ).catch(()=> {});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.openAs) {
+    cachedSettings.openAs = changes.openAs.newValue;
+  }
+});
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (cachedSettings.openAs === 'sidepanel') {
+    await chrome.sidePanel.open({ windowId: tab.windowId! });
+  } else {
+    const tabId = tab.id;
+    await chrome.windows.create({
+      url: chrome.runtime.getURL('panel/panel.html') + (tabId ? `?tabId=${tabId}` : ''),
+      type: 'popup',
+      width: 450,
+      height: 700,
+    });
+  }
+});
 // ─── Recording State ───────────────────────────────────────────────────────
 
 let recordingTabId: number | null = null;

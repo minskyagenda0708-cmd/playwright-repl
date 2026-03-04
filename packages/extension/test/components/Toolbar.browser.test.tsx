@@ -821,9 +821,113 @@ test('recorded session', async ({ page }) => {
     await expect.element(screen.getByText(':6781')).toBeInTheDocument();
   });
 
+  // ─── Tab switcher ────────────────────────────────────────────────────────
 
+  describe('tab switcher', () => {
+    const mockTabs = [
+      { id: 1, url: 'https://example.com', title: 'Example' },
+      { id: 2, url: 'https://google.com', title: 'Google' },
+    ];
 
+    beforeEach(() => {
+      (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockTabs);
+    });
 
+    it('renders a tab select element', async () => {
+      const screen = await render(<Toolbar
+        editorContent=''
+        fileName=''
+        stepLine={-1}
+        dispatch={vi.fn()}
+        attachedTabUrl={undefined}
+        onTabChange={vi.fn()}
+      />);
+      const select = screen.container.querySelector('select[title="Switch tab"]');
+      expect(select).not.toBeNull();
+    });
+
+    it('shows attachedTabUrl as the selected value', async () => {
+      const screen = await render(<Toolbar
+        editorContent=''
+        fileName=''
+        stepLine={-1}
+        dispatch={vi.fn()}
+        attachedTabUrl='https://example.com'
+        onTabChange={vi.fn()}
+      />);
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      expect(select.value).toBe('https://example.com');
+    });
+
+    it('loads tabs from chrome.tabs.query on focus', async () => {
+      const screen = await render(<Toolbar
+        editorContent=''
+        fileName=''
+        stepLine={-1}
+        dispatch={vi.fn()}
+        attachedTabUrl={undefined}
+        onTabChange={vi.fn()}
+      />);
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+      await vi.waitFor(() => {
+        expect(window.chrome.tabs.query).toHaveBeenCalled();
+        const options = select.querySelectorAll('option');
+        expect(options.length).toBe(2);
+      });
+    });
+
+    it('calls onTabChange with the selected URL', async () => {
+      const onTabChange = vi.fn();
+      const screen = await render(<Toolbar
+        editorContent=''
+        fileName=''
+        stepLine={-1}
+        dispatch={vi.fn()}
+        attachedTabUrl='https://example.com'
+        onTabChange={onTabChange}
+      />);
+
+      // Focus first to load tabs
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+      await vi.waitFor(() => {
+        expect(select.querySelectorAll('option').length).toBe(2);
+      });
+
+      await userEvent.selectOptions(select, 'https://google.com');
+      expect(onTabChange).toHaveBeenCalledWith('https://google.com');
+    });
+
+    it('filters out chrome:// and chrome-extension:// tabs', async () => {
+      (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { id: 1, url: 'https://example.com', title: 'Example' },
+        { id: 2, url: 'chrome://newtab/', title: 'New Tab' },
+        { id: 3, url: 'chrome-extension://abc/panel.html', title: 'Panel' },
+        { id: 4, url: 'about:blank', title: 'Blank' },
+      ]);
+
+      const screen = await render(<Toolbar
+        editorContent=''
+        fileName=''
+        stepLine={-1}
+        dispatch={vi.fn()}
+        attachedTabUrl={undefined}
+        onTabChange={vi.fn()}
+      />);
+
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+      await vi.waitFor(() => {
+        const options = select.querySelectorAll('option');
+        expect(options.length).toBe(1);
+        expect((options[0] as HTMLOptionElement).value).toBe('https://example.com');
+      });
+    });
+  });
 
 
 })

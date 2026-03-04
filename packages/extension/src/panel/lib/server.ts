@@ -39,3 +39,13 @@ export async function checkHealth(): Promise<{status: string, version: string, b
     const res = await fetch(`${getServerUrl()}/health`);
     return res.json();
 }
+
+export async function selectTab(url: string): Promise<void> {
+    console.log('[selectTab] sending', url);
+    const res = await fetch(`${getServerUrl()}/select-tab`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+    }).catch((e) => { console.error('[selectTab] fetch failed', e); return null; });
+    console.log('[selectTab] response', res?.status);
+}

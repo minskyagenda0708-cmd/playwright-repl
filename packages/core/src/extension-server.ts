@@ -30,6 +30,7 @@ export class CommandServer {
   private _engine: EngineInterface;
   private _server: Server | null = null;
   private _port: number | null = null;
+  private _lastActiveUrl: string | null = null;
 
   constructor(engine: EngineInterface) {
     this._engine = engine;
@@ -79,6 +80,25 @@ export class CommandServer {
       return;
     }
 
+    // Tab selection endpoint — eagerly switches Playwright's active page
+    if (req.method === 'POST' && urlPath === '/select-tab') {
+      try {
+        const body = await readBody(req);
+        const { url } = JSON.parse(body);
+        console.log(`[select-tab] ${url || 'no-url'}`);
+        if (url && url !== this._lastActiveUrl) {
+          await withTimeout(this._engine.selectPageByUrl(url), 5000).catch(() => {});
+          this._lastActiveUrl = url;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch {
+        res.writeHead(500);
+        res.end('{}');
+      }
+      return;
+    }
+
     // Panel command endpoint
     if (req.method === 'POST' && urlPath === '/run') {
       try {
@@ -86,9 +106,10 @@ export class CommandServer {
         const { raw, activeTabUrl } = JSON.parse(body);
         console.log(`[server] ${raw} | ${activeTabUrl || 'no-url'}`);
 
-        // Auto-select the tab matching the panel's active tab.
-        if (activeTabUrl) {
+        // Auto-select the tab matching the panel's active tab (only when it changes).
+        if (activeTabUrl && activeTabUrl !== this._lastActiveUrl) {
           await withTimeout(this._engine.selectPageByUrl(activeTabUrl), 5000).catch(() => {});
+          this._lastActiveUrl = activeTabUrl;
         }
 
         let args = parseInput(raw);

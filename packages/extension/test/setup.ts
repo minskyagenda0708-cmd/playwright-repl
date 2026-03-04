@@ -13,7 +13,15 @@ if (!globalThis.chrome.scripting) {
 // vitest-chrome doesn't include chrome.sidePanel — add it manually
 if (!globalThis.chrome.sidePanel) {
   (globalThis.chrome as any).sidePanel = {
-    setPanelBehavior: () => {},
+    setPanelBehavior: () => Promise.resolve(),
+    open: () => Promise.resolve(),
+  };
+}
+
+// vitest-chrome doesn't include chrome.action — add it manually
+if (!globalThis.chrome.action) {
+  (globalThis.chrome as any).action = {
+    onClicked: { addListener: () => {} },
   };
 }
 

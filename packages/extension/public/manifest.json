@@ -8,8 +8,14 @@
     "tabs",
     "sidePanel",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "storage",
+    "windows"
   ],
+  "options_ui": {
+    "page": "preferences/preferences.html",
+    "open_in_tab": false
+  },
   "host_permissions": [
     "<all_urls>"
   ],

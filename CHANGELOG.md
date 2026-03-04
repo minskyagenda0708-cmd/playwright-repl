@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.7.15 — Popup Window Mode + Tab Switcher
+
+**2026-03-04**
+
+### Features
+
+- **Popup window mode**: Right-click the extension icon → Options to choose "Side Panel" or "Popup Window". In popup mode, clicking the icon opens a standalone 450×700 popup with the REPL panel attached to the current tab (closes [#34](https://github.com/stevez/playwright-repl/issues/34))
+- **Tab switcher**: Toolbar dropdown lets you re-attach the panel to any open browser tab — works in both side panel and popup modes
+- **Preferences page**: New Options UI (right-click icon → Options) saves the open-as preference via `chrome.storage.local`
+
+### Improvements
+
+- **URL normalization in tab switching**: `selectPageByUrl` strips query params and hash fragments before comparing URLs, fixing mismatches caused by Chrome's internal params (e.g. `?zx=...&no_sw_cr=1`)
+- **`/select-tab` HTTP endpoint**: New `CommandServer` endpoint lets the panel notify the engine when the active tab changes
+
+### Tests
+
+- 7 new unit tests for `Engine.selectPageByUrl` (exact match, query params, trailing slash, hash, multi-page index, no-op)
+- 4 new unit tests for `POST /select-tab` in `CommandServer` (200 response, deduplication, URL change)
+- 5 new browser component tests for the Toolbar tab switcher
+
+---
+
 ## v0.7.14 — Focus Fix + Command Timeout
 
 **2026-03-03**

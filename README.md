@@ -26,16 +26,16 @@ Key features:
 Both CLI and Extension are frontends to the Engine. Neither directly accesses Chrome.
 
 ```
-┌──────────────┐     ┌──────────────┐
-│   CLI (REPL) │     │  Extension   │
-│  packages/cli│     │  (Side Panel)│
-└──────┬───────┘     └──────┬───────┘
-       │                    │ fetch POST /run
-       │                    ▼
-       │              ┌─────────────┐
-       └──────────────►   Engine    │
-                      │ (in-process)│
-                      └──────┬──────┘
+┌──────────────┐     ┌───────────────────────┐
+│   CLI (REPL) │     │       Extension        │
+│  packages/cli│     │  (Side Panel / Popup)  │
+└──────┬───────┘     └──────────┬─────────────┘
+       │                        │ fetch POST /run
+       │                        ▼
+       │              ┌─────────────────┐
+       └──────────────►     Engine      │
+                      │  (in-process)   │
+                      └──────┬──────────┘
                              │ CDP
                              ▼
                       ┌─────────────┐
@@ -88,12 +88,14 @@ pw> verify-text "1 item left"
 # 1. Start in extension mode (launches Chrome with extension loaded)
 playwright-repl --extension
 
-# 2. Open any website → click the side panel icon → "Playwright REPL" panel
+# 2. Click the extension icon to open the "Playwright REPL" side panel
 
 # 3. Type commands in the panel — same syntax as CLI
 ```
 
-The extension side panel includes a REPL input, script editor, visual recorder, and export to Playwright tests.
+The extension panel includes a REPL input, script editor, visual recorder, and export to Playwright tests.
+
+**Open as popup window:** Right-click the extension icon → **Options** → select "Popup Window". Click the icon and the REPL opens as a standalone 450×700 window attached to the current tab. Use the **tab switcher** in the toolbar to re-attach to a different tab at any time.
 
 ## Install
 
@@ -385,14 +387,17 @@ pw> run-code const u = await page.url(); const t = await page.title(); return {u
 
 ## Extension Features
 
-### Side Panel
+### Side Panel and Popup Window
 
-The extension adds a "Playwright REPL" side panel in Chrome with:
+The extension opens as a Chrome **side panel** by default. To switch to a standalone **popup window**, right-click the extension icon → **Options** and choose "Open as Popup Window". Your preference is saved and applied every time you click the icon.
+
+The panel UI is the same in both modes:
 
 - **REPL input** — type commands at the bottom, results appear in the console pane
 - **Script editor** — write multi-line `.pw` scripts with line numbers, run all or step through
 - **Visual recorder** — click Record, interact with the page, recorded commands appear automatically
 - **Export** — convert `.pw` commands to Playwright TypeScript test code
+- **Tab switcher** — toolbar dropdown lets you re-attach the panel to any open browser tab without reopening
 - **Light/dark themes** — matches your DevTools theme
 
 ### Recording in Extension

@@ -8,10 +8,12 @@ import { getServerPort } from '@/lib/server';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
-    dispatch: React.Dispatch<Action>
+    dispatch: React.Dispatch<Action>,
+    attachedTabUrl: string | undefined,
+    onTabChange: (url: string) => void,
 };
 
-function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, onTabChange }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
@@ -21,6 +23,19 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
     const [isDarkMode, setIsDarkMode] = useState(()=> localStorage.getItem("theme") === 'dark');
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
+;
+    const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
+
+    async function loadTabs() {
+        if (!chrome.tabs?.query) return;
+        const tabs = await chrome.tabs.query({});
+        setAvailableTabs(tabs.filter(t =>
+            t?.url &&
+            !t.url.startsWith('chrome://') &&
+            !t.url.startsWith('chrome-extension://') &&
+            !t.url.startsWith('about:')
+        ));
+    }
 
     function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -195,6 +210,10 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
     }, [isDarkMode]);
 
+    useEffect(() => {
+        loadTabs();
+    }, []);
+
     return (
         <div id="toolbar" className="flex flex-wrap gap-1 justify-between items-center py-1 px-2 bg-(--bg-toolbar) border-b border-solid border-(--border-primary) shrink-0">
             <div id="toolbar-left" className="flex flex-wrap gap-1 items-center">
@@ -225,6 +244,16 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 </button>
             </div>
             <div id="toolbar-right" className="flex items-center">
+                <select
+                    value={attachedTabUrl ?? ''}
+                    title="Switch tab"
+                    onFocus={loadTabs}
+                    onChange={e => onTabChange(e.target.value)}
+                >
+                    {availableTabs.map(tab => (
+                        <option key={tab.id} value={tab.url}>{new URL(tab.url!).hostname}</option>
+                    ))}
+                </select>
                 <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
                 <span className="w-[1px] h-[18px] bg-(--color-toolbar-sep) mx-1"></span>
                 <span

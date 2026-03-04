@@ -275,7 +275,12 @@ export class Engine {
   async selectPageByUrl(targetUrl: string): Promise<void> {
     if (!this._browserContext || !this._backend || !targetUrl) return;
     const pages = this._browserContext.pages();
-    const normalize = (u: string) => u.replace(/\/+$/, '');
+    const normalize = (u: string) => {
+      try {
+        const p = new URL(u);
+        return (p.origin + p.pathname).replace(/\/+$/, '');
+      } catch { return u.replace(/\/+$/, ''); }
+    };
     const target = normalize(targetUrl);
     for (let i = 0; i < pages.length; i++) {
       if (normalize(pages[i].url()) === target) {
