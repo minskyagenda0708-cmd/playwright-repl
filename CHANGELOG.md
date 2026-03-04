@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.7.16 — Tab Switch Recording
+
+**2026-03-04**
+
+### Features
+
+- **Tab switch recording**: Switching Chrome tabs during a recording session now automatically records a `tab-select N` command. The panel resolves the Playwright tab index by calling `tab-list` on the server (which sets the tab as current), parsing the `(current)` marker, and appending the command to the editor.
+
+### Tests
+
+- 3 new unit tests for `onActivated` handler in `background.test.ts` (sends `pw-tab-activated` with URL, skips when not recording, skips when tab has no URL)
+- 5 new browser component tests for `pw-tab-activated` handling in `Toolbar.browser.test.tsx` (calls `tab-list` with correct URL, records `tab-select 0`, records `tab-select 2`, no-op when no `(current)` marker, no-op on server error)
+
+---
+
 ## v0.7.15 — Popup Window Mode + Tab Switcher
 
 **2026-03-04**

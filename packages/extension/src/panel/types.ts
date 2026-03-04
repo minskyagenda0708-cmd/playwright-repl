@@ -10,4 +10,6 @@ export type CommandResult = {
     image?: string
 }
 
-export type RecordedMessage = { type: 'pw-recorded-command'; command: string };
+export type RecordedMessage =
+    | { type: 'pw-recorded-command'; command: string }
+    | { type: 'pw-tab-activated'; url: string };

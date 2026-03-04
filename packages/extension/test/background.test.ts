@@ -360,4 +360,54 @@ describe("background.js recording handlers", () => {
       files: ["content/recorder.js"],
     });
   });
+
+  // ─── onActivated (tab switch during recording) ─────────────────────────
+
+  describe("onActivated (tab switch during recording)", () => {
+    it("sends pw-tab-activated with URL when recording is active", async () => {
+      await startRecording(42);
+
+      (chrome.tabs as any).get = vi.fn().mockImplementation((_id: number, cb: (tab: chrome.tabs.Tab) => void) => {
+        cb({ id: 43, url: "https://google.com" } as chrome.tabs.Tab);
+      });
+
+      const onActivatedListener = ((chrome.tabs.onActivated as any).addListener as Mock).mock.calls[0][0];
+      onActivatedListener({ tabId: 43 });
+
+      await vi.waitFor(() => {
+        expect(rtSendMessage).toHaveBeenCalledWith({ type: "pw-tab-activated", url: "https://google.com" });
+      });
+    });
+
+    it("does nothing when not recording", async () => {
+      // recordingTabId is null — startRecording not called
+      (chrome.tabs as any).get = vi.fn().mockImplementation((_id: number, cb: (tab: chrome.tabs.Tab) => void) => {
+        cb({ id: 43, url: "https://google.com" } as chrome.tabs.Tab);
+      });
+
+      const onActivatedListener = ((chrome.tabs.onActivated as any).addListener as Mock).mock.calls[0][0];
+      onActivatedListener({ tabId: 43 });
+
+      await vi.advanceTimersByTimeAsync(50);
+      expect(rtSendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "pw-tab-activated" }),
+      );
+    });
+
+    it("skips sending when tab has no URL", async () => {
+      await startRecording(42);
+
+      (chrome.tabs as any).get = vi.fn().mockImplementation((_id: number, cb: (tab: chrome.tabs.Tab) => void) => {
+        cb({ id: 43 } as chrome.tabs.Tab);
+      });
+
+      const onActivatedListener = ((chrome.tabs.onActivated as any).addListener as Mock).mock.calls[0][0];
+      onActivatedListener({ tabId: 43 });
+
+      await vi.advanceTimersByTimeAsync(50);
+      expect(rtSendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "pw-tab-activated" }),
+      );
+    });
+  });
 });

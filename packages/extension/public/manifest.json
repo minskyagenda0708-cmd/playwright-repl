@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Playwright REPL",
-  "version": "0.7.0",
+  "version": "0.7.16",
   "description": "A side panel for Playwright-style browser automation commands.",
   "permissions": [
     "activeTab",

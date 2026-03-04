@@ -2,18 +2,18 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import type { RecordedMessage } from '@/types';
 import { exportToPlaywright } from '@/lib/converter';
-import { checkHealth, setServerPort } from '@/lib/server';
+import { checkHealth, setServerPort, executeCommand } from '@/lib/server';
 import { runAndDispatch } from '@/lib/run';
 import { getServerPort } from '@/lib/server';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>,
-    attachedTabUrl: string | undefined,
-    onTabChange: (url: string) => void,
+    attachedTabUrl?: string,
+    onTabChange?: (url: string) => void,
 };
 
-function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, onTabChange }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, onTabChange = () => {} }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
@@ -160,6 +160,18 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch, attachedTabUrl, 
             if (msg.type === "pw-recorded-command" && msg.command) {
                 dispatch({ type: 'ADD_LINE', line: { text: msg.command, type: 'command' } });
                 dispatch({ type: 'APPEND_EDITOR_CONTENT', command: msg.command });
+            }
+            if (msg.type === "pw-tab-activated" && msg.url) {
+                // Pass the new tab URL as activeTabUrl so the server auto-selects it in Playwright,
+                // then parse the (current) index from tab-list output to record tab-select N
+                executeCommand('tab-list', msg.url).then(result => {
+                    const match = result.text.match(/^- (\d+): \(current\)/m);
+                    if (match) {
+                        const cmd = `tab-select ${match[1]}`;
+                        dispatch({ type: 'ADD_LINE', line: { text: cmd, type: 'command' } });
+                        dispatch({ type: 'APPEND_EDITOR_CONTENT', command: cmd });
+                    }
+                }).catch(() => {});
             }
         };
         if (!chrome.runtime?.onMessage) return;

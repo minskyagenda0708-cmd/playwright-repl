@@ -85,13 +85,10 @@ chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
   if (recordingTabId === null) return;
   recordingTabId = activeInfo.tabId;
   injectRecorder(activeInfo.tabId).catch(() => {});
-  // Notify panel about tab switch
+  // Notify panel to record tab-select N (panel resolves index via tab-list)
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (chrome.runtime.lastError) return;
-    chrome.runtime.sendMessage({
-      type: "pw-recorded-command",
-      command: "# tab: " + (tab.title || tab.url || "unknown"),
-    }).catch(() => {});
+    if (chrome.runtime.lastError || !tab.url) return;
+    chrome.runtime.sendMessage({ type: "pw-tab-activated", url: tab.url }).catch(() => {});
   });
 });
 

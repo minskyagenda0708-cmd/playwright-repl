@@ -929,5 +929,94 @@ test('recorded session', async ({ page }) => {
     });
   });
 
+  // ─── Tab recording (pw-tab-activated) ───────────────────────────────────
+
+  describe('tab recording', () => {
+    it('calls executeCommand with tab-list and the activated tab URL', async () => {
+      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0: (current) [Google](https://google.com)', isError: false });
+
+      const dispatch = vi.fn();
+      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
+
+      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      listener({ type: 'pw-tab-activated', url: 'https://google.com' });
+
+      await vi.waitFor(() => {
+        expect(executeCommand).toHaveBeenCalledWith('tab-list', 'https://google.com');
+      });
+    });
+
+    it('records tab-select 0 when current tab is at index 0', async () => {
+      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0: (current) [Google](https://google.com)', isError: false });
+
+      const dispatch = vi.fn();
+      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
+
+      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      listener({ type: 'pw-tab-activated', url: 'https://google.com' });
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'tab-select 0', type: 'command' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'APPEND_EDITOR_CONTENT', command: 'tab-select 0' });
+      });
+    });
+
+    it('records tab-select 2 when current tab is at index 2', async () => {
+      const tabListText = [
+        '- 0:  [Tab 1](https://tab1.com)',
+        '- 1:  [Tab 2](https://tab2.com)',
+        '- 2: (current) [Tab 3](https://tab3.com)',
+      ].join('\n');
+
+      vi.mocked(executeCommand).mockResolvedValue({ text: tabListText, isError: false });
+
+      const dispatch = vi.fn();
+      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
+
+      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      listener({ type: 'pw-tab-activated', url: 'https://tab3.com' });
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'tab-select 2', type: 'command' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'APPEND_EDITOR_CONTENT', command: 'tab-select 2' });
+      });
+    });
+
+    it('does not record when tab-list output has no (current) marker', async () => {
+      vi.mocked(executeCommand).mockResolvedValue({ text: '- 0:  [Tab 1](https://tab1.com)', isError: false });
+
+      const dispatch = vi.fn();
+      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
+
+      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      dispatch.mockClear();
+      listener({ type: 'pw-tab-activated', url: 'https://tab1.com' });
+
+      // Wait for the executeCommand promise to resolve
+      await vi.waitFor(() => {
+        expect(executeCommand).toHaveBeenCalledWith('tab-list', 'https://tab1.com');
+      });
+      expect(dispatch).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'APPEND_EDITOR_CONTENT' }),
+      );
+    });
+
+    it('does not throw when executeCommand rejects', async () => {
+      vi.mocked(executeCommand).mockRejectedValue(new Error('Server error'));
+
+      const dispatch = vi.fn();
+      await render(<Toolbar editorContent='' fileName='' stepLine={-1} dispatch={dispatch} />);
+
+      const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      dispatch.mockClear();
+
+      expect(() => listener({ type: 'pw-tab-activated', url: 'https://example.com' })).not.toThrow();
+
+      await new Promise(r => setTimeout(r, 50));
+      expect(dispatch).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'APPEND_EDITOR_CONTENT' }),
+      );
+    });
+  });
 
 })
