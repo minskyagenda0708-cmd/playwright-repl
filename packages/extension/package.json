@@ -39,7 +39,6 @@
     "vitest-chrome": "^0.1.0"
   },
   "dependencies": {
-    "playwright-crx": "^0.15.0",
     "@codemirror/autocomplete": "^6.20.1",
     "@codemirror/commands": "^6.10.2",
     "@codemirror/language": "^6.12.2",
@@ -47,6 +46,7 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.16",
     "codemirror": "^6.0.2",
+    "@playwright-repl/playwright-crx": "0.15.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   }

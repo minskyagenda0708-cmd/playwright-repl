@@ -10,3 +10,5 @@ packages/*/dist/
 *.tsbuildinfo
 test-results/
 __screenshots__/
+.yalc/
+yalc.lock

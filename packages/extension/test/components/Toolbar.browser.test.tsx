@@ -56,7 +56,7 @@ describe('Toolbar component tests', () => {
       onMessage: { addListener: vi.fn() },
       onDisconnect: { addListener: vi.fn() },
       disconnect: vi.fn(),
-    });
+    } as unknown as chrome.runtime.Port);
   });
 
   afterEach(() => {
@@ -396,7 +396,7 @@ describe('Toolbar component tests', () => {
       onMessage: { addListener: vi.fn() },
       onDisconnect: { addListener: vi.fn() },
       disconnect: vi.fn(),
-    };
+    } as unknown as chrome.runtime.Port;
     vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
 
     const screen = await renderToolbar();
@@ -461,7 +461,7 @@ describe('Toolbar component tests', () => {
       },
       onDisconnect: { addListener: vi.fn() },
       disconnect: vi.fn(),
-    };
+    } as unknown as chrome.runtime.Port;
     vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
 
     const dispatch = vi.fn();

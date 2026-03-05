@@ -102,7 +102,7 @@ describe('Reducer tests', () => {
    })
 
    it('should remain the same state for the invalid event', () => {
-     const newState = panelReducer(initialState, {type: 'invalid_event'});
+     const newState = panelReducer(initialState, {type: 'invalid_event'} as never);
      expect(newState).toEqual(initialState);
    })
 

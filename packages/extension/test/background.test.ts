@@ -6,7 +6,7 @@ let mockPage: any;
 let mockCrxApp: any;
 let parseReplCommandMock: ReturnType<typeof vi.fn>;
 
-vi.mock('playwright-crx', () => {
+vi.mock('@playwright-repl/playwright-crx', () => {
   mockPage = { url: vi.fn().mockReturnValue('https://example.com') };
   const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
   mockCrxApp = {
@@ -53,7 +53,7 @@ describe("background.ts message handlers", () => {
     };
 
     // Override factory for this test
-    const { crx } = await import('playwright-crx');
+    const { crx } = await import('@playwright-repl/playwright-crx');
     (crx.start as ReturnType<typeof vi.fn>).mockResolvedValue(mockCrxApp);
 
     // Re-import parseReplCommand mock reference
@@ -103,7 +103,7 @@ describe("background.ts message handlers", () => {
   // ─── attach ───────────────────────────────────────────────────────────────
 
   it("attach starts crxApp and attaches to tab", async () => {
-    const { crx } = await import('playwright-crx');
+    const { crx } = await import('@playwright-repl/playwright-crx');
     const result = await sendMessage({ type: 'attach', tabId: 42 });
     expect(crx.start).toHaveBeenCalled();
     expect(mockCrxApp.attach).toHaveBeenCalledWith(42);
@@ -230,7 +230,7 @@ describe("background.ts message handlers", () => {
   });
 
   it("record-start returns ok:false when crx.start throws", async () => {
-    const { crx } = await import('playwright-crx');
+    const { crx } = await import('@playwright-repl/playwright-crx');
     (crx.start as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('crx init failed'));
     const result = await sendMessage({ type: 'record-start' });
     expect(result.ok).toBe(false);

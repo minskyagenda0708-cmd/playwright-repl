@@ -1,6 +1,6 @@
-import { crx } from 'playwright-crx';
-import type { CrxApplication } from 'playwright-crx';
-import type { Page } from 'playwright-crx/test';
+import { crx } from '@playwright-repl/playwright-crx';
+import type { CrxApplication } from '@playwright-repl/playwright-crx';
+import type { Page } from '@playwright-repl/playwright-crx/test';
 import { parseReplCommand } from './commands';
 import type { TabOperation } from './commands';
 import { loadSettings } from './panel/lib/settings';
