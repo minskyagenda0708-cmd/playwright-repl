@@ -6,6 +6,10 @@ let mockPage: any;
 let mockCrxApp: any;
 let parseReplCommandMock: ReturnType<typeof vi.fn>;
 
+vi.mock('@playwright-repl/playwright-crx/test', () => ({
+  expect: vi.fn().mockReturnValue(new Proxy({}, { get: () => vi.fn().mockResolvedValue(undefined) })),
+}));
+
 vi.mock('@playwright-repl/playwright-crx', () => {
   mockPage = { url: vi.fn().mockReturnValue('https://example.com') };
   const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
