@@ -33,6 +33,7 @@
 
 - [ ] **Recorder: merge fill + Enter into `fill --submit`** — When recording, absorb `press Enter` after a `fill` into a single `fill "loc" "value" --submit` command. The `--submit` flag already exists in the engine. Change is in `recorder.ts` `handleKeydown`.
 - [x] **`highlight` command** — `highlight <locator>` as shortcut for `page.locator(<locator>).highlight()`. Useful for visualizing non-unique locator matches. ([#14](https://github.com/stevez/playwright-repl/issues/14))
+- [ ] **Migrate monorepo to pnpm** — Replace npm workspaces with pnpm. Use `workspace:*` protocol for internal dependencies so version bumps no longer require updating dep versions in each package. Migration: `pnpm import`, delete `package-lock.json`, update CI/scripts to use `pnpm`.
 - [ ] **Improve README structure** — Consider splitting README into per-package docs (`packages/cli/README.md`, `packages/extension/README.md`) with a concise root README linking to both.
 - [x] **Convert to TypeScript** — All packages migrated to TypeScript.
 - [x] **Extension server (Phase 8)** — `playwright-repl --extension` starts HTTP server; extension connects as thin CDP relay.

@@ -139,6 +139,14 @@ export function pwToPlaywright(cmd: string): string | null {
       if (args.length < 2) return null;
       return `await expect(page.getByRole(${JSON.stringify(args[0])}, { name: ${JSON.stringify(args.slice(1).join(' '))} })).not.toBeVisible();`;
     }
+    case "verify-visible": {
+      if (args.length < 2) return null;
+      return `await expect(page.getByRole(${JSON.stringify(args[0])}, { name: ${JSON.stringify(args.slice(1).join(' '))} })).toBeVisible();`;
+    }
+    case "verify-value": {
+      if (args.length < 2) return null;
+      return `await expect(page.getByLabel(${JSON.stringify(args[0])})).toHaveValue(${JSON.stringify(args[1])});`;
+    }
     case "verify-url": {
       if (!args[0]) return null;
       return `await expect(page).toHaveURL(/${args[0].replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/);`;
@@ -263,18 +271,19 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
       // ─── Assertions ───────────────────────────────────────────
       case 'assertVisible':
         if (!text) return null;
-        if (kind === 'role' && body) return `verify element ${body} ${q(text)}`;
+        if (kind === 'role' && body) return `verify-visible ${body} ${q(text)}`;
         return `verify text ${q(text)}`;
 
       case 'assertText':
         return a.text ? `verify text ${q(a.text)}` : null;
 
       case 'assertValue':
-        if (text && a.value != null) return `# verify value "${a.value}" in ${q(text)} — use snapshot ref`;
+        if (text && a.value != null) return `verify-value ${q(text)} ${q(String(a.value))}`;
         return null;
 
       case 'assertChecked':
-        return `# assertChecked — not yet supported`;
+        if (!text) return null;
+        return `verify-value ${q(text)} ${q(a.checked ? 'checked' : 'unchecked')}`;
 
       default:
         return `# ${a.name} (unsupported)`;

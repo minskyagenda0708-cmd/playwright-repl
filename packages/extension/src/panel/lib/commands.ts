@@ -60,12 +60,14 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'unroute':              { desc: 'Remove route' },
     'upload':               { desc: 'Upload a file' },
     'verify':               { desc: 'Assert page state (title, url, text, element, value, list)' },
-    'verify-element':       { desc: 'Verify element exists' },
+    'verify-element':       { desc: 'Verify element exists by role' },
     'verify-no-element':    { desc: 'Verify element not exists' },
     'verify-no-text':       { desc: 'Verify text not visible' },
     'verify-text':          { desc: 'Verify text visible' },
     'verify-title':         { desc: 'Verify page title' },
     'verify-url':           { desc: 'Verify page URL' },
+    'verify-value':         { desc: 'Verify input / checkbox / radio value' },
+    'verify-visible':       { desc: 'Verify element is visible by role' },
 };
 
 // Aliases from parser.ts (core package not available in extension bundle)
@@ -74,7 +76,7 @@ export const ALIASES = [
   'c', 'dc', 't', 'f', 'h', 'p', 'sel', 'chk', 'unchk',
   'hl', 's', 'snap', 'ss', 'e', 'con', 'net',
   'tl', 'tn', 'tc', 'ts',
-  'v', 'vt', 've', 'vv', 'vl',
+  'v', 'vt', 've', 'vvis', 'vv', 'vl',
   'q', 'ls',
 ];
 

@@ -59,6 +59,51 @@ export async function verifyNoElement(page, role, name) {
     throw new Error('Element still exists: ' + role + ' "' + name + '"');
 }
 
+export async function verifyVisible(page, role, name) {
+  if (!(await page.getByRole(role, { name }).isVisible()))
+    throw new Error('Element not visible: ' + role + ' "' + name + '"');
+}
+
+export async function verifyInputValue(page, label, expected) {
+  let loc = page.getByLabel(label);
+  if (await loc.count() === 0) loc = page.getByRole('spinbutton', { name: label });
+  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: label });
+  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: label });
+
+  if (await loc.count() > 0) {
+    const el = loc.first();
+    const inputType = await el.evaluate(e => e instanceof HTMLInputElement ? e.type : '');
+    if (inputType === 'checkbox') {
+      const isChecked = await el.isChecked();
+      const expectChecked = ['checked', 'true', 'yes', '1'].includes(expected.toLowerCase());
+      if (isChecked !== expectChecked)
+        throw new Error('Expected "' + label + '" to be ' + expected + ', but was ' + (isChecked ? 'checked' : 'unchecked'));
+      return;
+    }
+    const value = await el.inputValue();
+    if (String(value) !== String(expected))
+      throw new Error('Expected "' + expected + '", got "' + value + '" for "' + label + '"');
+    return;
+  }
+
+  // Radio group: find a role=group labeled <label>, then check which radio is selected
+  const group = page.getByRole('group', { name: label });
+  if (await group.count() > 0) {
+    const checkedRadio = group.locator('input[type=radio]:checked');
+    if (await checkedRadio.count() === 0)
+      throw new Error('No radio button selected in group "' + label + '"');
+    const value = await checkedRadio.evaluate(e => {
+      const lbl = document.querySelector('label[for="' + e.id + '"]');
+      return lbl ? lbl.textContent.trim() : e.value;
+    });
+    if (value !== expected)
+      throw new Error('Expected "' + expected + '" selected, got "' + value + '" in group "' + label + '"');
+    return;
+  }
+
+  throw new Error('Element not found for label: ' + label);
+}
+
 // ─── Text locator actions ───────────────────────────────────────────────────
 
 export async function actionByText(page, text, action, nth) {

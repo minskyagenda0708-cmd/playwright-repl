@@ -11,6 +11,7 @@
 import {
   verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
+  verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   highlightByText, highlightBySelector, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
@@ -92,6 +93,7 @@ const ALIASES: Record<string, string> = {
   'v':    'verify',
   'vt':   'verify-text',
   've':   'verify-element',
+  'vvis': 'verify-visible',
   'vv':   'verify-value',
   'vl':   'verify-list',
 };
@@ -220,9 +222,12 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution | TabOperat
   }
 
   // ── Legacy verify-* commands ────────────────────────────────
+  const TEXT_VERIFY_CMDS = new Set(['verify-text', 'verify-no-text', 'verify-title', 'verify-url']);
+  const ELEMENT_VERIFY_CMDS = new Set(['verify-element', 'verify-no-element', 'verify-visible']);
   const verifyFns: Record<string, PageScriptFn> = {
     'verify-text': verifyText as PageScriptFn,
     'verify-element': verifyElement as PageScriptFn,
+    'verify-visible': verifyVisible as PageScriptFn,
     'verify-value': verifyValue as PageScriptFn,
     'verify-list': verifyList as PageScriptFn,
     'verify-title': verifyTitle as PageScriptFn,
@@ -233,11 +238,15 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution | TabOperat
   if (verifyFns[cmdName]) {
     const pos = args._.slice(1);
     const fn = verifyFns[cmdName];
-    if (cmdName === 'verify-text' || cmdName === 'verify-no-text' || cmdName === 'verify-title' || cmdName === 'verify-url') {
+    if (TEXT_VERIFY_CMDS.has(cmdName)) {
       const text = pos.join(' ');
       if (text) return { fn, fnArgs: [text] };
-    } else if (cmdName === 'verify-no-element' || cmdName === 'verify-element') {
+    } else if (ELEMENT_VERIFY_CMDS.has(cmdName)) {
       if (pos[0] && pos.length >= 2) return { fn, fnArgs: [pos[0], pos.slice(1).join(' ')] };
+    } else if (cmdName === 'verify-value' && pos[0] && pos.length >= 2) {
+      const isRef = /^e\d+$/.test(pos[0]);
+      const valueFn = isRef ? (verifyValue as PageScriptFn) : (verifyInputValue as PageScriptFn);
+      return { fn: valueFn, fnArgs: [pos[0], pos.slice(1).join(' ')] };
     } else if (pos[0] && pos.length >= 2) {
       const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
       return { fn, fnArgs: [pos[0], rest] };
