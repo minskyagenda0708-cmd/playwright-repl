@@ -19,7 +19,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": ">=1.59.0-alpha-2026-02-01",
+    "@playwright/test": "1.59.0-alpha-2026-02-21",
+    "playwright": "1.59.0-alpha-2026-02-21",
     "@tailwindcss/vite": "^4.2.0",
     "@types/chrome": "^0.0.304",
     "@types/react": "^19.2.14",
@@ -45,8 +46,9 @@
     "@codemirror/search": "^6.6.0",
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.16",
-    "codemirror": "^6.0.2",
+    "@lezer/highlight": "^1.2.3",
     "@playwright-repl/playwright-crx": "0.15.1",
+    "codemirror": "^6.0.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   }

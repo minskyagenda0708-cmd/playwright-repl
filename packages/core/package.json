@@ -18,9 +18,11 @@
     "minimist": "^1.2.8"
   },
   "peerDependencies": {
-    "playwright": ">=1.59.0-alpha-2026-02-21"
+    "playwright": "1.59.0-alpha-2026-02-21",
+    "playwright-core": "1.59.0-alpha-2026-02-21"
   },
   "devDependencies": {
+    "playwright-core": "1.59.0-alpha-2026-02-21",
     "vitest": "^4.0.18"
   }
 }
