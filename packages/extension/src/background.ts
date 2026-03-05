@@ -181,11 +181,11 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
 
     const url = crxApp.context().pages()[0]?.url();
 
-    crxApp.recorder.show({
+    await crxApp.recorder.show({
       mode: 'recording',
       language: 'javascript',
       window: { type: 'sidepanel', url: 'panel/panel.html' },
-    }).catch(() => {});
+    });
 
     return { ok: true, url };
   } catch (e) {
