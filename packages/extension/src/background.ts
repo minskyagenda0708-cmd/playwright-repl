@@ -57,9 +57,12 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
 
     if (!crxApp) crxApp = await crx.start();
 
-    if (activeTabId !== null && activeTabId !== tabId) {
+    // Always detach first — stale frame connections cause "Frame has been detached" errors
+    // (e.g. GitHub SPA navigation replaces frames within the same tab)
+    if (activeTabId !== null) {
       await crxApp.detach(activeTabId).catch(() => {});
       currentPage = null;
+      activeTabId = null;
     }
 
     currentPage = await crxApp.attach(tabId);
