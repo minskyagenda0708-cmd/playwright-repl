@@ -78,6 +78,7 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       }
     }
     activeTabId = tabId;
+    Object.assign(globalThis, { page: currentPage, crxApp, activeTabId, expect });
     return { ok: true, url: currentPage.url() };
   } catch (e) {
     activeTabId = null;
