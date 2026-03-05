@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.9.0 — run-code Sandbox, Improved Recording & pnpm
+
+**2026-03-05**
+
+### Features
+
+- **`run-code` sandbox iframe**: Commands now execute in an isolated `<iframe>` sandbox inside the panel page. Avoids CSP restrictions from the background service worker and enables direct access to `page`, `crxApp`, `expect`, and `activeTabId` on `globalThis` ([#50](https://github.com/stevez/playwright-repl/pull/50), [#53](https://github.com/stevez/playwright-repl/pull/53))
+- **`expect()` in run-code**: Playwright's `expect` is now available inside `run-code` commands — `run-code await expect(page.locator('h1')).toBeVisible()` ([#52](https://github.com/stevez/playwright-repl/pull/52))
+- **`verify-visible` command**: Assert an element is visible — `verify-visible "Submit"` / `verify-visible e5` ([#47](https://github.com/stevez/playwright-repl/pull/47))
+- **`verify-value` improvements**: Ref-based value assertions now work with checkboxes, selects, and text inputs ([#47](https://github.com/stevez/playwright-repl/pull/47))
+- **Attach button**: Toolbar now includes a manual **Attach** button to re-attach to the current tab without reopening the panel ([#49](https://github.com/stevez/playwright-repl/pull/49))
+- **JSONL recording improvements**: CSS selector fallback for elements without accessible names; `verify-visible` and `verify-value` assertions are now recorded; better locator priority order ([#48](https://github.com/stevez/playwright-repl/pull/48))
+
+### Internal
+
+- **pnpm migration**: Switched from npm to pnpm workspaces. `workspace:*` protocol links local packages without hitting the registry ([#56](https://github.com/stevez/playwright-repl/pull/56))
+- **playwright-crx 0.15.1**: Fixes service worker crash on attach ([#45](https://github.com/stevez/playwright-repl/pull/45))
+
+### Fixes
+
+- **README on npm**: Added `README.md` to `packages/cli/` so it is included in the published npm package (was empty on the registry)
+
+---
+
 ## v0.8.0 — playwright-crx Migration (No External Server)
 
 **2026-03-04**
