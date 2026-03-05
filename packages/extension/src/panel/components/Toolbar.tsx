@@ -265,9 +265,6 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                         <option key={tab.id} value={tab.id}>{new URL(tab.url!).hostname}</option>
                     ))}
                 </select>
-                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching} onClick={handleAttach}>
-                    Attach
-                </button>
                 <div
                     className="flex items-center gap-1 text-[11px] text-(--text-dim)"
                     data-testid="status-indicator"
@@ -280,6 +277,9 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                     />
                     {!attachedUrl && <span>{isAttaching ? 'Connecting...' : 'Not attached'}</span>}
                 </div>
+                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching} onClick={handleAttach}>
+                    Attach
+                </button>
                 <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
             </div>
         </div>
