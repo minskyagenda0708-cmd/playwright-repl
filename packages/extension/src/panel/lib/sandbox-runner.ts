@@ -12,7 +12,7 @@
  * Each page method call is forwarded to background.ts via chrome.runtime.sendMessage.
  */
 
-type PendingRun = { resolve: (v: string) => void; reject: (e: Error) => void };
+type PendingRun = { resolve: (v: string) => void; reject: (e: unknown) => void };
 
 let frame: HTMLIFrameElement | null = null;
 let frameReady: Promise<HTMLIFrameElement> | null = null;
@@ -63,7 +63,7 @@ function initSandbox(): Promise<HTMLIFrameElement> {
             const pending = pendingRuns.get(id);
             if (!pending) return;
             pendingRuns.delete(id);
-            if (error) pending.reject(new Error(error));
+            if (error) pending.reject(error);
             else pending.resolve(result);
         }
     });

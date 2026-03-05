@@ -16,7 +16,7 @@
             function handler(e) {
               if (!e.data || e.data.type !== 'page-result' || e.data.id !== id) return;
               window.removeEventListener('message', handler);
-              if (e.data.error) reject(new Error(e.data.error));
+              if (e.data.error) reject(e.data.error);
               else resolve(e.data.result);
             }
             window.addEventListener('message', handler);
@@ -49,6 +49,22 @@
     });
   }
 
+  // expect(chainProxy).toBeVisible() appends __expect__ to the chain so the
+  // assertion runs on the parent side where the real Playwright Locator lives.
+  function createExpect() {
+    return function expect(chainProxy) {
+      return new Proxy({}, {
+        get: function (_, matcher) {
+          if (typeof matcher !== 'string') return undefined;
+          return function () {
+            var args = Array.prototype.slice.call(arguments);
+            return chainProxy.__expect__(matcher, ...args);
+          };
+        }
+      });
+    };
+  }
+
   var AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
   window.addEventListener('message', async function (e) {
@@ -56,23 +72,24 @@
     var code = e.data.code;
     var id = e.data.id;
     var page = createPageProxy();
+    var expect = createExpect();
     try {
       var trimmed = code.trim();
       var isFnExpr = /^(async\s*)?\(|^(async\s+)?function\b/.test(trimmed);
       var body;
       if (isFnExpr) {
-        body = 'return (' + trimmed + ')(page)';
+        body = 'return await (' + trimmed + ')(page, expect)';
       } else {
         // Try as expression to capture return value, else run as statements
         try {
-          new AsyncFunction('page', 'return (' + trimmed + ')');
+          new AsyncFunction('page', 'expect', 'return (' + trimmed + ')');
           body = 'return (' + trimmed + ')';
         } catch (_) {
           body = trimmed;
         }
       }
-      var fn = new AsyncFunction('page', body);
-      var result = await fn(page);
+      var fn = new AsyncFunction('page', 'expect', body);
+      var result = await fn(page, expect);
       var text = result != null ? String(result) : 'Done';
       window.parent.postMessage({ type: 'run-code-result', id: id, result: text }, '*');
     } catch (err) {

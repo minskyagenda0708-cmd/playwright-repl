@@ -1,5 +1,6 @@
 import { crx } from '@playwright-repl/playwright-crx';
 import type { CrxApplication } from '@playwright-repl/playwright-crx';
+import { expect } from '@playwright-repl/playwright-crx/test';
 import type { Page } from '@playwright-repl/playwright-crx/test';
 import { parseReplCommand } from './commands';
 import type { TabOperation } from './commands';
@@ -204,6 +205,21 @@ async function handlePageCall(chain: { method: string; args: unknown[] }[]): Pro
   const page = await ensurePage();
   if (!page) return { error: 'Not attached to any tab. Click Attach to connect.' };
   try {
+    // __expect__ step: resolve chain up to that point → real Locator, then call expect(locator)[matcher]()
+    const expectIdx = chain.findIndex(s => s.method === '__expect__');
+    if (expectIdx !== -1) {
+      let target: any = page;
+      for (let i = 0; i < expectIdx; i++) {
+        const { method, args } = chain[i];
+        const fn = target[method];
+        if (typeof fn !== 'function') return { error: `${method} is not a function` };
+        target = await fn.apply(target, args);
+      }
+      const [matcher, ...matcherArgs] = chain[expectIdx].args as [string, ...unknown[]];
+      await (expect(target) as any)[matcher](...matcherArgs);
+      return { result: 'passed' };
+    }
+
     let obj: any = page;
     for (const { method, args } of chain) {
       const fn = obj[method];

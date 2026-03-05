@@ -425,3 +425,49 @@ test.describe('run-code', () => {
     expect(result.isError).toBe(true);
   });
 });
+
+// ─── run-code: expect() ───────────────────────────────────────────────────────
+
+test.describe('run-code: expect()', () => {
+  test('expect(page).toHaveTitle() passes', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveTitle('React • TodoMVC')");
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('passed');
+  });
+
+  test('expect(page).toHaveTitle() fails with assertion error', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveTitle('WrongTitle')");
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('toHaveTitle');
+  });
+
+  test('expect(page).toHaveURL() passes', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, `run-code await expect(page).toHaveURL('${TEST_URL}')`);
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('passed');
+  });
+
+  test('expect(locator).toBeVisible() passes', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, "run-code await expect(page.locator('h1')).toBeVisible()");
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('passed');
+  });
+
+  test('expect(locator).toBeVisible() fails for missing element', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, "run-code await expect(page.locator('.nonexistent-xyz')).toBeVisible({ timeout: 1000 })");
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('toBeVisible');
+  });
+
+  test('expect(locator).toHaveText() passes', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    const result = await sendViaUI(panelPage, "run-code await expect(page.locator('h1')).toHaveText('todos')");
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('passed');
+  });
+});
