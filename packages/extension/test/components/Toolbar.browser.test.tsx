@@ -27,6 +27,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     fileName=''
     stepLine={-1}
     attachedUrl={null}
+    attachedTabId={null}
     isAttaching={false}
     dispatch={vi.fn()}
     {...overrides}

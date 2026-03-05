@@ -11,6 +11,7 @@ export type PanelState = {
   failCount: number
   lineResults: ('pass' | 'fail' | null)[]
   attachedUrl: string | null
+  attachedTabId: number | null
   isAttaching: boolean
 }
 
@@ -30,7 +31,7 @@ export type Action =
    | { type: 'STEP_ADVANCE', stepLine: number }
    | { type: 'SET_LINE_RESULT', index: number, result: 'pass' | 'fail'}
    | { type: 'ATTACH_START' }
-   | { type: 'ATTACH_SUCCESS', url: string }
+   | { type: 'ATTACH_SUCCESS', url: string, tabId: number }
    | { type: 'ATTACH_FAIL' }
    | { type: 'DETACH' }
 
@@ -45,6 +46,7 @@ export const initialState : PanelState = {
     failCount: 0,
     lineResults: [],
     attachedUrl: null,
+    attachedTabId: null,
     isAttaching: false,
 }
 
@@ -113,11 +115,11 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
         case 'ATTACH_START':
             return { ...state, isAttaching: true }
         case 'ATTACH_SUCCESS':
-            return { ...state, isAttaching: false, attachedUrl: action.url }
+            return { ...state, isAttaching: false, attachedUrl: action.url, attachedTabId: action.tabId }
         case 'ATTACH_FAIL':
-            return { ...state, isAttaching: false, attachedUrl: null }
+            return { ...state, isAttaching: false, attachedUrl: null, attachedTabId: null }
         case 'DETACH':
-            return { ...state, attachedUrl: null }
+            return { ...state, attachedUrl: null, attachedTabId: null }
         default:
             return state
     }

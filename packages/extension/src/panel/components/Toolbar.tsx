@@ -5,11 +5,11 @@ import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine' | 'attachedUrl' | 'isAttaching'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
     dispatch: React.Dispatch<Action>,
 };
 
-function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, dispatch }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
@@ -37,7 +37,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
     async function handleTabChange(tabId: number) {
         dispatch({ type: 'ATTACH_START' });
         const res = await attachToTab(tabId);
-        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
         else dispatch({ type: 'ATTACH_FAIL' });
     }
 
@@ -48,7 +48,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
         if (!tab?.id) return;
         dispatch({ type: 'ATTACH_START' });
         const res = await attachToTab(tab.id);
-        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId: tab.id });
         else dispatch({ type: 'ATTACH_FAIL' });
     }
 
@@ -249,16 +249,16 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
             </div>
             <div id="toolbar-right" className="flex items-center gap-2">
                 <select
-                    value={attachedUrl ?? ''}
+                    value={attachedTabId ?? ''}
                     title="Switch tab"
                     onFocus={loadTabs}
                     onChange={e => {
-                        const tabId = availableTabs.find(t => t.url === e.target.value)?.id;
+                        const tabId = Number(e.target.value);
                         if (tabId) handleTabChange(tabId);
                     }}
                 >
                     {availableTabs.map(tab => (
-                        <option key={tab.id} value={tab.url}>{new URL(tab.url!).hostname}</option>
+                        <option key={tab.id} value={tab.id}>{new URL(tab.url!).hostname}</option>
                     ))}
                 </select>
                 <button id="attach-btn" title="Attach to active tab" disabled={isAttaching} onClick={handleAttach}>

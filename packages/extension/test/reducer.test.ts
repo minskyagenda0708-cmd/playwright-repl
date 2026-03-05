@@ -116,7 +116,7 @@ describe('Reducer tests', () => {
    it('should process event ATTACH_SUCCESS', () => {
      const newState = panelReducer(
        { ...initialState, isAttaching: true },
-       { type: 'ATTACH_SUCCESS', url: 'https://example.com' }
+       { type: 'ATTACH_SUCCESS', url: 'https://example.com', tabId: 1 }
      );
      expect(newState.isAttaching).toBe(false);
      expect(newState.attachedUrl).toBe('https://example.com');

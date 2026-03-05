@@ -16,7 +16,7 @@ function App() {
   async function doAttach(tabId: number) {
     dispatch({ type: 'ATTACH_START' });
     const res = await attachToTab(tabId);
-    if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+    if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
     else dispatch({ type: 'ATTACH_FAIL' });
   }
 
@@ -57,6 +57,7 @@ function App() {
         fileName={state.fileName}
         stepLine={state.stepLine}
         attachedUrl={state.attachedUrl}
+        attachedTabId={state.attachedTabId}
         isAttaching={state.isAttaching}
         dispatch={dispatch}
       />
