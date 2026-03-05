@@ -539,15 +539,16 @@ test('recorded session', async ({ page }) => {
     expect(dot.dataset.status).toBe('connected');
   });
 
-  it('shows hostname when attached', async () => {
+  it('shows hostname in dot tooltip when attached', async () => {
     const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
-    const statusIndicator = screen.container.querySelector('[data-testid="status-indicator"]');
-    expect(statusIndicator?.textContent).toContain('example.com');
+    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+    expect(dot.title).toContain('example.com');
   });
 
-  it('shows Not attached text when disconnected', async () => {
+  it('shows no extra text when disconnected (only dot)', async () => {
     const screen = await renderToolbar({ attachedUrl: null, isAttaching: false });
-    await expect.element(screen.getByText('Not attached')).toBeInTheDocument();
+    const statusIndicator = screen.container.querySelector('[data-testid="status-indicator"]');
+    expect(statusIndicator?.textContent?.trim()).toBe('');
   });
 
   it('shows Connecting text when isAttaching', async () => {
@@ -573,18 +574,19 @@ test('recorded session', async ({ page }) => {
       expect(select).not.toBeNull();
     });
 
-    it('shows attachedUrl as the selected value', async () => {
-      const screen = await renderToolbar({ attachedUrl: 'https://example.com' });
+    it('shows attached tab as the selected value', async () => {
+      // attachedTabId=1 matches example.com (id=1 in mockTabs)
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com', attachedTabId: 1 });
 
-      // Load tabs first
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
       await vi.waitFor(() => {
+        // No placeholder when attachedTabId is set; 2 tab options
         expect(select.querySelectorAll('option').length).toBe(2);
       });
 
-      expect(select.value).toBe('https://example.com');
+      expect(select.value).toBe('1'); // tab ID, not URL
     });
 
     it('loads tabs from chrome.tabs.query on focus', async () => {
@@ -595,7 +597,8 @@ test('recorded session', async ({ page }) => {
       await vi.waitFor(() => {
         expect(window.chrome.tabs.query).toHaveBeenCalled();
         const options = select.querySelectorAll('option');
-        expect(options.length).toBe(2);
+        // placeholder + 2 tabs (no attachedTabId set)
+        expect(options.length).toBe(3);
       });
     });
 
@@ -603,7 +606,7 @@ test('recorded session', async ({ page }) => {
       vi.mocked(attachToTab).mockResolvedValue({ ok: true, url: 'https://google.com' });
 
       const dispatch = vi.fn();
-      const screen = await renderToolbar({ attachedUrl: 'https://example.com', dispatch });
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com', attachedTabId: 1, dispatch });
 
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
@@ -612,12 +615,12 @@ test('recorded session', async ({ page }) => {
         expect(select.querySelectorAll('option').length).toBe(2);
       });
 
-      await userEvent.selectOptions(select, 'https://google.com');
+      await userEvent.selectOptions(select, 'google.com'); // select by label text
 
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_START' });
         expect(attachToTab).toHaveBeenCalledWith(2);
-        expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_SUCCESS', url: 'https://google.com' });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_SUCCESS', url: 'https://google.com', tabId: 2 });
       });
     });
 
@@ -625,21 +628,21 @@ test('recorded session', async ({ page }) => {
       vi.mocked(attachToTab).mockResolvedValue({ ok: false, error: 'Cannot attach' });
 
       const dispatch = vi.fn();
-      const screen = await renderToolbar({ attachedUrl: 'https://example.com', dispatch });
+      const screen = await renderToolbar({ attachedUrl: 'https://example.com', attachedTabId: 1, dispatch });
 
       const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
       select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
       await vi.waitFor(() => expect(select.querySelectorAll('option').length).toBe(2));
 
-      await userEvent.selectOptions(select, 'https://google.com');
+      await userEvent.selectOptions(select, 'google.com'); // select by label text
 
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_FAIL' });
       });
     });
 
-    it('filters out chrome:// and chrome-extension:// tabs', async () => {
+    it('filters out chrome-extension:// and about: tabs but keeps chrome:// tabs', async () => {
       (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue([
         { id: 1, url: 'https://example.com', title: 'Example' },
         { id: 2, url: 'chrome://newtab/', title: 'New Tab' },
@@ -653,8 +656,13 @@ test('recorded session', async ({ page }) => {
 
       await vi.waitFor(() => {
         const options = select.querySelectorAll('option');
-        expect(options.length).toBe(1);
-        expect((options[0] as HTMLOptionElement).value).toBe('https://example.com');
+        // placeholder + example.com + chrome://newtab (chrome-extension:// and about: excluded)
+        expect(options.length).toBe(3);
+        const values = Array.from(options).map(o => (o as HTMLOptionElement).value);
+        expect(values).not.toContain('3'); // chrome-extension:// tab excluded
+        expect(values).not.toContain('4'); // about:blank excluded
+        expect(values).toContain('1');     // https://example.com included
+        expect(values).toContain('2');     // chrome://newtab included
       });
     });
   });
