@@ -16,42 +16,83 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
     const [isRecording, setIsRecording] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
+    const [canAttach, setCanAttach] = useState(true);
+    const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
     // ─── Tab switcher ───
 
+    function isInternalUrl(url: string | undefined) {
+        if (!url) return true;
+        return url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:');
+    }
+
+    function getTabLabel(tab: chrome.tabs.Tab): string {
+        try {
+            const url = new URL(tab.url!);
+            if (url.protocol === 'chrome:') return `chrome://${url.hostname}`;
+            return url.hostname;
+        } catch {
+            return tab.url ?? '(unknown)';
+        }
+    }
+
     async function loadTabs() {
         if (!chrome.tabs?.query) return;
         const tabs = await chrome.tabs.query({});
-        setAvailableTabs(tabs.filter(t =>
-            t?.url &&
-            !t.url.startsWith('chrome://') &&
-            !t.url.startsWith('chrome-extension://') &&
-            !t.url.startsWith('about:')
-        ));
+        // Keep chrome:// tabs (to preserve tab order) but exclude chrome-extension:// and about: tabs
+        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('chrome-extension://') && !t.url.startsWith('about:')));
     }
 
-    useEffect(() => { loadTabs(); }, []);
+    async function checkActiveTab() {
+        if (!chrome.tabs?.query) return;
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        setCanAttach(!isInternalUrl(tab?.url));
+    }
+
+    useEffect(() => {
+        loadTabs();
+        checkActiveTab();
+        if (!chrome.tabs?.onActivated) return;
+        const onActivated = () => { setSelectedTabId(null); checkActiveTab(); };
+        chrome.tabs.onActivated.addListener(onActivated);
+        return () => chrome.tabs.onActivated.removeListener(onActivated);
+    }, []);
 
     async function doAttach(tabId: number) {
         dispatch({ type: 'ATTACH_START' });
         const res = await attachToTab(tabId);
         if (res.ok && res.url) {
             dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
+            setSelectedTabId(null); // attachedTabId takes over in dropdown
         } else {
             dispatch({ type: 'ATTACH_FAIL' });
             dispatch({ type: 'ADD_LINE', line: { text: `Attach failed: ${res.error ?? 'unknown error'}`, type: 'error' } });
+            // keep selectedTabId so dropdown stays on the failed tab
         }
     }
 
-    async function handleTabChange(tabId: number) { await doAttach(tabId); }
+    async function handleTabChange(tabId: number) {
+        const tab = availableTabs.find(t => t.id === tabId);
+        setSelectedTabId(tabId); // show in dropdown immediately
+        if (tab && isInternalUrl(tab.url)) return; // internal: Attach disabled, don't try
+        await doAttach(tabId);
+    }
 
     // ─── Attach ───
 
     async function handleAttach() {
+        // Reconnect to the tab shown in the dropdown; only use browser's active tab when nothing is selected/attached
+        const targetTabId = selectedTabId ?? attachedTabId;
+        if (targetTabId !== null) {
+            const tab = availableTabs.find(t => t.id === targetTabId);
+            if (tab && isInternalUrl(tab.url)) return;
+            await doAttach(targetTabId);
+            return;
+        }
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab?.id) return;
+        if (!tab?.id || isInternalUrl(tab.url)) return;
         await doAttach(tab.id);
     }
 
@@ -252,7 +293,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
             </div>
             <div id="toolbar-right" className="flex items-center gap-2">
                 <select
-                    value={attachedTabId ?? ''}
+                    value={selectedTabId ?? attachedTabId ?? ''}
                     title="Switch tab"
                     onFocus={loadTabs}
                     onChange={e => {
@@ -260,9 +301,9 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                         if (tabId) handleTabChange(tabId);
                     }}
                 >
-                    {!attachedTabId && <option value="">— select tab —</option>}
+                    {!selectedTabId && !attachedTabId && <option value="">— select tab —</option>}
                     {availableTabs.map(tab => (
-                        <option key={tab.id} value={tab.id}>{new URL(tab.url!).hostname}</option>
+                        <option key={tab.id} value={tab.id}>{getTabLabel(tab)}</option>
                     ))}
                 </select>
                 <div
@@ -275,9 +316,9 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                         data-status={isAttaching ? 'attaching' : attachedUrl ? 'connected' : 'disconnected'}
                         title={isAttaching ? 'Connecting...' : attachedUrl ? `Attached: ${attachedUrl}` : 'Not attached'}
                     />
-                    {!attachedUrl && <span>{isAttaching ? 'Connecting...' : 'Not attached'}</span>}
+                    {isAttaching && <span>Connecting...</span>}
                 </div>
-                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching} onClick={handleAttach}>
+                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching || !canAttach || availableTabs.some(t => t.id === selectedTabId && isInternalUrl(t.url))} onClick={handleAttach}>
                     Attach
                 </button>
                 <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
