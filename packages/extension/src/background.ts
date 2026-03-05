@@ -198,6 +198,31 @@ async function stopRecording(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+// ─── Page call (sandbox iframe → background) ─────────────────────────────────
+
+async function handlePageCall(chain: { method: string; args: unknown[] }[]): Promise<{ result?: unknown; error?: string }> {
+  const page = await ensurePage();
+  if (!page) return { error: 'Not attached to any tab. Click Attach to connect.' };
+  try {
+    let obj: any = page;
+    for (const { method, args } of chain) {
+      const fn = obj[method];
+      if (typeof fn !== 'function') return { error: `${method} is not a function` };
+      obj = await fn.apply(obj, args);
+    }
+    // Only serialize plain data — class instances (Locator, Response) return null
+    const isPlainData = obj == null || typeof obj !== 'object' || Array.isArray(obj) || Object.getPrototypeOf(obj) === Object.prototype;
+    if (!isPlainData) return { result: null };
+    try {
+      return { result: JSON.parse(JSON.stringify(obj)) };
+    } catch {
+      return { result: null };
+    }
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -206,4 +231,5 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'health')       { sendResponse({ ok: !!crxApp }); return false; }
   if (msg.type === 'record-start') { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')  { stopRecording().then(sendResponse); return true; }
+  if (msg.type === 'page-call')    { handlePageCall(msg.chain).then(sendResponse); return true; }
 });

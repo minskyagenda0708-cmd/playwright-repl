@@ -29,6 +29,9 @@
   "side_panel": {
     "default_path": "panel/panel.html"
   },
+  "sandbox": {
+    "pages": ["sandbox.html"]
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"

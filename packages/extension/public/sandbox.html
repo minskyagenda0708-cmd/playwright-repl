@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+(function () {
+  // Chain-based proxy: builds up [{method, args}, ...] and sends the full chain
+  // only when awaited — so page.locator('.btn').click() works without serializing Locator.
+  function createPageProxy() {
+    function makeChainProxy(chain) {
+      var promise = null;
+      function getPromise() {
+        if (!promise) {
+          promise = new Promise(function (resolve, reject) {
+            var id = Math.random().toString(36).slice(2);
+            function handler(e) {
+              if (!e.data || e.data.type !== 'page-result' || e.data.id !== id) return;
+              window.removeEventListener('message', handler);
+              if (e.data.error) reject(new Error(e.data.error));
+              else resolve(e.data.result);
+            }
+            window.addEventListener('message', handler);
+            window.parent.postMessage({ type: 'page-call', chain: chain, id: id }, '*');
+          });
+        }
+        return promise;
+      }
+      return new Proxy({}, {
+        get: function (_, prop) {
+          if (typeof prop !== 'string') return undefined;
+          if (prop === 'then') return function (res, rej) { return getPromise().then(res, rej); };
+          if (prop === 'catch') return function (rej) { return getPromise().catch(rej); };
+          if (prop === 'finally') return function (fn) { return getPromise().finally(fn); };
+          return function () {
+            var args = Array.prototype.slice.call(arguments);
+            return makeChainProxy(chain.concat([{ method: prop, args: args }]));
+          };
+        }
+      });
+    }
+    return new Proxy({}, {
+      get: function (_, method) {
+        if (typeof method !== 'string') return undefined;
+        return function () {
+          var args = Array.prototype.slice.call(arguments);
+          return makeChainProxy([{ method: method, args: args }]);
+        };
+      }
+    });
+  }
+
+  var AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+  window.addEventListener('message', async function (e) {
+    if (!e.data || e.data.type !== 'run-code') return;
+    var code = e.data.code;
+    var id = e.data.id;
+    var page = createPageProxy();
+    try {
+      var trimmed = code.trim();
+      var isFnExpr = /^(async\s*)?\(|^(async\s+)?function\b/.test(trimmed);
+      var body;
+      if (isFnExpr) {
+        body = 'return (' + trimmed + ')(page)';
+      } else {
+        // Try as expression to capture return value, else run as statements
+        try {
+          new AsyncFunction('page', 'return (' + trimmed + ')');
+          body = 'return (' + trimmed + ')';
+        } catch (_) {
+          body = trimmed;
+        }
+      }
+      var fn = new AsyncFunction('page', body);
+      var result = await fn(page);
+      var text = result != null ? String(result) : 'Done';
+      window.parent.postMessage({ type: 'run-code-result', id: id, result: text }, '*');
+    } catch (err) {
+      window.parent.postMessage({ type: 'run-code-result', id: id, error: String(err) }, '*');
+    }
+  });
+})();
+</script>
+</body>
+</html>

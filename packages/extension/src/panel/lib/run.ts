@@ -4,6 +4,7 @@ import { COMMANDS } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
+import { runCodeInSandbox } from '@/lib/sandbox-runner';
 
 function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boolean {
     if (command.trim().startsWith('#')) {
@@ -43,9 +44,24 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
 
     addCommand(command);
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
+
+    // run-code is handled locally via sandbox iframe (bypasses background service worker)
+    const cmdName = command.trim().split(/\s+/)[0].toLowerCase();
+    if (cmdName === 'run-code') {
+        const code = command.trim().slice('run-code'.length).trim();
+        try {
+            const text = await runCodeInSandbox(code);
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success' } });
+            return { text, isError: false };
+        } catch (e) {
+            const text = String(e);
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'error' } });
+            return { text, isError: true };
+        }
+    }
+
     try {
         const result = await executeCommand(command);
-        const cmdName = command.trim().split(/\s+/)[0];
         const text = filterResponse(result.text, cmdName);
         if (cmdName === 'snapshot') {
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'snapshot' } });
