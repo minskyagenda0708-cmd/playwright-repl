@@ -41,6 +41,17 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
         else dispatch({ type: 'ATTACH_FAIL' });
     }
 
+    // ─── Attach ───
+
+    async function handleAttach() {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+        dispatch({ type: 'ATTACH_START' });
+        const res = await attachToTab(tab.id);
+        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url });
+        else dispatch({ type: 'ATTACH_FAIL' });
+    }
+
     // ─── File operations ───
 
     function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -250,6 +261,9 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
                         <option key={tab.id} value={tab.url}>{new URL(tab.url!).hostname}</option>
                     ))}
                 </select>
+                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching} onClick={handleAttach}>
+                    Attach
+                </button>
                 <div
                     className="flex items-center gap-1 text-[11px] text-(--text-dim)"
                     data-testid="status-indicator"
