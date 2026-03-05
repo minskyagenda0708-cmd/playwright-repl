@@ -444,8 +444,8 @@ test.describe('run-code: expect()', () => {
   });
 
   test('expect(page).toHaveURL() passes', async ({ testPage: _, panelPage }) => {
-    await sendCommand(panelPage, `goto ${TEST_URL}`);
-    const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveURL(/todomvc/)");
+    await sendCommand(panelPage, `goto ${SECOND_URL}`);
+    const result = await sendViaUI(panelPage, `run-code await expect(page).toHaveURL('${SECOND_URL}')`);
     expect(result.isError).toBe(false);
     expect(result.text).toBe('passed');
   });
