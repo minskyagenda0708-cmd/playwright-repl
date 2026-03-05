@@ -65,7 +65,17 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       activeTabId = null;
     }
 
-    currentPage = await crxApp.attach(tabId);
+    // Retry once on "Frame has been detached" — can happen with SPA navigation
+    try {
+      currentPage = await crxApp.attach(tabId);
+    } catch (e) {
+      if (String(e).includes('Frame') && String(e).includes('detached')) {
+        await new Promise(r => setTimeout(r, 500));
+        currentPage = await crxApp.attach(tabId);
+      } else {
+        throw e;
+      }
+    }
     activeTabId = tabId;
     return { ok: true, url: currentPage.url() };
   } catch (e) {
