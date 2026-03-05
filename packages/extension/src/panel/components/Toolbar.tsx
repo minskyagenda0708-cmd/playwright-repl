@@ -34,22 +34,25 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
 
     useEffect(() => { loadTabs(); }, []);
 
-    async function handleTabChange(tabId: number) {
+    async function doAttach(tabId: number) {
         dispatch({ type: 'ATTACH_START' });
         const res = await attachToTab(tabId);
-        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
-        else dispatch({ type: 'ATTACH_FAIL' });
+        if (res.ok && res.url) {
+            dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
+        } else {
+            dispatch({ type: 'ATTACH_FAIL' });
+            dispatch({ type: 'ADD_LINE', line: { text: `Attach failed: ${res.error ?? 'unknown error'}`, type: 'error' } });
+        }
     }
+
+    async function handleTabChange(tabId: number) { await doAttach(tabId); }
 
     // ─── Attach ───
 
     async function handleAttach() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) return;
-        dispatch({ type: 'ATTACH_START' });
-        const res = await attachToTab(tab.id);
-        if (res.ok && res.url) dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId: tab.id });
-        else dispatch({ type: 'ATTACH_FAIL' });
+        await doAttach(tab.id);
     }
 
     // ─── File operations ───
@@ -274,10 +277,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                         data-status={isAttaching ? 'attaching' : attachedUrl ? 'connected' : 'disconnected'}
                         title={isAttaching ? 'Connecting...' : attachedUrl ? `Attached: ${attachedUrl}` : 'Not attached'}
                     />
-                    {attachedUrl
-                        ? <span className="max-w-[160px] truncate" title={attachedUrl}>{attachedUrl.replace(/^https?:\/\//, '')}</span>
-                        : <span>{isAttaching ? 'Connecting...' : 'Not attached'}</span>
-                    }
+                    {!attachedUrl && <span>{isAttaching ? 'Connecting...' : 'Not attached'}</span>}
                 </div>
                 <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
             </div>
