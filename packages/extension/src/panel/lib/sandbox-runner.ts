@@ -37,7 +37,14 @@ function initSandbox(): Promise<HTMLIFrameElement> {
         if (e.data.type === 'page-call') {
             const { chain, id } = e.data;
             try {
-                const response = await chrome.runtime.sendMessage({ type: 'page-call', chain });
+                // chrome.runtime.sendMessage uses JSON — serialize RegExp args so they survive
+                const serialized = (chain as { method: string; args: unknown[] }[]).map(step => ({
+                    ...step,
+                    args: step.args.map(a =>
+                        a instanceof RegExp ? { __type: 'RegExp', source: a.source, flags: a.flags } : a
+                    ),
+                }));
+                const response = await chrome.runtime.sendMessage({ type: 'page-call', chain: serialized });
                 if (response?.error) {
                     frame!.contentWindow!.postMessage(
                         { type: 'page-result', id, error: response.error },

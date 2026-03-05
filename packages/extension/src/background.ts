@@ -201,7 +201,17 @@ async function stopRecording(): Promise<{ ok: boolean }> {
 
 // ─── Page call (sandbox iframe → background) ─────────────────────────────────
 
+function deserializeArg(a: unknown): unknown {
+  if (a && typeof a === 'object' && (a as any).__type === 'RegExp') {
+    const { source, flags } = a as { source: string; flags: string };
+    return new RegExp(source, flags);
+  }
+  return a;
+}
+
 async function handlePageCall(chain: { method: string; args: unknown[] }[]): Promise<{ result?: unknown; error?: string }> {
+  const deserialized = chain.map(step => ({ ...step, args: step.args.map(deserializeArg) }));
+  chain = deserialized;
   const page = await ensurePage();
   if (!page) return { error: 'Not attached to any tab. Click Attach to connect.' };
   try {
