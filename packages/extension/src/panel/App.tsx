@@ -38,7 +38,12 @@ function App() {
       if (tabId) doAttach(tabId);
     });
 
-    const onActivated = (info: chrome.tabs.TabActiveInfo) => doAttach(info.tabId);
+    const onActivated = async (info: chrome.tabs.TabActiveInfo) => {
+      const tab = await chrome.tabs.get(info.tabId).catch(() => null);
+      const url = tab?.url ?? '';
+      if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
+      doAttach(info.tabId);
+    };
     chrome.tabs.onActivated.addListener(onActivated);
     return () => chrome.tabs.onActivated.removeListener(onActivated);
   }, []);

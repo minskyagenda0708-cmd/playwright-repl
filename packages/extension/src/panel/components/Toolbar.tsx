@@ -260,6 +260,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                         if (tabId) handleTabChange(tabId);
                     }}
                 >
+                    {!attachedTabId && <option value="">— select tab —</option>}
                     {availableTabs.map(tab => (
                         <option key={tab.id} value={tab.id}>{new URL(tab.url!).hostname}</option>
                     ))}
