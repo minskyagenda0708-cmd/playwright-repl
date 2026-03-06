@@ -20,7 +20,16 @@
               else resolve(e.data.result);
             }
             window.addEventListener('message', handler);
-            window.parent.postMessage({ type: 'page-call', chain: chain, id: id }, '*');
+            var serialized = chain.map(function (step) {
+              return {
+                method: step.method,
+                args: step.args.map(function (a) {
+                  if (typeof a === 'function') return { __type: 'Function', source: a.toString() };
+                  return a;
+                })
+              };
+            });
+            window.parent.postMessage({ type: 'page-call', chain: serialized, id: id }, '*');
           });
         }
         return promise;
@@ -43,6 +52,25 @@
         if (typeof method !== 'string') return undefined;
         if (method === 'then' || method === 'catch' || method === 'finally') return undefined;
         if (method === 'toString' || method === 'valueOf') return function () { return '[Page]'; };
+        // Router: page.evaluate / page.evaluateHandle bypass the chain proxy —
+        // the function source is sent directly to background.ts which calls page.evaluate.
+        if (method === 'evaluate' || method === 'evaluateHandle') {
+          return function (fnOrString, arg) {
+            return new Promise(function (resolve, reject) {
+              var id = Math.random().toString(36).slice(2);
+              var source = typeof fnOrString === 'function' ? fnOrString.toString() : String(fnOrString);
+              var isString = typeof fnOrString === 'string';
+              function handler(e) {
+                if (!e.data || e.data.type !== 'page-evaluate-result' || e.data.id !== id) return;
+                window.removeEventListener('message', handler);
+                if (e.data.error) reject(new Error(e.data.error));
+                else resolve(e.data.result);
+              }
+              window.addEventListener('message', handler);
+              window.parent.postMessage({ type: 'page-evaluate', method: method, source: source, isString: isString, arg: arg, id: id }, '*');
+            });
+          };
+        }
         return function () {
           var args = Array.prototype.slice.call(arguments);
           return makeChainProxy([{ method: method, args: args }]);
@@ -65,6 +93,30 @@
         }
       });
     };
+  }
+
+  function toSerializedValue(v, depth) {
+    if (v === null) return { __type: 'null' };
+    if (v === undefined) return { __type: 'undefined' };
+    var t = typeof v;
+    if (t === 'string')  return { __type: 'string',  v: v };
+    if (t === 'number')  return { __type: 'number',  v: v };
+    if (t === 'boolean') return { __type: 'boolean', v: v };
+    if (t === 'function') return { __type: 'function', name: v.name || '(anonymous)' };
+    if (t === 'object') {
+      var cls = (v.constructor && v.constructor.name) || 'Object';
+      if (depth <= 0) return { __type: 'ref', cls: cls };
+      var isArr = Array.isArray(v);
+      var keys = Object.keys(v).slice(0, 30);
+      var props = {};
+      for (var i = 0; i < keys.length; i++) {
+        try { props[keys[i]] = toSerializedValue(v[keys[i]], depth - 1); }
+        catch (_) { props[keys[i]] = { __type: 'error' }; }
+      }
+      if (isArr) return { __type: 'array', cls: cls, len: v.length, props: props };
+      return { __type: 'object', cls: cls, props: props };
+    }
+    return { __type: 'string', v: String(v) };
   }
 
   var AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -101,8 +153,12 @@
       }
       var fn = new AsyncFunction('page', 'expect', body);
       var result = await fn(page, expect);
-      var text = result != null ? String(result) : 'Done';
-      window.parent.postMessage({ type: 'run-code-result', id: id, result: text }, '*');
+      if (result !== null && result !== undefined && typeof result === 'object') {
+        window.parent.postMessage({ type: 'run-code-result', id: id, value: toSerializedValue(result, 2) }, '*');
+      } else {
+        var text = result != null ? String(result) : 'Done';
+        window.parent.postMessage({ type: 'run-code-result', id: id, result: text }, '*');
+      }
     } catch (err) {
       window.parent.postMessage({ type: 'run-code-result', id: id, error: String(err) }, '*');
     }

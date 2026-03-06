@@ -1,20 +1,27 @@
-export type ConsoleMode = 'pw' | 'playwright' | 'js';
+export type SerializedValue =
+  | { __type: 'null' }
+  | { __type: 'undefined' }
+  | { __type: 'string';   v: string }
+  | { __type: 'number';   v: number }
+  | { __type: 'boolean';  v: boolean }
+  | { __type: 'function'; name: string }
+  | { __type: 'object';   cls: string; props: Record<string, SerializedValue> }
+  | { __type: 'array';    cls: string; len: number; props: Record<string, SerializedValue> }
+  | { __type: 'ref';      cls: string }
+  | { __type: 'circular' }
+  | { __type: 'error' };
 
 export interface ConsoleEntry {
   id: string;
   input: string;
-  mode: ConsoleMode;
   status: 'pending' | 'done' | 'error';
-  text?: string;       // pw / playwright result text
-  value?: unknown;     // js result (for ObjectTree)
-  image?: string;      // screenshot base64
+  value?: SerializedValue;
+  text?: string;
   errorText?: string;
 }
 
 export interface ConsoleExecutors {
-  pw: (cmd: string) => Promise<{ text: string; isError: boolean; image?: string }>;
-  playwright: (code: string) => Promise<string>;
-  js: (expr: string) => Promise<{ value?: unknown; text?: string; isError: boolean }>;
+  playwright: (code: string) => Promise<{ value?: SerializedValue; text?: string }>;
 }
 
 export interface ConsoleHandle {

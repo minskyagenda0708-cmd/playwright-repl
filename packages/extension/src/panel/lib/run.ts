@@ -50,7 +50,8 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     if (cmdName === 'run-code') {
         const code = command.trim().slice('run-code'.length).trim();
         try {
-            const text = await runCodeInSandbox(code);
+            const result = await runCodeInSandbox(code);
+            const text = result.text ?? 'Done';
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success' } });
             return { text, isError: false };
         } catch (e) {

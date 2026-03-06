@@ -12,7 +12,9 @@
  * Each page method call is forwarded to background.ts via chrome.runtime.sendMessage.
  */
 
-type PendingRun = { resolve: (v: string) => void; reject: (e: unknown) => void };
+import type { SerializedValue } from '@/components/Console/types';
+type PendingRunResult = { value?: SerializedValue; text?: string };
+type PendingRun = { resolve: (v: PendingRunResult) => void; reject: (e: unknown) => void };
 
 let frame: HTMLIFrameElement | null = null;
 let frameReady: Promise<HTMLIFrameElement> | null = null;
@@ -32,6 +34,21 @@ function initSandbox(): Promise<HTMLIFrameElement> {
 
     window.addEventListener('message', async (e: MessageEvent) => {
         if (!e.data) return;
+
+        // page.evaluate / page.evaluateHandle — direct path, no chain proxy
+        if (e.data.type === 'page-evaluate') {
+            const { method, source, isString, arg, id } = e.data;
+            try {
+                const response = await chrome.runtime.sendMessage({ type: 'page-evaluate', method, source, isString, arg });
+                if (response?.error) {
+                    frame!.contentWindow!.postMessage({ type: 'page-evaluate-result', id, error: response.error }, '*');
+                } else {
+                    frame!.contentWindow!.postMessage({ type: 'page-evaluate-result', id, result: response?.result ?? null }, '*');
+                }
+            } catch (err) {
+                frame!.contentWindow!.postMessage({ type: 'page-evaluate-result', id, error: String(err) }, '*');
+            }
+        }
 
         // page chain call from sandbox → forward full chain to background
         if (e.data.type === 'page-call') {
@@ -66,22 +83,23 @@ function initSandbox(): Promise<HTMLIFrameElement> {
 
         // run-code completed
         if (e.data.type === 'run-code-result') {
-            const { id, result, error } = e.data;
+            const { id, result, value, error } = e.data;
             const pending = pendingRuns.get(id);
             if (!pending) return;
             pendingRuns.delete(id);
             if (error) pending.reject(error);
-            else pending.resolve(result);
+            else if (value !== undefined) pending.resolve({ value: value as SerializedValue });
+            else pending.resolve({ text: result as string });
         }
     });
 
     return frameReady;
 }
 
-export async function runCodeInSandbox(code: string): Promise<string> {
+export async function runCodeInSandbox(code: string): Promise<PendingRunResult> {
     const f = await initSandbox();
     const id = Math.random().toString(36).slice(2);
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<PendingRunResult>((resolve, reject) => {
         pendingRuns.set(id, { resolve, reject });
         f.contentWindow!.postMessage({ type: 'run-code', code, id }, '*');
     });
