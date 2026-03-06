@@ -1,5 +1,13 @@
 export type CommandResult = { text: string; isError: boolean; image?: string };
 
+export async function cdpEvaluate(expression: string): Promise<unknown> {
+  return chrome.runtime.sendMessage({ type: 'cdp-evaluate', expression });
+}
+
+export async function cdpGetProperties(objectId: string): Promise<unknown> {
+  return chrome.runtime.sendMessage({ type: 'cdp-get-properties', objectId });
+}
+
 export async function executeCommand(command: string): Promise<CommandResult> {
   return chrome.runtime.sendMessage({ type: 'run', command });
 }

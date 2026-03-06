@@ -296,6 +296,36 @@ async function handlePageEvaluate(msg: { method: string; source: string; isStrin
   }
 }
 
+// ─── CDP Evaluate ────────────────────────────────────────────────────────────
+
+function cdpEvaluate(tabId: number, expression: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    chrome.debugger.sendCommand(
+      { tabId },
+      'Runtime.evaluate',
+      { expression, objectGroup: 'console', returnByValue: false, generatePreview: true, awaitPromise: true },
+      (result) => {
+        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+        else resolve(result);
+      }
+    );
+  });
+}
+
+function cdpGetProperties(tabId: number, objectId: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    chrome.debugger.sendCommand(
+      { tabId },
+      'Runtime.getProperties',
+      { objectId, ownProperties: true, generatePreview: true },
+      (result) => {
+        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+        else resolve(result);
+      }
+    );
+  });
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -306,4 +336,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'page-call')     { handlePageCall(msg.chain).then(sendResponse).catch(e => sendResponse({ error: String(e) })); return true; }
   if (msg.type === 'page-evaluate') { handlePageEvaluate(msg).then(sendResponse).catch(e => sendResponse({ error: String(e) })); return true; }
+  if (msg.type === 'cdp-evaluate')  {
+    if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
+    cdpEvaluate(activeTabId, msg.expression).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
+    return true;
+  }
+  if (msg.type === 'cdp-get-properties') {
+    if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
+    cdpGetProperties(activeTabId, msg.objectId).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
+    return true;
+  }
 });

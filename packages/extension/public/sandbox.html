@@ -153,8 +153,12 @@
       }
       var fn = new AsyncFunction('page', 'expect', body);
       var result = await fn(page, expect);
-      if (result !== null && result !== undefined && typeof result === 'object') {
+      if (result === page) {
+        window.parent.postMessage({ type: 'run-code-result', id: id, result: 'Playwright Page — use page.url(), page.title(), page.locator(), etc.' }, '*');
+      } else if (result !== null && result !== undefined && typeof result === 'object') {
         window.parent.postMessage({ type: 'run-code-result', id: id, value: toSerializedValue(result, 2) }, '*');
+      } else if (typeof result === 'function') {
+        window.parent.postMessage({ type: 'run-code-result', id: id, error: 'Invalid function' }, '*');
       } else {
         var text = result != null ? String(result) : 'Done';
         window.parent.postMessage({ type: 'run-code-result', id: id, result: text }, '*');

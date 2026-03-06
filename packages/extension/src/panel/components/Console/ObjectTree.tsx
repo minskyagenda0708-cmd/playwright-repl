@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { SerializedValue } from './types';
+import { cdpGetProperties } from '@/lib/bridge';
+import { fromCdpGetProperties } from './cdpToSerialized';
+
+const MAX_DEPTH = 8;
 
 interface Props {
     data: SerializedValue;
@@ -32,6 +36,25 @@ function inlineSummary(data: SerializedValue): string {
 
 export function ObjectTree({ data, label, depth = 0 }: Props) {
     const [open, setOpen] = useState(depth < 1);
+    const [childProps, setChildProps] = useState<Record<string, SerializedValue> | null>(null);
+    const [loading, setLoading] = useState(false);
+    const fetchedRef = useRef(false);
+
+    const objectId =
+        depth < MAX_DEPTH && (data.__type === 'object' || data.__type === 'array' || data.__type === 'ref')
+            ? data.objectId
+            : undefined;
+
+    useEffect(() => {
+        if (open && objectId && !fetchedRef.current) {
+            fetchedRef.current = true;
+            setLoading(true);
+            cdpGetProperties(objectId).then(raw => {
+                setChildProps(fromCdpGetProperties(raw));
+                setLoading(false);
+            });
+        }
+    }, [open, objectId]);
 
     const prefix = label !== undefined
         ? <><span className="ot-key">{label}</span><span className="ot-colon">: </span></>
@@ -44,16 +67,43 @@ export function ObjectTree({ data, label, depth = 0 }: Props) {
     if (data.__type === 'number')    return <span>{prefix}<span className="ot-number">{data.v}</span></span>;
     if (data.__type === 'boolean')   return <span>{prefix}<span className="ot-boolean">{String(data.v)}</span></span>;
     if (data.__type === 'function')  return <span>{prefix}<span className="ot-summary">ƒ {data.name}()</span></span>;
-    if (data.__type === 'ref')       return <span>{prefix}<span className="ot-summary">{data.cls} {'{…}'}</span></span>;
     if (data.__type === 'circular')  return <span>{prefix}<span className="ot-empty">[Circular]</span></span>;
     if (data.__type === 'error')     return <span>{prefix}<span className="ot-empty">[Error]</span></span>;
 
+    // Ref — expandable if objectId present, static otherwise
+    if (data.__type === 'ref') {
+        if (!objectId) return <span>{prefix}<span className="ot-summary">{data.cls} {'{…}'}</span></span>;
+        const keys = Object.keys(childProps ?? {});
+        return (
+            <span className="ot-node">
+                {prefix}
+                <span className="ot-toggle" onClick={() => setOpen(o => !o)}>
+                    {open ? '▼' : '▶'}{' '}
+                    <span className="ot-summary">{data.cls} {!open && '{…}'}</span>
+                </span>
+                {open && (
+                    <div className="ot-children">
+                        {loading
+                            ? <div className="ot-row"><span className="ot-empty">Loading…</span></div>
+                            : keys.map(k => (
+                                <div key={k} className="ot-row">
+                                    <ObjectTree data={childProps![k]} label={k} depth={depth + 1} />
+                                </div>
+                            ))
+                        }
+                    </div>
+                )}
+            </span>
+        );
+    }
+
     // Object / Array
     const isArray = data.__type === 'array';
-    const keys = Object.keys(data.props);
+    const propsToShow = childProps ?? data.props;
+    const keys = Object.keys(propsToShow);
     const header = isArray ? `Array(${data.len})` : data.cls;
 
-    if (keys.length === 0) {
+    if (keys.length === 0 && !objectId && !loading) {
         return <span>{prefix}<span className="ot-empty">{isArray ? '[]' : `${data.cls} {}`}</span></span>;
     }
 
@@ -68,11 +118,14 @@ export function ObjectTree({ data, label, depth = 0 }: Props) {
             </span>
             {open && (
                 <div className="ot-children">
-                    {keys.map(k => (
-                        <div key={k} className="ot-row">
-                            <ObjectTree data={data.props[k]} label={k} depth={depth + 1} />
-                        </div>
-                    ))}
+                    {loading
+                        ? <div className="ot-row"><span className="ot-empty">Loading…</span></div>
+                        : keys.map(k => (
+                            <div key={k} className="ot-row">
+                                <ObjectTree data={propsToShow[k]} label={k} depth={depth + 1} />
+                            </div>
+                        ))
+                    }
                 </div>
             )}
         </span>
