@@ -41,6 +41,8 @@
     return new Proxy({}, {
       get: function (_, method) {
         if (typeof method !== 'string') return undefined;
+        if (method === 'then' || method === 'catch' || method === 'finally') return undefined;
+        if (method === 'toString' || method === 'valueOf') return function () { return '[Page]'; };
         return function () {
           var args = Array.prototype.slice.call(arguments);
           return makeChainProxy([{ method: method, args: args }]);
@@ -74,7 +76,7 @@
     var page = createPageProxy();
     var expect = createExpect();
     try {
-      var trimmed = code.trim();
+      var trimmed = code.trim().replace(/;+$/, '');
       var isFnExpr = /^(async\s*)?\(|^(async\s+)?function\b/.test(trimmed);
       var body;
       if (isFnExpr) {
@@ -85,7 +87,16 @@
           new AsyncFunction('page', 'expect', 'return (' + trimmed + ')');
           body = 'return (' + trimmed + ')';
         } catch (_) {
-          body = trimmed;
+          // Multi-statement: try returning the last line
+          var lines = trimmed.split('\n');
+          var lastLine = lines[lines.length - 1].trim().replace(/;+$/, '');
+          var prevLines = lines.slice(0, -1).join('\n');
+          try {
+            new AsyncFunction('page', 'expect', prevLines + '\nreturn (' + lastLine + ')');
+            body = prevLines + '\nreturn (' + lastLine + ')';
+          } catch (_) {
+            body = trimmed;
+          }
         }
       }
       var fn = new AsyncFunction('page', 'expect', body);

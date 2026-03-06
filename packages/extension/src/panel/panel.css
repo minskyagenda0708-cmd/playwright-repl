@@ -194,3 +194,79 @@ html, body {
 .cm-scroller::-webkit-scrollbar-thumb:hover {
   background: var(--bg-scrollbar-thumb-hover);
 }
+
+/* === ObjectTree === */
+
+.ot-key    { color: var(--color-flag); }
+.ot-colon  { color: var(--text-dim); }
+.ot-string { color: var(--color-string); }
+.ot-number { color: var(--color-url); }
+.ot-boolean { color: var(--color-url); }
+.ot-null, .ot-undefined { color: var(--text-dim); font-style: italic; }
+.ot-empty  { color: var(--text-dim); }
+
+.ot-toggle {
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-dim);
+}
+.ot-toggle:hover { color: var(--text-default); }
+
+.ot-summary { color: var(--text-dim); }
+
+.ot-children { padding-left: 12px; }
+
+.ot-row { display: flex; align-items: baseline; }
+
+/* === Bottom Tab Bar === */
+
+.bottom-tab-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-toolbar);
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 4px;
+}
+
+.bottom-tab-bar button {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 10px;
+  height: 100%;
+}
+
+.bottom-tab-bar button:hover {
+  color: var(--text-default);
+}
+
+.bottom-tab-bar button[data-active="true"] {
+  color: var(--text-default);
+  border-bottom-color: var(--color-command);
+}
+
+.bottom-tab-spacer { flex: 1; }
+
+.console-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.console-clear-btn:hover {
+  color: var(--text-default);
+  background: var(--bg-button);
+}
+

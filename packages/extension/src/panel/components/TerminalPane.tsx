@@ -1,14 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { OutputLine } from "@/types";
-import { Action } from "@/reducer";
 import Lightbox from '@/components/Lightbox';
 import { saveImageToFile } from '@/lib/file-utils';
 
-interface ConsolePaneProps {
+interface TerminalPaneProps {
     outputLines: OutputLine[]
-    passCount: number
-    failCount: number
-    dispatch: React.Dispatch<Action>
 }
 
 const lineStyles: Record<string, string> = {
@@ -20,7 +16,7 @@ const lineStyles: Record<string, string> = {
     snapshot: "text-(--color-snapshot) text-[12px]",
 };
 
-function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePaneProps) {
+function TerminalPane({ outputLines }: TerminalPaneProps) {
     const [lightBoxImage, setLightBoxImage ] = useState<string | undefined>(undefined);
     const outputRef = useRef<HTMLDivElement>(null);
 
@@ -29,10 +25,6 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
             outputRef.current.scrollTop = outputRef.current.scrollHeight;
         }
     }, [outputLines]);
-
-    function handleClear() {
-        dispatch({ type: 'CLEAR_CONSOLE' });
-    }
 
     function openLightbox(image: string | undefined) {
         setLightBoxImage(image);
@@ -73,34 +65,16 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
     }
     return (
         <>
-        <div id="console-pane" className='flex flex-col flex-1 min-h-[80px] overflow-hidden'>
-            <div id="console-header" className='flex justify-between items-center py-1 px-3 bg-(--bg-toolbar) border-b border-solid border-(--border-primary) shrink-0 text-[11px]'>
-                <span id="console-header-left" className='flex items-center gap-2'>
-                    <span id="console-title" className='text-(--text-default) text-[12px] font-semibold'>Terminal</span>
-                    <button id="console-clear-btn" className="bg-transparent border-none text-(--text-dim) font-[inherit] text-[11px] cursor-pointer py-[1px] px-1.5 rounded-[3px] hover:text-(--text-default) hover:bg-(--bg-button)" title="Clear terminal" onClick={handleClear} onMouseDown={(e) => e.preventDefault()}>Clear</button>
-                </span>
-                    <span id="console-stats" className='text-(--text-dim)'>
-                        {
-                            (passCount > 0 || failCount > 0) && (
-                                <>
-                                    <span className="text-(--color-success)">{passCount} passed</span>
-                                    {' / '}
-                                    <span className="text-(--color-error)">{failCount} failed</span>
-                                </>
-                            )
-                        }
-                </span>
-                
+            <div id="terminal-pane" className='flex flex-col flex-1 min-h-20 overflow-hidden'>
+                <div id="output" ref={outputRef} data-testid="output" className='flex-1 overflow-y-auto py-2 px-3 whitespace-pre-wrap wrap-break-word'>
+                    {outputLines.map(renderLine)}
+                </div>
             </div>
-            <div id="output" ref={outputRef} data-testid="output" className='flex-1 overflow-y-auto py-2 px-3 whitespace-pre-wrap wrap-break-word'>
-                {outputLines.map(renderLine)}
-            </div>
-        </div>
-        { lightBoxImage && 
-            <Lightbox image={lightBoxImage} onClose={()=> setLightBoxImage(undefined)} />
-        }
+            {lightBoxImage &&
+                <Lightbox image={lightBoxImage} onClose={() => setLightBoxImage(undefined)} />
+            }
         </>
     )
 }
 
-export default ConsolePane;
+export default TerminalPane;

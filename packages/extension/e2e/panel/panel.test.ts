@@ -96,16 +96,6 @@ test('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
 
 // ─── Local Commands ────────────────────────────────────────────────────────
 
-test('clear button empties the output', async ({ panelPage }) => {
-  await fillInput(panelPage, 'snapshot');
-  await panelPage.keyboard.press('Escape');
-  await panelPage.keyboard.press('Enter');
-  await expect(panelPage.locator('[data-type="command"]')).toBeVisible();
-
-  await panelPage.getByRole('button', { name: 'Clear' }).click();
-
-  await expect(panelPage.getByTestId('output').locator('[data-type]')).toHaveCount(0);
-});
 
 test('comments display without server call', async ({ panelPage }) => {
   await fillInput(panelPage, '# this is a comment');

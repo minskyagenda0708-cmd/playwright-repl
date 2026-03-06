@@ -31,3 +31,7 @@ export function connectWithRetry(maxRetries = 20, delay = 150): Promise<chrome.r
     tryConnect();
   });
 }
+
+export async function jsEval(expr: string): Promise<{ value?: unknown; text?: string; isError: boolean }> {
+  return chrome.runtime.sendMessage({ type: 'js-eval', expr });
+}

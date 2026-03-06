@@ -3,7 +3,7 @@ import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 import { useReducer } from 'react';
 
-import ConsolePane from '@/components/ConsolePane';
+import TerminalPane from '@/components/TerminalPane';
 import CommandInput from '@/components/CommandInput';
 import type { OutputLine } from '@/types'
 import { panelReducer, initialState, PanelState } from '@/reducer';
@@ -32,7 +32,7 @@ test('recorded session', async ({ page }) => {
   await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
 });`.trim();
 
-describe("ConsolePane component tests", () => {
+describe("TerminalPane component tests", () => {
 
   function TestWrapper({ initState = initialState }: { initState?: PanelState } = {}) {
     const [state, dispatch] = useReducer(panelReducer, initState)
@@ -41,7 +41,7 @@ describe("ConsolePane component tests", () => {
     }
     return (
       <>
-        <ConsolePane outputLines={state.outputLines} dispatch={dispatch} passCount={state.passCount} failCount={state.failCount} />
+        <TerminalPane outputLines={state.outputLines} />
         <CommandInput onSubmit={handleSubmit} />
       </>
     );
@@ -61,18 +61,13 @@ describe("ConsolePane component tests", () => {
     });
   })
 
-  it('should render console pane', async () => {
-    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={0} failCount={0} />);
-    await expect.element(screen.getByText('Terminal')).toBeInTheDocument();
-  });
-
   it('should render output lines', async () => {
     const lines: OutputLine[] = [
       { text: 'click e5', type: 'command' },
       { text: 'Clicked', type: 'success' },
       { text: 'Element not found', type: 'error' },
     ];
-    const screen = await render(<ConsolePane outputLines={lines} dispatch={vi.fn()} passCount={0} failCount={0} />);
+    const screen = await render(<TerminalPane outputLines={lines} />);
 
     await expect.element(screen.getByText('click e5')).toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).toBeInTheDocument();
@@ -84,11 +79,6 @@ describe("ConsolePane component tests", () => {
     await screen.getByRole('textbox').fill('click e5');
     await expect.element(screen.getByRole('textbox')).toHaveTextContent('click e5');
   })
-
-  it('should render pass / fail count stats', async () => {
-    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={2} failCount={0} />);
-    await expect.element(screen.getByText('2 passed / 0 failed')).toBeInTheDocument();
-  });
 
   it('should submit command on Enter', async () => {
     vi.mocked(executeCommand).mockResolvedValue({ text: '### Ran Playwright code\n### Result\nClicked\n', isError: false });
@@ -165,26 +155,6 @@ describe("ConsolePane component tests", () => {
     await userEvent.keyboard('{Enter}');
 
     expect(executeCommand).not.toHaveBeenCalled();
-    await expect.element(screen.getByText('click e5')).not.toBeInTheDocument();
-    await expect.element(screen.getByText('Clicked')).not.toBeInTheDocument();
-  });
-
-  it('should clear the console', async () => {
-    const preloadedState: PanelState = {
-      ...initialState,
-      outputLines: [
-        { text: 'click e5', type: 'command' },
-        { text: 'Clicked', type: 'success' },
-      ]
-    };
-
-    const screen = await render(<TestWrapper initState={preloadedState} />);
-
-    await expect.element(screen.getByText('click e5')).toBeInTheDocument();
-    await expect.element(screen.getByText('Clicked')).toBeInTheDocument();
-
-    await screen.getByText('Clear').click();
-
     await expect.element(screen.getByText('click e5')).not.toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).not.toBeInTheDocument();
   });

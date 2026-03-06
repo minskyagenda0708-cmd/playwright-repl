@@ -1,17 +1,22 @@
-import { useReducer, useRef, useEffect } from 'react'
+import { useReducer, useRef, useEffect, useState } from 'react'
 import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
-import ConsolePane from './components/ConsolePane'
+import TerminalPane from './components/TerminalPane'
 import CommandInput, { CommandInputHandle } from './components/CommandInput'
 import { panelReducer, initialState } from './reducer'
 import { runAndDispatch } from './lib/run'
-import { attachToTab } from './lib/bridge'
+import { attachToTab, executeCommand, jsEval } from './lib/bridge'
+import { Console, type ConsoleHandle } from './components/Console';
+import { runCodeInSandbox } from '@/lib/sandbox-runner';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const cmdInputRef = useRef<CommandInputHandle>(null)
+  const [bottomTab, setBottomTab] = useState<'terminal' | 'console'>('terminal');
+  const consoleRef = useRef<ConsoleHandle>(null);
+
 
   async function doAttach(tabId: number) {
     dispatch({ type: 'ATTACH_START' });
@@ -79,16 +84,42 @@ function App() {
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef}/>
 
-      {/* Console pane */}
-      <ConsolePane
-         outputLines={state.outputLines}
-         passCount={state.passCount}
-         failCount={state.failCount}
-         dispatch={dispatch}
-      />
-
-      {/* Command input — lives outside ConsolePane so its CM view is unaffected by console re-renders */}
-      <CommandInput ref={cmdInputRef} onSubmit={handleSubmit} />
+      <div className="bottom-tab-bar">
+        <button
+          data-active={bottomTab === 'terminal'}
+          onClick={() => setBottomTab('terminal')}
+        >Terminal</button>
+        <button
+          data-active={bottomTab === 'console'}
+          onClick={() => setBottomTab('console')}
+        >Console</button>
+        <div className="bottom-tab-spacer" />
+        {bottomTab === 'console' && (
+          <button
+            className="console-clear-btn"
+            onClick={() => consoleRef.current?.clear()}
+            title="Clear console (Ctrl+L)"
+          >⊘</button>
+        )}
+      </div>
+      
+      {bottomTab === 'terminal' ? (
+        <>
+          <TerminalPane
+            outputLines={state.outputLines}
+          />
+          <CommandInput ref={cmdInputRef} onSubmit={handleSubmit} />
+        </>
+      ) : (
+        <Console
+          ref={consoleRef}
+          executors={{
+            pw: cmd => executeCommand(cmd),
+            playwright: code => runCodeInSandbox(code),
+            js: expr => jsEval(expr),
+          }}
+        />
+      )}
     </>
   )
 }

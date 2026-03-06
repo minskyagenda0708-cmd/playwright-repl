@@ -259,4 +259,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'record-start') { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')  { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'page-call')    { handlePageCall(msg.chain).then(sendResponse); return true; }
+  if (msg.type === 'js-eval') {
+     if (!currentPage) {
+       sendResponse({ isError: true, text: 'Not attached.' });
+       return false;
+     }
+     currentPage.evaluate((expr: string) => {
+       return Function(`'use strict'; return (${expr})`)();
+     }, msg.expr as string)
+     .then(value => sendResponse( { isError: false, value}))
+     .catch((e: any) => sendResponse({ isError: true, text: e?.message ?? String(e)}));
+     return true;
+    }
 });
