@@ -38,6 +38,22 @@ export class BridgeServer {
         });
     }
 
+    async waitForConnection(timeoutMs = 30000): Promise<void> {
+        if (this.connected) return;
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('Timed out waiting for extension to connect'));
+            }, timeoutMs);
+            const prev = this._onConnect;
+            this._onConnect = () => {
+                clearTimeout(timer);
+                this._onConnect = prev;
+                prev?.();
+                resolve();
+            };
+        });
+    }
+
     async close(): Promise<void> {
         this.socket?.close();
         await new Promise<void>(r => this.wss.close(() => r()));

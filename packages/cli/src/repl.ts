@@ -15,7 +15,7 @@ import {
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   Engine, BridgeServer,
 } from '@playwright-repl/core';
-import type { EngineOpts, ParsedArgs } from '@playwright-repl/core';
+import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
 import type { CompletionItem } from '@playwright-repl/core';
 
@@ -400,12 +400,12 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
 
 // ─── Resolve replay targets (files and folders → .pw file list) ──────────────
 
-export function resolveReplayFiles(targets: string[]): string[] {
+export function resolveReplayFiles(targets: string[], extensions = ['.pw']): string[] {
   const files: string[] = [];
   for (const target of targets) {
     if (fs.statSync(target).isDirectory()) {
       const entries = fs.readdirSync(target)
-        .filter(f => f.endsWith('.pw'))
+        .filter(f => extensions.some(ext => f.endsWith(ext)))
         .sort()
         .map(f => path.join(target, f));
       files.push(...entries);
@@ -414,6 +414,24 @@ export function resolveReplayFiles(targets: string[]): string[] {
     }
   }
   return files;
+}
+
+// Load commands from a .pw or .js file, buffering multiline JS expressions.
+export function loadReplayFile(file: string): string[] {
+  const content = fs.readFileSync(file, 'utf-8');
+  const commands: string[] = [];
+  let buffer = '';
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+    buffer = buffer ? buffer + '\n' + line : line;
+    if (isComplete(buffer)) {
+      commands.push(buffer);
+      buffer = '';
+    }
+  }
+  if (buffer.trim()) commands.push(buffer.trim());
+  return commands;
 }
 
 // ─── Replay mode (non-interactive, --replay flag) ───────────────────────────
@@ -736,6 +754,121 @@ function isComplete(code: string): boolean {
   return depth <= 0;
 }
 
+// ─── Bridge shared helpers ───────────────────────────────────────────────────
+
+function displayBridgeResult(result: EngineResult, silent: boolean): void {
+  if (result.image) {
+    const screenshotDir = path.join(os.homedir(), 'pw-screenshots');
+    fs.mkdirSync(screenshotDir, { recursive: true });
+    const imgPath = path.join(screenshotDir, `pw-screenshot-${Date.now()}.png`);
+    const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
+    fs.writeFileSync(imgPath, Buffer.from(b64, 'base64'));
+    if (!silent) console.log(`Screenshot saved to ${imgPath}`);
+  } else if (result.text) {
+    const t = result.text.trim();
+    if (!result.isError && (t.startsWith('{') || t.startsWith('['))) {
+      console.log(prettyJson(t));
+    } else {
+      console.log(result.isError ? `${c.red}${result.text}${c.reset}` : result.text);
+    }
+  }
+}
+
+// ─── Bridge replay mode ──────────────────────────────────────────────────────
+
+async function runSingleBridgeFile(
+  srv: BridgeServer,
+  file: string,
+  step: boolean,
+  silent: boolean,
+  prefixed = false,
+): Promise<{ passed: boolean; commandsRun: number; errorMsg?: string }> {
+  const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
+  const commands = loadReplayFile(file);
+
+  if (!prefixed) {
+    log(`${c.blue}▶${c.reset} Replaying ${c.bold}${file}${c.reset} (${commands.length} commands)\n`);
+  }
+
+  let commandsRun = 0;
+  for (const cmd of commands) {
+    commandsRun++;
+    const indent = prefixed ? '  ' : '';
+    log(`${indent}${c.dim}[${commandsRun}/${commands.length}]${c.reset} ${cmd}`);
+
+    const result = await srv.run(cmd);
+    displayBridgeResult(result, silent);
+
+    if (result.isError) {
+      return { passed: false, commandsRun, errorMsg: `failed at [${commandsRun}/${commands.length}]: ${cmd}` };
+    }
+
+    if (step && commandsRun < commands.length) {
+      await new Promise<void>((resolve) => {
+        process.stdout.write(`${c.dim}  Press Enter to continue...${c.reset}`);
+        process.stdin.once('data', () => { process.stdout.write('\r\x1b[K'); resolve(); });
+      });
+    }
+  }
+
+  if (!prefixed) log(`\n${c.green}✓${c.reset} Replay complete`);
+  return { passed: true, commandsRun };
+}
+
+async function runBridgeReplayMode(opts: ReplOpts, srv: BridgeServer): Promise<void> {
+  const silent = opts.silent || false;
+  const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
+
+  log('Waiting for extension to connect...');
+  try {
+    await srv.waitForConnection(30000);
+  } catch (err: unknown) {
+    console.error(`${c.red}Error:${c.reset} ${(err as Error).message}`);
+    await srv.close();
+    process.exit(1);
+  }
+  log(`${c.green}✓${c.reset} Extension connected`);
+
+  const files = resolveReplayFiles(opts.replay!, ['.pw', '.js']);
+  if (files.length === 0) {
+    console.error(`${c.red}Error:${c.reset} No .pw or .js files found`);
+    await srv.close();
+    process.exit(1);
+  }
+
+  if (files.length === 1) {
+    const { passed } = await runSingleBridgeFile(srv, files[0], opts.step || false, silent);
+    await srv.close();
+    process.exit(passed ? 0 : 1);
+  }
+
+  // Multi-file
+  log(`${c.blue}▶${c.reset} Running ${c.bold}${files.length}${c.reset} files\n`);
+  const results: { file: string; passed: boolean; commands: number; error?: string }[] = [];
+
+  for (const file of files) {
+    const basename = path.basename(file);
+    log(`${c.blue}▶${c.reset} ${c.bold}${basename}${c.reset}`);
+    const { passed, commandsRun, errorMsg } = await runSingleBridgeFile(srv, file, opts.step || false, silent, true);
+    const status = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
+    log(`  ${status} ${basename}\n`);
+    results.push({ file: basename, passed, commands: commandsRun, error: errorMsg });
+  }
+
+  const passCount = results.filter(r => r.passed).length;
+  const failCount = results.filter(r => !r.passed).length;
+
+  log(`${c.bold}─── Results ───${c.reset}`);
+  for (const r of results) {
+    const icon = r.passed ? `${c.green}✓${c.reset}` : `${c.red}✗${c.reset}`;
+    log(`  ${icon} ${r.file}${r.error ? ` — ${r.error}` : ''}`);
+  }
+  log(`\n${passCount} passed, ${failCount} failed (${results.length} total)`);
+
+  await srv.close();
+  process.exit(failCount > 0 ? 1 : 0);
+}
+
 // ─── Bridge REPL loop ────────────────────────────────────────────────────────
 
 async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void> {
@@ -804,22 +937,7 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     }
 
     const result = await srv.run(command);
-
-    if (result.image) {
-      const screenshotDir = path.join(os.homedir(), 'pw-screenshots');
-      fs.mkdirSync(screenshotDir, { recursive: true });
-      const imgPath = path.join(screenshotDir, `pw-screenshot-${Date.now()}.png`);
-      const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
-      fs.writeFileSync(imgPath, Buffer.from(b64, 'base64'));
-      log(`Screenshot saved to ${imgPath}`);
-    } else if (result.text) {
-      const t = result.text.trim();
-      if (!result.isError && (t.startsWith('{') || t.startsWith('['))) {
-        console.log(prettyJson(t));
-      } else {
-        console.log(result.isError ? `${c.red}${result.text}${c.reset}` : result.text);
-      }
-    }
+    displayBridgeResult(result, silent);
   }
 
   async function processQueue(): Promise<void> {
@@ -868,8 +986,12 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     const srv = new BridgeServer();
     await srv.start(port);
     log(`Bridge server listening on ws://localhost:${port}`);
-    log('Waiting for extension to connect...');
-    await startBridgeLoop(opts, srv);
+    if (opts.replay && opts.replay.length > 0) {
+      await runBridgeReplayMode(opts, srv);
+    } else {
+      log('Waiting for extension to connect...');
+      await startBridgeLoop(opts, srv);
+    }
     return;
   }
 
