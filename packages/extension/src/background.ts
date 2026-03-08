@@ -172,64 +172,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 (globalThis as any).attachToTab = attachToTab;
 
 // ─── CLI Bridge ───────────────────────────────────────────────────────────────
+// The offscreen document owns the persistent WebSocket connection to the CLI.
+// Service workers are ephemeral (Chrome kills them when idle), so we can't
+// maintain a WS connection here. The offscreen is a persistent extension page.
 
-let bridgeExecutorPort: chrome.runtime.Port | null = null;
-let bridgePortReadyCb: ((port: chrome.runtime.Port) => void) | null = null;
-const bridgePending = new Map<string, (r: any) => void>();
-
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'bridge-executor') return;
-  bridgeExecutorPort = port;
-  bridgePortReadyCb?.(port);
-  bridgePortReadyCb = null;
-  port.onMessage.addListener((msg) => {
-    if (msg.type === 'bridge-result') {
-      bridgePending.get(msg.id)?.(msg);
-      bridgePending.delete(msg.id);
-    }
-  });
-  port.onDisconnect.addListener(() => { bridgeExecutorPort = null; });
-});
-
-async function ensureBridgeExecutor(): Promise<chrome.runtime.Port> {
-  if (bridgeExecutorPort) return bridgeExecutorPort;
-  const hasDoc = await (chrome.offscreen as any).hasDocument?.() ?? false;
-  if (!hasDoc) {
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL('offscreen/offscreen.html'),
-      reasons: ['DOM_SCRAPING' as chrome.offscreen.Reason],
-      justification: 'Execute Playwright commands via Chrome debugger for CLI bridge',
-    });
-  }
-  return new Promise((resolve) => { bridgePortReadyCb = resolve; });
-}
-
-async function executeBridgeCommand(id: string, command: string): Promise<any> {
-  const port = await ensureBridgeExecutor();
-  return new Promise((resolve) => {
-    bridgePending.set(id, resolve);
-    port.postMessage({ type: 'bridge-execute', id, command });
-  });
-}
-
-function connectToCLI(wsPort = 9876) {
-  try {
-    const ws = new WebSocket(`ws://localhost:${wsPort}`);
-    ws.onmessage = async (e) => {
-      const msg = JSON.parse(e.data as string);
-      const result = await executeBridgeCommand(msg.id, msg.command)
-        .catch((err: any) => ({ id: msg.id, text: String(err), isError: true }));
-      if (ws.readyState === WebSocket.OPEN)
-        ws.send(JSON.stringify({ id: msg.id, ...result }));
-    };
-    ws.onclose = () => setTimeout(() => connectToCLI(wsPort), 3000);
-    ws.onerror = () => {};
-  } catch {
-    setTimeout(() => connectToCLI(wsPort), 3000);
-  }
-}
-
-connectToCLI();
+chrome.offscreen.createDocument({
+  url: chrome.runtime.getURL('offscreen/offscreen.html'),
+  reasons: ['DOM_SCRAPING' as chrome.offscreen.Reason],
+  justification: 'Maintain persistent WebSocket connection to CLI bridge',
+}).catch(() => {});  // ignore "already exists" on SW restart
 
 // ─── JS Step Debugger ─────────────────────────────────────────────────────────
 

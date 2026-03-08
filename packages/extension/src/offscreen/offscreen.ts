@@ -47,11 +47,23 @@ async function executeForBridge(command: string): Promise<{
     }
 }
 
-const port = chrome.runtime.connect({ name: 'bridge-executor' });
+// The offscreen document is a persistent extension page — it stays alive and
+// can maintain a stable WebSocket connection (unlike the service worker).
+function connectToCLI(wsPort = 9876) {
+    try {
+        const ws = new WebSocket(`ws://localhost:${wsPort}`);
+        ws.onmessage = async (e) => {
+            const msg = JSON.parse(e.data as string) as { id: string; command: string };
+            const result = await executeForBridge(msg.command)
+                .catch((err: any) => ({ text: String(err), isError: true }));
+            if (ws.readyState === WebSocket.OPEN)
+                ws.send(JSON.stringify({ id: msg.id, ...result }));
+        };
+        ws.onclose = () => setTimeout(() => connectToCLI(wsPort), 3000);
+        ws.onerror = () => {};
+    } catch {
+        setTimeout(() => connectToCLI(wsPort), 3000);
+    }
+}
 
-port.onMessage.addListener(async (msg) => {
-    if (msg.type !== 'bridge-execute') return;
-    const result = await executeForBridge(msg.command as string)
-        .catch(err => ({ text: String(err), isError: true }));
-    port.postMessage({ type: 'bridge-result', id: msg.id, ...result });
-});
+connectToCLI();
