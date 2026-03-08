@@ -806,7 +806,9 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     const result = await srv.run(command);
 
     if (result.image) {
-      const imgPath = path.join(os.tmpdir(), `pw-screenshot-${Date.now()}.png`);
+      const screenshotDir = path.join(os.homedir(), 'pw-screenshots');
+      fs.mkdirSync(screenshotDir, { recursive: true });
+      const imgPath = path.join(screenshotDir, `pw-screenshot-${Date.now()}.png`);
       const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
       fs.writeFileSync(imgPath, Buffer.from(b64, 'base64'));
       log(`Screenshot saved to ${imgPath}`);
@@ -830,13 +832,24 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     rl.prompt();
   }
 
+  // Print a status message above the current prompt line
+  function printStatus(msg: string) {
+    process.stdout.write('\r\x1b[K'); // clear current prompt line
+    console.log(msg);
+    rl.prompt(true);
+  }
+
+  if (!silent) {
+    srv.onConnect(()    => printStatus(`${c.green}✓${c.reset} Extension connected`));
+    srv.onDisconnect(() => printStatus(`${c.yellow}Extension disconnected${c.reset}`));
+  }
+
   rl.prompt();
   rl.on('line', (line: string) => { commandQueue.push(line); processQueue(); });
   rl.on('close', async () => { await srv.close(); process.exit(0); });
   rl.on('SIGINT', () => {
-    if (buffer) { buffer = ''; rl.setPrompt(promptReady); }
-    else log(`\n${c.dim}(Ctrl+C again to exit, or type .exit)${c.reset}`);
-    rl.prompt();
+    if (buffer) { buffer = ''; rl.setPrompt(promptReady); rl.prompt(); }
+    else rl.close();
   });
 }
 
@@ -856,8 +869,6 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     await srv.start(port);
     log(`Bridge server listening on ws://localhost:${port}`);
     log('Waiting for extension to connect...');
-    srv.onConnect(()    => { if (!silent) console.log(`${c.green}✓${c.reset} Extension connected`); });
-    srv.onDisconnect(() => { if (!silent) console.log(`${c.yellow}Extension disconnected${c.reset}`); });
     await startBridgeLoop(opts, srv);
     return;
   }

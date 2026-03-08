@@ -171,17 +171,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;
 
-// ─── CLI Bridge ───────────────────────────────────────────────────────────────
-// The offscreen document owns the persistent WebSocket connection to the CLI.
-// Service workers are ephemeral (Chrome kills them when idle), so we can't
-// maintain a WS connection here. The offscreen is a persistent extension page.
-
-chrome.offscreen.createDocument({
-  url: chrome.runtime.getURL('offscreen/offscreen.html'),
-  reasons: ['DOM_SCRAPING' as chrome.offscreen.Reason],
-  justification: 'Maintain persistent WebSocket connection to CLI bridge',
-}).catch(() => {});  // ignore "already exists" on SW restart
-
 // ─── JS Step Debugger ─────────────────────────────────────────────────────────
 
 let __dbgResolve: ((stop: boolean) => void) | null = null;

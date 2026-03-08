@@ -3,7 +3,7 @@ import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
-import { attachToTab } from './lib/bridge'
+import { attachToTab, executeCommand } from './lib/bridge'
 import { Console } from './components/Console';
 
 function App() {
@@ -27,6 +27,45 @@ function App() {
     }
     chrome.runtime.onMessage.addListener(onMessage);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
+  }, []);
+
+  // ─── CLI Bridge ──────────────────────────────────────────────────────────────
+  // The panel owns the WebSocket connection — it's persistent (user keeps it open)
+  // and has chrome.debugger access needed for executeCommand().
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let unmounted = false;
+
+    function connect(port = 9876) {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(`ws://localhost:${port}`);
+        ws.onmessage = async (e) => {
+          const msg = JSON.parse(e.data as string) as { id: string; command: string };
+          const result = await executeCommand(msg.command).catch((err: unknown) => ({
+            text: String(err), isError: true,
+          }));
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ id: msg.id, ...result }));
+          }
+        };
+        ws.onclose = () => {
+          if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
+        };
+        ws.onerror = () => {};
+      } catch {
+        if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
+      }
+    }
+
+    connect();
+
+    return () => {
+      unmounted = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
   }, []);
 
   useEffect(() => {

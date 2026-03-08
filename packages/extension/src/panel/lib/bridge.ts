@@ -12,15 +12,13 @@ export async function cdpGetProperties(objectId: string): Promise<unknown> {
   return chrome.runtime.sendMessage({ type: 'cdp-get-properties', objectId });
 }
 
+type CdpResult = { type?: string; value?: unknown; description?: string; objectId?: string };
+
 export async function executeCommand(command: string): Promise<CommandResult> {
   const parsed = parseReplCommand(command);
-
-  if ('error' in parsed) return { text: parsed.error, isError: true };
   if ('help' in parsed) return { text: parsed.help, isError: false };
 
-  // DirectExecution — run the generated JS in the SW context where `page` is a live global
-  const { swDebugEval } = await import('@/lib/sw-debugger');
-  const { jsExpr } = parsed;
+  const { swDebugEval, swCallFunctionOn } = await import('@/lib/sw-debugger');
 
   let timer: ReturnType<typeof setTimeout>;
   const withTimeout = <T>(p: Promise<T>): Promise<T> =>
@@ -31,25 +29,73 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       }),
     ]).finally(() => clearTimeout(timer!));
 
-  try {
-    const raw = await withTimeout(swDebugEval(jsExpr)) as { result?: { type?: string; value?: unknown; description?: string } };
-    const r = raw?.result;
-
+  async function formatResult(r: CdpResult | undefined): Promise<CommandResult> {
     if (!r || r.type === 'undefined') return { text: 'Done', isError: false };
-
     if (r.type === 'string') {
       const val = r.value as string;
-      // Screenshot result is JSON-encoded { __image, mimeType }
       try {
         const obj = JSON.parse(val);
         if (obj && typeof obj === 'object' && '__image' in obj) {
-          return { text: '', image: `data:${obj.mimeType};base64,${obj.__image}`, isError: false };
+          return { text: '', image: `data:${(obj as any).mimeType};base64,${(obj as any).__image}`, isError: false };
         }
       } catch { /* not JSON — treat as plain text */ }
       return { text: val, isError: false };
     }
-
+    if (r.type === 'number' || r.type === 'boolean') return { text: String(r.value), isError: false };
+    if (r.objectId) {
+      try {
+        const s = await swCallFunctionOn(r.objectId,
+          'function() { try { return JSON.stringify(this, null, 2); } catch(e) { return String(this); } }'
+        ) as any;
+        const val: string = s?.result?.value;
+        if (val) return { text: val, isError: false };
+      } catch { /* fall through */ }
+    }
     return { text: (r.description as string) ?? 'Done', isError: false };
+  }
+
+  if ('error' in parsed) {
+    // Not a keyword command — check if it's a raw playwright/JS expression
+    const { detectMode } = await import('@/lib/execute');
+    const mode = detectMode(command.trim());
+
+    if (mode === 'playwright') {
+      // Evaluate in SW context (page, crxApp globals available)
+      try {
+        const raw = await withTimeout(swDebugEval(command.trim())) as { result?: CdpResult };
+        return formatResult(raw?.result);
+      } catch (e: any) {
+        return { text: e?.message ?? String(e), isError: true };
+      }
+    }
+
+    if (mode === 'js' || mode === 'pw') {
+      // Evaluate in tab context, serializing objects via JSON.stringify
+      try {
+        const expr = command.trim();
+        const wrapped = `(function(){try{var __v=(${expr});`
+          + `if(__v===undefined)return undefined;`
+          + `try{return JSON.stringify(__v,null,2);}catch(_){return String(__v);}`
+          + `}catch(e){throw e;}})()`;
+        const raw = await withTimeout(cdpEvaluate(wrapped)) as { result?: CdpResult; exceptionDetails?: any };
+        if (raw?.exceptionDetails) {
+          const msg = raw.exceptionDetails.exception?.description ?? raw.exceptionDetails.text ?? 'Unknown error';
+          return { text: msg, isError: true };
+        }
+        return formatResult(raw?.result);
+      } catch (e: any) {
+        if (mode === 'pw') { /* fall through to error */ }
+        else return { text: e?.message ?? String(e), isError: true };
+      }
+    }
+
+    return { text: parsed.error, isError: true };
+  }
+
+  // Known keyword command — evaluate the generated JS in SW context
+  try {
+    const raw = await withTimeout(swDebugEval(parsed.jsExpr)) as { result?: CdpResult };
+    return formatResult(raw?.result);
   } catch (e: any) {
     return { text: e?.message ?? String(e), isError: true };
   }
