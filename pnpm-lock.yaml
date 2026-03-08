@@ -48,7 +48,13 @@ importers:
       playwright:
         specifier: 1.59.0-alpha-2026-02-21
         version: 1.59.0-alpha-2026-02-21
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
     devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       playwright-core:
         specifier: 1.59.0-alpha-2026-02-21
         version: 1.59.0-alpha-2026-02-21

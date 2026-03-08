@@ -22,6 +22,7 @@ export default defineConfig({
         background: resolve(__dirname, "src/background.ts"),
 "panel/panel": resolve(__dirname, "src/panel/panel.html"),
         "preferences/preferences": resolve(__dirname, "src/preferences/preferences.html"),
+        "offscreen/offscreen": resolve(__dirname, "src/offscreen/offscreen.html"),
       },
       output: {
         entryFileNames: "[name].js",

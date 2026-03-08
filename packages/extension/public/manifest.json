@@ -9,7 +9,8 @@
     "sidePanel",
     "debugger",
     "storage",
-    "windows"
+    "windows",
+    "offscreen"
   ],
   "options_ui": {
     "page": "preferences/preferences.html",

@@ -89,6 +89,24 @@ export function tryReturnLastExpr(code: string): string {
     return lines.join('\n');
 }
 
+export async function swCallFunctionOn(objectId: string, functionDeclaration: string): Promise<unknown> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand(
+            { targetId },
+            'Runtime.callFunctionOn',
+            { objectId, functionDeclaration, returnByValue: true, awaitPromise: false },
+            (result: any) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+                resolve(result);
+            }
+        );
+    });
+}
+
 export async function swDebugEval(expression: string): Promise<unknown> {
     const targetId = await ensureAttached();
     const isMultiLine = expression.includes('\n');

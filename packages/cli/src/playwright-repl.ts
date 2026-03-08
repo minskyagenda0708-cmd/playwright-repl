@@ -16,8 +16,8 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port'],
+  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -42,6 +42,8 @@ Options:
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
   --extension            Connect to Chrome with side panel extension
   --spawn                Spawn Chrome automatically (default: connect to existing)
+  --bridge               Connect to extension via WebSocket bridge (no CDP required)
+  --bridge-port <port>   WebSocket bridge port (default: 9876)
   --port <number>        Extension server port (default: 6781)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --config <file>        Path to config file
@@ -72,6 +74,8 @@ Examples:
   playwright-repl --extension --spawn    # spawn Chrome automatically
   playwright-repl --extension --port 7000  # custom server port
   playwright-repl --extension --cdp-port 9333  # custom CDP port
+  playwright-repl --bridge               # connect to extension via WebSocket bridge
+  playwright-repl --bridge --bridge-port 9877  # custom bridge port
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
   playwright-repl --replay tests/         # replay all .pw files in folder
@@ -104,6 +108,8 @@ startRepl({
   record: args.record as string,
   step: args.step as boolean,
   silent: args.silent as boolean,
+  bridge: args.bridge as boolean,
+  bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
 }).catch((err: Error) => {
   console.error(`Fatal: ${err.message}`);
   process.exit(1);

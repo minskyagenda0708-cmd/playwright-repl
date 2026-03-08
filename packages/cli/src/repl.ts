@@ -9,11 +9,11 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import {
-  replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c,
+  replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  Engine,
+  Engine, BridgeServer,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -27,6 +27,8 @@ export interface ReplOpts extends EngineOpts {
   record?: string;
   step?: boolean;
   silent?: boolean;
+  bridge?: boolean;
+  bridgePort?: number;
 }
 
 export interface ReplContext {
@@ -709,6 +711,135 @@ function attachGhostCompletion(rl: any, items: CompletionItem[]): void {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+// ─── Multi-line completion check ────────────────────────────────────────────
+
+/**
+ * Returns true if the code string has balanced brackets/parens/braces.
+ * Used to detect multi-line continuation in bridge mode.
+ */
+function isComplete(code: string): boolean {
+  let depth = 0;
+  let inStr: string | null = null;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (inStr) {
+      if (ch === '\\') { i++; continue; }
+      if (ch === inStr) inStr = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      inStr = ch;
+    } else if (ch === '{' || ch === '(' || ch === '[') {
+      depth++;
+    } else if (ch === '}' || ch === ')' || ch === ']') {
+      depth--;
+    }
+  }
+  return depth <= 0;
+}
+
+// ─── Bridge REPL loop ────────────────────────────────────────────────────────
+
+async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void> {
+  const silent = opts.silent || false;
+  const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
+
+  const historyDir = path.join(os.homedir(), '.playwright-repl');
+  const historyFile = path.join(historyDir, '.repl-history');
+  const sessionHistory: string[] = [];
+
+  const promptReady = `${c.cyan}pw>${c.reset} `;
+  const promptCont  = `${c.dim}...${c.reset} `;
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: promptReady,
+    historySize: 500,
+  });
+
+  try {
+    const hist = fs.readFileSync(historyFile, 'utf-8').split('\n').filter(Boolean).reverse();
+    for (const line of hist) (rl as readline.Interface & { history: string[] }).history.push(line);
+  } catch { /* ignore */ }
+
+  attachGhostCompletion(rl, buildCompletionItems());
+
+  let buffer = '';
+  let processing = false;
+  const commandQueue: string[] = [];
+
+  async function handleLine(line: string): Promise<void> {
+    // Multi-line accumulation
+    buffer = buffer ? buffer + '\n' + line : line;
+    if (!isComplete(buffer)) {
+      rl.setPrompt(promptCont);
+      return;
+    }
+    const command = buffer.trim();
+    buffer = '';
+    rl.setPrompt(promptReady);
+
+    if (!command || command.startsWith('#')) return;
+
+    // Meta-commands
+    if (command === '.exit' || command === '.quit') {
+      await srv.close();
+      process.exit(0);
+    }
+    if (command === '.clear') { console.clear(); return; }
+    if (command === '.history clear') { sessionHistory.length = 0; log('History cleared.'); return; }
+    if (command === '.history') { log(sessionHistory.length ? sessionHistory.join('\n') : '(no history)'); return; }
+    if (command === '.help' || command === '?') { showHelp(); return; }
+    if (command === '.aliases') { showAliases(); return; }
+
+    // Record to history
+    sessionHistory.push(command);
+    try {
+      fs.mkdirSync(path.dirname(historyFile), { recursive: true });
+      fs.appendFileSync(historyFile, command + '\n');
+    } catch { /* ignore */ }
+
+    if (!srv.connected) {
+      log(`${c.yellow}[not connected] Waiting for extension...${c.reset}`);
+      return;
+    }
+
+    const result = await srv.run(command);
+
+    if (result.image) {
+      const imgPath = path.join(os.tmpdir(), `pw-screenshot-${Date.now()}.png`);
+      const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
+      fs.writeFileSync(imgPath, Buffer.from(b64, 'base64'));
+      log(`Screenshot saved to ${imgPath}`);
+    } else if (result.text) {
+      const t = result.text.trim();
+      if (!result.isError && (t.startsWith('{') || t.startsWith('['))) {
+        console.log(prettyJson(t));
+      } else {
+        console.log(result.isError ? `${c.red}${result.text}${c.reset}` : result.text);
+      }
+    }
+  }
+
+  async function processQueue(): Promise<void> {
+    if (processing) return;
+    processing = true;
+    while (commandQueue.length > 0) {
+      await handleLine(commandQueue.shift()!);
+    }
+    processing = false;
+    rl.prompt();
+  }
+
+  rl.prompt();
+  rl.on('line', (line: string) => { commandQueue.push(line); processQueue(); });
+  rl.on('close', async () => { await srv.close(); process.exit(0); });
+  rl.on('SIGINT', () => {
+    if (buffer) { buffer = ''; rl.setPrompt(promptReady); }
+    else log(`\n${c.dim}(Ctrl+C again to exit, or type .exit)${c.reset}`);
+    rl.prompt();
+  });
+}
+
 // ─── REPL ────────────────────────────────────────────────────────────────────
 
 export async function startRepl(opts: ReplOpts = {}): Promise<void> {
@@ -716,6 +847,20 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
+
+  // ─── Bridge mode ─────────────────────────────────────────────────
+
+  if (opts.bridge) {
+    const port = opts.bridgePort ?? 9876;
+    const srv = new BridgeServer();
+    await srv.start(port);
+    log(`Bridge server listening on ws://localhost:${port}`);
+    log('Waiting for extension to connect...');
+    srv.onConnect(()    => { if (!silent) console.log(`${c.green}✓${c.reset} Extension connected`); });
+    srv.onDisconnect(() => { if (!silent) console.log(`${c.yellow}Extension disconnected${c.reset}`); });
+    await startBridgeLoop(opts, srv);
+    return;
+  }
 
   // ─── Start engine ────────────────────────────────────────────────
 
