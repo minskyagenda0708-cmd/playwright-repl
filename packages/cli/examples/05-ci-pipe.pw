@@ -3,6 +3,8 @@
 # Usage: playwright-repl --replay examples/05-ci-pipe.pw --silent
 
 goto https://demo.playwright.dev/todomvc/
+localstorage-clear
+reload
 fill "What needs to be done?" "Buy groceries"
 press Enter
 verify-text "Buy groceries"
