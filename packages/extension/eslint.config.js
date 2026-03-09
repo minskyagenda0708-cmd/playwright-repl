@@ -22,7 +22,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/page-scripts.ts"],
+    files: ["src/panel/lib/page-scripts.ts"],
     rules: {
       "@typescript-eslint/ban-ts-comment": "off",
     },
