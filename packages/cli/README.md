@@ -1,138 +1,61 @@
-# playwright-repl
+# playwright-repl (CLI)
 
-![playwright-repl](cover-image.png)
-
-Interactive browser automation powered by Playwright — use it from your **terminal** or as a **Chrome side panel**.
-
-Two frontends, one engine: the CLI gives you a terminal REPL with recording and replay; the Chrome extension gives you a DevTools panel with a script editor and visual recorder. Both run the same 55+ Playwright commands through a shared Engine — no command duplication.
-
-## Why?
-
-**playwright-repl** runs Playwright's browser tools in-process. Type a command, see the result instantly. No code, no tokens, no setup.
-
-- **CLI** — terminal REPL with recording, replay, piping, and 20+ aliases
-- **Extension** — Chrome DevTools panel with script editor, recorder, and light/dark themes
-- **Same commands everywhere** — `click`, `fill`, `snapshot`, `verify-text` work identically in both
-
-Key features:
-- **Text locators** — `click "Submit"` or `fill "Email" "test@example.com"` instead of element refs
-- **Element refs** — `click e5`, `fill e7 "hello"` from `snapshot` output
-- **Assertions** — `verify-text`, `verify-element`, `verify-value`, `verify-list`
-- **Record & replay** — capture sessions as `.pw` files (CLI) or record interactions visually (extension)
-- **Three connection modes** — launch a new browser, connect to existing Chrome, or use the extension relay
-
-## Architecture
-
-The CLI and Extension use different execution paths.
-
-**CLI** — commands execute in-process via the Engine:
-```
-┌──────────────┐
-│   CLI (REPL) │
-│  packages/cli│
-└──────┬───────┘
-       │
-       ▼
-┌─────────────────┐
-│     Engine      │  (BrowserServerBackend in-process)
-└──────┬──────────┘
-       │ CDP
-       ▼
-┌─────────────┐
-│   Chrome    │
-└─────────────┘
-```
-
-**Extension** — commands execute in the service worker via `playwright-crx`:
-```
-┌─────────────────────────┐
-│  Extension (Side Panel) │
-│  chrome.runtime.sendMessage({ type: 'run', command })
-└────────────┬────────────┘
-             │
-             ▼
-┌──────────────────────────────┐
-│  background.ts               │
-│  (playwright-crx service worker)
-│  crxApp.attach(tabId)        │
-└────────────┬─────────────────┘
-             │ chrome.debugger API (CDP)
-             ▼
-┌─────────────┐
-│   Chrome    │
-└─────────────┘
-```
-
-The extension is **self-contained** — no external server or CLI process is required.
-
-### CLI Connection Modes
-
-| Mode | Flag | Browser Source | Use Case |
-|------|------|---------------|----------|
-| **Launch** | `--headed` (default) | Launches new Chromium via Playwright | General automation |
-| **Connect** | `--connect [port]` | Existing Chrome with `--remote-debugging-port` | Debug running app |
-
-## Quick Start — CLI
+Interactive terminal REPL for browser automation powered by Playwright. Type a command, see the result instantly — no code, no boilerplate.
 
 ```bash
-# Install
 npm install -g playwright-repl
-npx playwright install  # browser binaries (if needed)
-
-# Start the REPL (launches browser automatically)
-playwright-repl
-
-# With a visible browser
 playwright-repl --headed
-
-# Connect to existing Chrome
-playwright-repl --connect 9222
 ```
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
 pw> fill "What needs to be done?" "Buy groceries"
 pw> press Enter
-pw> fill "What needs to be done?" "Write tests"
-pw> press Enter
-pw> check "Buy groceries"
 pw> verify-text "1 item left"
+pw> screenshot
 ```
-
-## Quick Start — Extension
-
-The extension works without any external server. Just load it in Chrome:
-
-```bash
-# Build the extension
-cd packages/extension && npm run build
-
-# Load in Chrome: chrome://extensions → Enable Developer mode → Load unpacked → select packages/extension/dist/
-```
-
-Or install from the Chrome Web Store (coming soon).
-
-Once loaded:
-1. Click the extension icon to open the **Playwright REPL** side panel
-2. The panel auto-attaches to the active tab — the status dot turns green
-3. Type commands in the panel — same syntax as CLI
-
-The extension panel includes a REPL input, script editor, visual recorder, and export to Playwright tests.
-
-**Open as popup window:** Right-click the extension icon → **Options** → select "Popup Window". Click the icon and the REPL opens as a standalone 450×700 window attached to the current tab. Use the **tab switcher** in the toolbar to re-attach to a different tab at any time.
 
 ## Install
 
 ```bash
 npm install -g playwright-repl
 
-# If you don't have browser binaries yet
+# Browser binaries (only needed for standalone mode)
 npx playwright install
-
-# Or install from source
-git clone https://github.com/stevez/playwright-repl.git
-cd playwright-repl && npm install && npm link
 ```
+
+## Connection Modes
+
+| Mode | Flag | Browser Source | Use Case |
+|------|------|---------------|----------|
+| **Standalone** | *(default)* | Launches new Chromium via Playwright | General automation, CI |
+| **Bridge** | `--bridge` | Your real Chrome (via extension) | Drive your existing session — cookies and logins intact |
+
+### Standalone
+
+Playwright launches and manages the browser. Headless by default, headed with `--headed`.
+
+```bash
+playwright-repl
+playwright-repl --headed
+playwright-repl --browser firefox
+playwright-repl --persistent   # keeps profile between sessions
+```
+
+### Bridge
+
+The bridge mode starts an interactive REPL that acts as a **remote console for the Chrome extension** — your terminal becomes the command input for the extension's browser session. Commands run inside your real Chrome with your existing cookies and logins.
+
+```bash
+playwright-repl --bridge                      # start bridge server, wait for extension to connect
+playwright-repl --bridge --replay script.pw   # replay a script via bridge
+playwright-repl --bridge --replay examples/   # replay all .pw files
+playwright-repl --bridge --bridge-port 9877   # custom port (default 9876)
+```
+
+The extension connects automatically when the side panel is opened. Once connected, all commands run against the active tab in your real browser.
+
+> Requires the playwright-repl Chrome extension — see [packages/extension/README.md](../extension/README.md) for setup.
 
 ## Usage
 
@@ -157,14 +80,19 @@ playwright-repl --record my-test.pw
 
 # Pipe commands
 echo -e "goto https://example.com\nsnapshot" | playwright-repl
-
-# Connect to existing Chrome via CDP
-playwright-repl --connect         # default port 9222
-playwright-repl --connect 9333    # custom port
-
 ```
 
-### CLI Options
+## Input Modes
+
+| Mode | Standalone | Bridge |
+|------|:---:|:---:|
+| **Keyword** — `click "Sign in"`, `goto https://...` | ✅ | ✅ |
+| **JavaScript** — `document.title`, `window.location.href` | ❌ | ✅ auto-detected |
+| **Playwright API** — `await page.locator('button').count()` | ❌ | ✅ auto-detected |
+
+Bridge mode auto-detects JavaScript and Playwright API expressions — just type them directly. For the full keyword command list, see [Command Reference](#command-reference).
+
+## CLI Options
 
 | Option | Description |
 |--------|-------------|
@@ -172,19 +100,114 @@ playwright-repl --connect 9333    # custom port
 | `--headed` | Run browser in headed (visible) mode |
 | `--persistent` | Use persistent browser profile |
 | `--profile <dir>` | Persistent profile directory |
-| `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
-| `--extension` | Launch Chrome with side panel extension and HTTP command server (legacy) |
-| `--port <number>` | Command server port for `--extension` mode (default: `6781`) |
+| `--bridge` | Start WebSocket bridge server; Chrome extension connects to CLI |
+| `--bridge-port <port>` | Bridge server port (default: `9876`) |
 | `--config <file>` | Path to config file |
-| `--replay <files...>` | Replay `.pw` file(s) or folder(s) |
+| `--replay <files...>` | Replay `.pw` or `.js` file(s) or folder(s) |
 | `--record <file>` | Start REPL with recording to file |
 | `--step` | Pause between commands during replay |
 | `-q, --silent` | Suppress banner and status messages |
 | `-h, --help` | Show help |
 
-## Commands
+## REPL Meta-Commands
 
-All commands work in both CLI and extension. In the CLI, type directly at the `pw>` prompt. In the extension, type in the REPL input or use the script editor.
+| Command | Description |
+|---------|-------------|
+| `.help` | Show available commands |
+| `.aliases` | Show all command aliases |
+| `.status` | Show connection status |
+| `.reconnect` | Restart browser |
+| `.record [file]` | Start recording commands |
+| `.save` | Stop recording and save to file |
+| `.pause` | Pause/resume recording |
+| `.discard` | Discard current recording |
+| `.replay <file>` | Replay a recorded session |
+| `.history` | Show session command history |
+| `.clear` | Clear the console output |
+| `.exit` | Exit REPL (also Ctrl+D) |
+
+## Recording & Replay
+
+Record your browser interactions and replay them later — great for regression tests, onboarding demos, or CI smoke tests.
+
+### Record
+
+```bash
+# From CLI flag
+playwright-repl --record my-test.pw --headed
+
+# Or inside the REPL
+pw> .record my-test
+⏺ Recording to my-test.pw
+pw> goto https://demo.playwright.dev/todomvc/
+pw> fill "What needs to be done?" "Buy groceries"
+pw> press Enter
+pw> verify-text "1 item left"
+pw> .save
+✓ Saved 4 commands to my-test.pw
+```
+
+### Replay
+
+```bash
+# Full speed
+playwright-repl --replay my-test.pw
+
+# Step-through (press Enter between commands)
+playwright-repl --replay my-test.pw --step --headed
+
+# Replay all .pw files in a folder
+playwright-repl --replay examples/ --silent
+
+# Inside the REPL
+pw> .replay my-test.pw
+```
+
+Multi-file replay runs all files sequentially, writes a `replay-<timestamp>.log` with per-command results, and prints a pass/fail summary. Exit code 0 if all pass, 1 if any fail.
+
+### .pw File Format
+
+Plain text — human-readable, diffable, version-controllable:
+
+```
+# CI smoke test
+# App: https://demo.playwright.dev/todomvc/
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+verify-text "Buy groceries"
+verify-text "1 item left"
+```
+
+## Examples
+
+| File | Description |
+|------|-------------|
+| [01-add-todos.pw](examples/01-add-todos.pw) | Add todos and verify with assertions |
+| [02-complete-and-filter.pw](examples/02-complete-and-filter.pw) | Complete todos, use filters |
+| [03-record-session.pw](examples/03-record-session.pw) | Record a test session |
+| [04-replay-session.pw](examples/04-replay-session.pw) | Replay with step-through |
+| [05-ci-pipe.pw](examples/05-ci-pipe.pw) | CI smoke test |
+| [06-edit-todo.pw](examples/06-edit-todo.pw) | Double-click to edit a todo |
+| [07-test-click-nth.pw](examples/07-test-click-nth.pw) | `--nth` disambiguation |
+| [08-localstorage.pw](examples/08-localstorage.pw) | localStorage commands |
+
+```bash
+playwright-repl --replay examples/01-add-todos.pw --headed
+playwright-repl --replay examples/ --silent
+```
+
+## Requirements
+
+- Node.js >= 20
+- `playwright` >= 1.59.0-alpha (browser binaries only needed for standalone mode)
+
+---
+
+## Command Reference
+
+Short aliases are CLI-only.
 
 ### Navigation
 
@@ -217,7 +240,7 @@ All commands work in both CLI and extension. In the CLI, type directly at the `p
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `snapshot` | `s` | Accessibility tree with element refs |
-| `screenshot` | `ss` | Take a screenshot |
+| `screenshot` | `ss` | Take a screenshot (saved to file) |
 | `eval <expr>` | `e` | Evaluate JavaScript in browser context |
 | `console` | `con` | Browser console messages |
 | `network` | `net` | Network requests log |
@@ -228,6 +251,7 @@ All commands work in both CLI and extension. In the CLI, type directly at the `p
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `verify-text <text>` | `vt` | Verify text is visible on page |
+| `verify-no-text <text>` | `vnt` | Verify text is not visible |
 | `verify-element <role> <name>` | `ve` | Verify element exists by role and name |
 | `verify-value <ref> <value>` | `vv` | Verify input/select/checkbox value |
 | `verify-list <ref> <items>` | `vl` | Verify list contains expected items |
@@ -286,249 +310,3 @@ All commands work in both CLI and extension. In the CLI, type directly at the `p
 |---------|-------|-------------|
 | `close` | `q` | Close the browser |
 | `config-print` | — | Print browser config |
-
-## CLI Features
-
-### REPL Meta-Commands
-
-| Command | Description |
-|---------|-------------|
-| `.help` | Show available commands |
-| `.aliases` | Show all command aliases |
-| `.status` | Show connection status |
-| `.reconnect` | Restart browser |
-| `.record [file]` | Start recording commands |
-| `.save` | Stop recording and save to file |
-| `.pause` | Pause/resume recording |
-| `.discard` | Discard current recording |
-| `.replay <file>` | Replay a recorded session |
-| `.exit` | Exit REPL (also Ctrl+D) |
-
-### Session Recording & Replay
-
-Record your browser interactions and replay them later — great for regression tests, onboarding demos, or sharing reproducible flows.
-
-#### Record
-
-```bash
-# From CLI
-playwright-repl --record my-test.pw --headed
-
-# Or inside the REPL
-pw> .record my-test
-⏺ Recording to my-test.pw
-pw> goto https://demo.playwright.dev/todomvc/
-pw> fill "What needs to be done?" "Buy groceries"
-pw> press Enter
-pw> verify-text "1 item left"
-pw> .save
-✓ Saved 4 commands to my-test.pw
-```
-
-#### Replay
-
-```bash
-# Full speed
-playwright-repl --replay my-test.pw
-
-# Step-through (press Enter between commands)
-playwright-repl --replay my-test.pw --step --headed
-
-# Replay all .pw files in a folder (multi-file mode)
-playwright-repl --replay examples/ --silent
-
-# Or inside the REPL
-pw> .replay my-test.pw
-```
-
-Multi-file replay runs all files sequentially, writes a `replay-<timestamp>.log` with per-command results, and prints a pass/fail summary. Exit code 0 if all pass, 1 if any fail.
-
-#### File Format
-
-`.pw` files are plain text — human-readable, diffable, version-controllable:
-
-```
-# CI smoke test — quick add-and-verify
-# App: https://demo.playwright.dev/todomvc/
-
-goto https://demo.playwright.dev/todomvc/
-fill "What needs to be done?" "Buy groceries"
-press Enter
-verify-text "Buy groceries"
-verify-text "1 item left"
-```
-
-#### Recording Controls
-
-| Command | Description |
-|---------|-------------|
-| `.record [file]` | Start recording |
-| `.pause` | Pause recording (toggle) |
-| `.save` | Stop and save to file |
-| `.discard` | Discard without saving |
-
-### eval & run-code
-
-Two ways to run custom code from the REPL:
-
-#### eval — Browser Context
-
-Runs JavaScript inside the browser page (via `page.evaluate`). Use browser globals like `document`, `window`, `location`:
-
-```
-pw> eval document.title
-"Installation | Playwright"
-
-pw> eval window.location.href
-"https://playwright.dev/docs/intro"
-
-pw> eval document.querySelectorAll('a').length
-42
-```
-
-#### run-code — Playwright API
-
-Runs code with full access to the Playwright `page` object. The REPL auto-wraps your code — just write the body:
-
-```
-pw> run-code page.url()
-→ async (page) => { return await page.url() }
-"https://playwright.dev/docs/intro"
-
-pw> run-code page.locator('h1').textContent()
-→ async (page) => { return await page.locator('h1').textContent() }
-"Installation"
-```
-
-For multiple statements, use semicolons:
-
-```
-pw> run-code const u = await page.url(); const t = await page.title(); return {u, t}
-```
-
-## Extension Features
-
-### Side Panel and Popup Window
-
-The extension opens as a Chrome **side panel** by default. To switch to a standalone **popup window**, right-click the extension icon → **Options** and choose "Open as Popup Window". Your preference is saved and applied every time you click the icon.
-
-The panel UI is the same in both modes:
-
-- **REPL input** — type commands at the bottom, results appear in the console pane
-- **Script editor** — write multi-line `.pw` scripts with line numbers, run all or step through
-- **Visual recorder** — click Record, interact with the page, recorded commands appear automatically
-- **Export** — convert `.pw` commands to Playwright TypeScript test code
-- **Tab switcher** — toolbar dropdown lets you re-attach the panel to any open browser tab without reopening
-- **Light/dark themes** — matches your DevTools theme
-
-### Recording in Extension
-
-Click the **Record** button in the toolbar, then interact with the page normally. The recorder uses playwright-crx's built-in CDP recorder to capture:
-
-- **Navigation** — `goto` commands on page load
-- **Clicks** — with text and ARIA role locators
-- **Form input** — fill commands
-- **Key presses** — Enter, Tab, Escape
-
-Recorded commands appear in the script editor in real time. Click **Stop** when done.
-
-### Export to Playwright
-
-The extension can export `.pw` commands to Playwright TypeScript:
-
-```
-# .pw commands                    → Playwright TypeScript
-goto https://example.com          → await page.goto("https://example.com");
-click "Submit"                    → await page.getByText("Submit").click();
-fill "Email" "test@example.com"   → await page.getByLabel("Email").fill("test@example.com");
-verify-text "Success"             → await expect(page.getByText("Success")).toBeVisible();
-```
-
-### Connect Mode
-
-To control an existing Chrome instance from the CLI:
-
-```bash
-# Start Chrome with debugging port
-chrome --remote-debugging-port=9222
-
-# Connect the REPL
-playwright-repl --connect 9222
-```
-
-## Examples
-
-Examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and [playwright.dev](https://playwright.dev/). All can be run directly or together via multi-file replay:
-
-| File | Description |
-|------|-------------|
-| [01-add-todos.pw](packages/cli/examples/01-add-todos.pw) | Add todos and verify with assertions |
-| [02-complete-and-filter.pw](packages/cli/examples/02-complete-and-filter.pw) | Complete todos, use filters |
-| [03-record-session.pw](packages/cli/examples/03-record-session.pw) | Record a test session |
-| [04-replay-session.pw](packages/cli/examples/04-replay-session.pw) | Replay with step-through |
-| [05-ci-pipe.pw](packages/cli/examples/05-ci-pipe.pw) | CI smoke test |
-| [06-edit-todo.pw](packages/cli/examples/06-edit-todo.pw) | Double-click to edit a todo |
-| [07-test-click-nth.pw](packages/cli/examples/07-test-click-nth.pw) | `--nth` disambiguation on playwright.dev |
-| [08-localstorage.pw](packages/cli/examples/08-localstorage.pw) | localStorage commands: list, clear, reload |
-
-Try one:
-
-```bash
-# Run an example with a visible browser
-playwright-repl --replay packages/cli/examples/01-add-todos.pw --headed
-
-# Step through an example interactively
-playwright-repl --replay packages/cli/examples/04-replay-session.pw --step --headed
-
-# Run as a CI smoke test (headless, silent)
-playwright-repl --replay packages/cli/examples/05-ci-pipe.pw --silent
-
-# Run all examples (multi-file replay with log report)
-playwright-repl --replay packages/cli/examples/ --silent
-```
-
-## Monorepo Structure
-
-```
-packages/
-├── core/           # Engine + shared utilities (TypeScript, tsc)
-│   └── src/
-│       ├── engine.ts             # Wraps BrowserServerBackend in-process
-│       ├── extension-server.ts   # HTTP server (CLI --extension mode)
-│       ├── parser.ts             # Command parsing and alias resolution
-│       ├── page-scripts.ts       # Text locator and assertion helpers
-│       ├── completion-data.ts    # Ghost completion items
-│       ├── colors.ts             # ANSI color helpers
-│       └── resolve.ts            # COMMANDS map, minimist re-export
-├── cli/            # Terminal REPL (TypeScript, tsc)
-│   └── src/
-│       ├── playwright-repl.ts    # CLI entry point
-│       ├── repl.ts               # Interactive readline loop
-│       ├── recorder.ts           # Session recording/replay
-│       └── index.ts              # Public API exports
-└── extension/      # Chrome side panel extension (React, Vite, Tailwind)
-    ├── src/
-    │   ├── background.ts         # Service worker — playwright-crx command execution + recording
-    │   ├── commands.ts           # Keyword → Playwright function mapping
-    │   ├── page-scripts.ts       # Text locator and assertion helpers (extension)
-    │   ├── panel/                # Side panel UI (React)
-    │   │   ├── panel.html
-    │   │   ├── panel.tsx         # React entry point
-    │   │   ├── panel.css         # Theme variables + residual styles
-    │   │   ├── App.tsx           # Root component (auto-attach, tab listener)
-    │   │   ├── reducer.ts        # useReducer state management
-    │   │   ├── types.ts          # TypeScript types
-    │   │   ├── components/       # Toolbar, CommandInput, EditorPane, ConsolePane, etc.
-    │   │   └── lib/              # bridge, run, commands, autocomplete, command-history, etc.
-    └── public/
-        └── manifest.json         # Manifest V3 config (requires "debugger" permission)
-```
-
-## Requirements
-
-- **Node.js** >= 20
-- **playwright** >= 1.59.0-alpha (includes `lib/mcp/browser/` engine)
-
-## License
-
-MIT

@@ -1,254 +1,195 @@
-# playwright-repl Extension
+# Dramaturg (@playwright-repl/extension)
 
-Chrome side panel extension for the playwright-repl REPL. Runs the same 55+ commands as the CLI, directly in your browser — no external server, no Node process, no backend required.
+Chrome side panel extension that runs the full Playwright API directly inside your browser — no Node.js backend, no external server required. Use it as a standalone automation console, or connect it to the CLI for terminal-driven control.
+
+| Feature | Description |
+|---------|-------------|
+| 🧠 **Mode Detection** | Console auto-detects input type — `.pw` keyword, Playwright API (`await page.*`), or JavaScript (`document.*`) — no prefix needed |
+| 🎬 **Record** | Capture clicks, fills, and navigations — generates `.pw` commands and JS Playwright code, inserted into the editor live |
+| ▶ **Run / Step Into** | Run scripts line-by-line with pass/fail gutter indicators; step debugger pauses at each line |
+| 📂 **Load / Save** | Open `.pw` or `.js` files from disk; save editor content with one click |
+| 🔗 **Auto-attach** | Automatically attaches to the active tab when the panel opens |
+| 🗂 **Tab Switcher** | Switch the active browser target to any open tab from the toolbar dropdown |
+| 🌳 **Object Tree** | Console results render as an expandable CDP object tree with lazy property loading |
+| 🖼 **Screenshot Preview** | Screenshot commands display the image inline; click to expand full-size |
+| ✨ **Autocomplete** | `.pw` keyword suggestions with descriptions as you type in both console and editor |
+| 🌗 **Light / Dark Mode** | Toggle between light and dark themes from the toolbar, persisted across sessions |
+| 🪟 **Side Panel & Popup** | Opens as a Chrome side panel by default; switch to a standalone popup window in Options |
+| ⚡ **Fast** | Commands execute directly via CDP in the service worker — no Node.js roundtrip, near-instant response |
+
+## Setup
+
+1. Build the extension (or download a release):
+   ```bash
+   npm run build   # from packages/extension/
+   ```
+2. Open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `packages/extension/dist/`
+3. Click the **Dramaturg** icon to open the side panel (or popup — configure in Options)
+
+## Features
+
+### Console — three input modes, one input
+
+The Console tab auto-detects what you type and routes it to the right executor:
+
+| What you type | Mode | Runs in |
+|---|---|---|
+| `goto`, `click`, `snapshot`, ... | **Keyword** | Playwright via service worker |
+| `await page.locator('h1').textContent()` | **Playwright API** | Service worker (live `page` object) |
+| `document.title`, `window.location.href` | **JavaScript** | Page context (CDP evaluate) |
+
+```
+> snapshot                                    ← keyword command
+→ ### Page ...
+
+> await page.locator('h1').textContent()      ← Playwright API
+→ "Fast and reliable end-to-end testing"
+
+> document.title                              ← JavaScript / DOM
+→ "Playwright"
+```
+
+Results are rendered as an **expandable CDP object tree** — click any object to lazily fetch its properties, just like Chrome DevTools.
+
+- **Command history** — Up/Down arrows cycle through previous commands
+- **Autocomplete** — keyword suggestions as you type
+- **Screenshot preview** — inline image with click-to-expand lightbox
+- **Ctrl+L / `.clear`** — clear console output
+
+### Script Editor
+
+Write and run multi-line `.pw` scripts or JavaScript directly in the panel:
+
+- **Syntax highlighting** — `.pw` keywords, strings, comments; full JS highlighting in JS mode
+- **Pass/fail gutter** — ✓/✗ markers per line after execution
+- **Run / Step / Stop** — run all lines, step through one at a time, or abort
+- **JS step debugger** — pauses at each line, resumes on Step
+- **Open / Save** — load `.pw` or `.js` files from disk; save with timestamp filename
+- **Ctrl+Enter** — run the script from keyboard
+
+### Recording
+
+Click **Record**, interact with the page — clicks, fills, and navigations are captured automatically and inserted into the editor at the cursor in two formats:
+
+- **`.pw` commands** — `goto`, `click`, `fill`, `press` — ready to replay with the CLI or extension
+- **JS Playwright code** — `await page.click(...)` — ready to paste into a Playwright test
+
+> Recording captures only human interactions — not AI-driven or programmatic commands.
+
+### Tab Management
+
+- **Tab switcher dropdown** — lists all open tabs; switch active target without leaving the panel
+- **Auto-attach** — attaches to the active tab automatically when the panel opens
+- **Connection status** — color-coded indicator (green / yellow / red) with tooltip
+- **Attach button** — manually re-attach after tab navigation or detach
+
+### Preferences
+
+- **Bridge port** — configure the WebSocket port for CLI / MCP server connection (default `9876`)
+- **Open mode** — side panel (default) or popup window
+- **Dark mode toggle** — sun/moon button in toolbar, persisted across sessions
+
+## Connect to CLI (Bridge Mode)
+
+The extension can act as the browser end of a CLI terminal session:
+
+```bash
+playwright-repl --bridge   # start the CLI bridge server
+```
+
+Open the side panel → the extension connects automatically. Your terminal becomes a remote console for the browser — type commands in the CLI, they execute in your real Chrome session.
+
+See [packages/cli/README.md](../cli/README.md) for CLI setup.
+
+## Connect to MCP Server (AI Browser Agent)
+
+The extension also connects to the `@playwright-repl/mcp` server, letting AI agents like Claude control your real browser:
+
+```bash
+npm install -g @playwright-repl/mcp
+playwright-repl-mcp   # starts the MCP bridge server
+```
+
+Open the side panel → the extension connects automatically. The AI agent can then call `run_command` to execute any keyword, Playwright API, or JavaScript command in your real Chrome session.
+
+See [packages/mcp/README.md](../mcp/README.md) for full MCP setup and Claude Desktop / Claude Code configuration.
 
 ## What Makes This Unique
 
-Most browser automation tools require a Node.js backend. Playwright normally runs in Node and controls Chrome via a WebSocket (CDP). The CLI version of playwright-repl works the same way.
+Most browser automation tools require a Node.js backend. This extension runs the full Playwright API — `page`, `context`, `expect`, locators, assertions — entirely inside Chrome, with zero backend.
 
-**This extension is different.** It runs the full Playwright API — `page`, `context`, `expect`, locators, assertions — entirely inside Chrome, with zero backend. No server. No subprocess. Just the extension.
-
-### How is that possible?
-
-Two technologies make it work:
-
-#### 1. playwright-crx — Playwright inside the browser
-
-[playwright-crx](https://github.com/ruifigueiredo19/playwright-crx) is a fork of Playwright that runs entirely in a Chrome extension's service worker. Normally Playwright opens a WebSocket to drive Chrome via CDP. playwright-crx replaces that WebSocket with `chrome.debugger` — a Chrome extension API that gives direct CDP access from within the browser itself.
-
-When you click **Attach**, the extension calls `crxApp.attach(tabId)`, which:
-- Uses `chrome.debugger.attach()` to connect to the tab's CDP session
-- Starts a `BrowserContext` and `Page` — real Playwright objects
-- Sets them as globals on `globalThis` in the service worker runtime
-
-From that point, `page.click()`, `page.goto()`, `expect(locator).toBeVisible()` — all of it works, in the browser, against the real live tab.
-
-#### 2. swDebugEval — evaluating code in the service worker via chrome.debugger
-
-The panel (React UI) and the service worker run in separate JavaScript contexts. To execute Playwright code, the panel uses `chrome.debugger` a second time — this time to attach to the **service worker itself** as a debug target and evaluate expressions in its runtime.
-
-```
-Panel context                        Service Worker context
-─────────────────                    ──────────────────────────
-chrome.debugger                  →   globalThis.page    (Playwright Page)
-  .sendCommand(                       globalThis.context (BrowserContext)
-    'Runtime.evaluate',               globalThis.crxApp  (CrxApp)
-    { expression: jsExpr }            globalThis.expect  (Playwright expect)
-  )
-```
-
-This is the key insight: the service worker's runtime holds live Playwright objects. `chrome.debugger` lets the panel reach into that runtime and call them directly — no `chrome.runtime.sendMessage` roundtrip, no serialization of Playwright internals.
-
-The panel generates a JS expression (`jsExpr`) from the user's command and evaluates it in the SW context. The result comes back as a CDP `Runtime.RemoteObject`.
-
-#### Why not chrome.runtime.sendMessage?
-
-`chrome.runtime.sendMessage` can only pass JSON-serializable data. Playwright objects (`Page`, `Locator`, `BrowserContext`) are not serializable — they hold WebSocket connections, CDP sessions, internal state. They can't cross message boundaries.
-
-`chrome.debugger.Runtime.evaluate` works differently: the expression runs *inside* the target context where those objects are live. The result is either a primitive value (returned as-is) or a handle to the remote object. No serialization of Playwright internals needed.
-
-### The Playwright Console — a DevTools console that understands Playwright
-
-The extension includes a **Console tab** that is unlike anything in Chrome DevTools or any other Playwright tool. It is a single input that automatically detects what you typed and routes it to the right executor:
-
-```
-> await page.locator('h1').textContent()    ← Playwright mode → swDebugEval in SW context
-→ "Introduction"
-
-> document.title                             ← JS mode → cdp-evaluate in page context
-→ "Playwright"
-
-> goto https://playwright.dev               ← pw mode → keyword command
-→ Done
-```
-
-**Three modes, zero syntax switching:**
-
-| What you type | Mode | Execution |
-|---|---|---|
-| `page.*`, `await page.*`, `expect(...)`, `context.*`, `crxApp.*` | Playwright | `swDebugEval` in service worker — live Playwright objects |
-| Any pw-repl keyword (`goto`, `click`, `snapshot`, ...) | pw | `runAndDispatch` — same as REPL tab |
-| Anything else (`document.*`, `fetch(...)`, expressions) | JS | `cdp-evaluate` in the page context |
-
-**CDP object tree with lazy expansion:**
-
-Results are not just strings. The Console renders a full expandable object tree backed by CDP `Runtime.getProperties`, matching the DevTools console experience:
-
-```
-> page.mainFrame()
-▶ Frame {
-    _name: ""
-    _url: "https://playwright.dev/"
-  ▶ _page: Page { ... }
-    ...
-  }
-```
-
-Objects with an `objectId` (CDP remote object handle) can be expanded lazily — clicking a collapsed node fetches its properties on demand without re-evaluating the expression.
-
-**`expect()` in the console:**
-
-Because Playwright mode evaluates in the service worker context where `expect` is a live global, assertions run interactively:
-
-```
-> await expect(page.locator('h1')).toBeVisible()
-→ (passes silently)
-
-> await expect(page.locator('h1')).toHaveText('wrong text')
-→ Error: expect(locator).toHaveText(expected)
-  Expected: "wrong text"
-  Received: "Introduction"
-```
-
-No test runner. No `describe` block. Just type an assertion and see if it passes.
-
-**No other tool has this.** Chrome DevTools Console runs JS in the page — you get `document`, `window`, but no Playwright. Playwright Inspector is Node-only. playwright-crx exposes the API in the SW but has no console UI. This is the first interactive console that lets you mix `document.querySelectorAll`, `page.locator()`, `expect()`, and pw commands in a single input.
-
-### Comparison
-
-| | Node + Playwright | Chrome DevTools | **playwright-repl extension** |
+| | Node + Playwright | Chrome DevTools | **Dramaturg** |
 |---|---|---|---|
-| Runs Playwright | ✅ Node process | ❌ | ✅ **Service worker** |
+| Runs Playwright | ✅ Node process | ❌ | ✅ Service worker |
 | Full `page.*` API | ✅ | ❌ | ✅ |
-| `expect()` in console | ✅ (test runner only) | ❌ | ✅ **interactively** |
+| `expect()` in console | ✅ (test runner only) | ❌ | ✅ interactively |
 | JS in page context | via `page.evaluate` | ✅ | ✅ |
 | CDP object tree | ❌ | ✅ | ✅ |
-| Both in one console | ❌ | ❌ | ✅ |
 | Real attached tab | ❌ (separate launch) | ✅ | ✅ |
+
+---
 
 ## Architecture
 
+### How it works
+
+Two technologies make Playwright run inside the browser:
+
+**1. playwright-crx** — replaces Playwright's CDP WebSocket with `chrome.debugger`, allowing the full Playwright API to run inside a Chrome extension's service worker. When you open the panel, `crxApp.attach(tabId)` connects to the active tab and sets `page`, `context`, and `expect` as live globals in the service worker.
+
+**2. swDebugEval** — the panel and service worker are separate JS contexts. To call Playwright objects, the panel uses `chrome.debugger` a second time — attaching to the service worker itself and evaluating expressions in its runtime, where the live Playwright globals exist.
+
 ### Command Execution Pipeline
 
-All commands follow a single path from user input to the browser tab:
-
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Side Panel (React)                                      │
-│  CommandInput.tsx → runAndDispatch() in run.ts           │
-└─────────────────────────┬────────────────────────────────┘
-                          │  string: e.g. "click Submit"
-                          ▼
-┌──────────────────────────────────────────────────────────┐
-│  commands.ts — parseReplCommand()                        │
-│  Parses keyword + args, produces a jsExpr string         │
-│                                                          │
-│  "click Submit"                                          │
-│    → return await refAction(page, 'Submit', 'click')     │
-│                                                          │
-│  "goto https://example.com"                              │
-│    → return await page.goto("https://example.com")       │
-│                                                          │
-│  "tab-list"                                              │
-│    → return await (tabList.toString())(page)             │
-└─────────────────────────┬────────────────────────────────┘
-                          │  jsExpr string
-                          ▼
-┌──────────────────────────────────────────────────────────┐
-│  bridge.ts — executeCommand()                            │
-│  Calls swDebugEval(jsExpr)                               │
-└─────────────────────────┬────────────────────────────────┘
-                          │  chrome.debugger.sendCommand
-                          ▼
-┌──────────────────────────────────────────────────────────┐
-│  Service Worker runtime (background.ts)                  │
-│  Live globals set by playwright-crx after attach:        │
-│    globalThis.page     — active Playwright Page          │
-│    globalThis.context  — BrowserContext                  │
-│    globalThis.crxApp   — CrxApp instance                 │
-│    globalThis.expect   — Playwright expect               │
-└─────────────────────────┬────────────────────────────────┘
-                          │  playwright-crx (CDP)
-                          ▼
-┌──────────────────────────────────────────────────────────┐
-│  Chrome tab                                              │
-└──────────────────────────────────────────────────────────┘
+Side Panel (React)
+  CommandInput → runAndDispatch()
+        │  string: e.g. "click Submit"
+        ▼
+  commands.ts — parseReplCommand()
+  Compiles keyword → jsExpr string
+  "click Submit" → "return await refAction(page, 'Submit', 'click')"
+        │
+        ▼
+  bridge.ts — executeCommand()
+  Calls swDebugEval(jsExpr)
+        │  chrome.debugger.sendCommand('Runtime.evaluate')
+        ▼
+  Service Worker (background.ts)
+  Live globals: page, context, crxApp, expect
+        │  playwright-crx (CDP)
+        ▼
+  Chrome tab
 ```
-
-### Why jsExpr Strings?
-
-The panel and service worker live in different JavaScript contexts. `chrome.debugger` lets the panel evaluate arbitrary JS in the SW's runtime — where `page`, `context`, and `expect` are live Playwright objects.
-
-`commands.ts` compiles each keyword into a self-contained JS expression that runs in that context. There is no `chrome.runtime.sendMessage` for commands — only a direct `chrome.debugger.sendCommand('Runtime.evaluate', ...)` call via `swDebugEval`.
-
-### page-scripts.ts — Serializable Helper Functions
-
-Text locators, assertions, and tab operations are implemented as plain functions in `src/page-scripts.ts`. Each function is **self-contained** — no imports, no closures — so it can be serialized via `.toString()` and sent as part of the jsExpr:
-
-```typescript
-// commands.ts
-import { tabList } from './page-scripts';
-
-// Compiles to:
-// return await (async function tabList(page) { ... })(page)
-return { jsExpr: call(tabList) };
-```
-
-The `call()` helper generates: `` `return await (${fn.toString()})(page, ...args)` ``
-
-Functions that need `context` (for tab operations) access it via `globalThis.context` directly, since `context` is a global in the SW runtime.
 
 ### background.ts — Lifecycle Only
 
-`background.ts` no longer executes commands. Its only responsibilities are:
-
 | Message type | Action |
 |---|---|
-| `attach` | `crxApp.attach(tabId)` — connects playwright-crx to the active tab, sets `page`/`context`/`crxApp` globals |
-| `record-start` | Injects recorder into the active tab, returns `{ ok, error }` |
+| `attach` | `crxApp.attach(tabId)` — connects playwright-crx to the tab |
+| `record-start` | Injects recorder into the active tab |
 | `record-stop` | Disconnects recorder port |
-| `health` | Returns `{ ok: !!crxApp }` — status indicator in the toolbar |
-| `cdp-evaluate` | Raw CDP `Runtime.evaluate` for the Console pane object tree |
-| `cdp-get-properties` | Raw CDP `Runtime.getProperties` for the Console pane |
-| `ping` | Keep-alive check |
+| `health` | Returns `{ ok: !!crxApp }` |
+| `cdp-evaluate` | Raw CDP `Runtime.evaluate` for the Console object tree |
+| `cdp-get-properties` | Raw CDP `Runtime.getProperties` for the Console object tree |
 
-### Tab Operations
-
-Tab commands (`tab-list`, `tab-new`, `tab-close`, `tab-select`) use Playwright's BrowserContext APIs, matching how Playwright MCP implements tabs:
-
-```
-tab-list   → context.pages() → index-based list
-             - 0: (current) [title](url)
-             - 1: [title](url)
-
-tab-new    → context.newPage() + page.goto(url)
-
-tab-close  → pages[index].close()
-
-tab-select → pages[index].bringToFront()
-             + globalThis.page = pages[index]  ← updates active page for all subsequent commands
-```
-
-### Local Commands
-
-Some commands are handled directly in `run.ts` without going through `swDebugEval`:
-
-| Command | Handler |
-|---|---|
-| `#comment` | Dispatches `ADD_LINE` with type `comment` |
-| `clear` | Dispatches `CLEAR_CONSOLE` |
-| `help` | Prints command list from `COMMANDS` map |
-| `history` / `history clear` | Reads/clears persistent command history |
-| `run-code <js>` | Calls `swDebugEval(code)` directly — no jsExpr compilation |
-
-## File Structure
+### File Structure
 
 ```
 src/
-├── background.ts           # Service worker — lifecycle (attach, record, health, CDP, ping)
-├── commands.ts             # Keyword → jsExpr compiler (parseReplCommand)
-├── page-scripts.ts         # Serializable helper functions (refAction, textLocator, tab*, verify*, etc.)
+├── background.ts           # Service worker — lifecycle (attach, record, health, CDP)
+├── commands.ts             # Keyword → jsExpr compiler
+├── page-scripts.ts         # Serializable helper functions (locators, assertions, tabs)
 └── panel/
-    ├── panel.html          # Extension page entry
+    ├── panel.html
     ├── panel.tsx           # React root
     ├── App.tsx             # Root component — auto-attach, tab listener
     ├── reducer.ts          # useReducer — console lines, loading state
-    ├── types.ts            # Shared TypeScript types
     ├── components/
     │   ├── Toolbar.tsx     # Record button, attach status, tab switcher
     │   ├── CommandInput.tsx # CodeMirror 6 REPL input with autocomplete + history
-    │   ├── ConsolePane.tsx  # Output lines (success, error, comment, screenshot, snapshot)
-    │   ├── EditorPane.tsx   # Multi-line script editor (Run button, Save, Export)
+    │   ├── ConsolePane.tsx  # Output lines
+    │   ├── EditorPane.tsx   # Multi-line script editor
     │   └── Console/        # CDP object tree renderer
     └── lib/
         ├── bridge.ts       # executeCommand — parses + calls swDebugEval
@@ -256,8 +197,7 @@ src/
         ├── sw-debugger.ts  # swDebugEval — chrome.debugger evaluation in SW context
         ├── cm-input-setup.ts # CodeMirror 6 extensions (autocomplete, keymaps, history)
         ├── command-history.ts # Persistent localStorage command history
-        ├── filter.ts       # Response filtering (snapshot truncation, etc.)
-        └── server.ts       # Health-check polling for auto-attach
+        └── filter.ts       # Response filtering
 ```
 
 ## Build & Test
@@ -271,16 +211,8 @@ npm run build
 npm run test
 
 # E2E tests (Playwright — loads real extension in Chromium)
-npm run test:e2e              # all suites
-npx playwright test e2e/panel # panel UI tests (mocked chrome.runtime)
-npx playwright test e2e/commands # command integration tests (real playwright-crx)
-npx playwright test e2e/recording # recorder tests
+npm run test:e2e
+npx playwright test e2e/panel
+npx playwright test e2e/commands
+npx playwright test e2e/recording
 ```
-
-### Test Architecture
-
-**Panel tests** (`e2e/panel/`) load `panel.html` and mock `chrome.runtime.sendMessage` to return fixture responses for lifecycle calls (`health`, `attach`, `record-start`, `record-stop`). Command execution goes through the real `swDebugEval` path — no mocking of the command pipeline.
-
-**Command tests** (`e2e/commands/`) load the full extension with a real service worker. Commands are submitted via the CodeMirror UI (type + Enter) and results are read from the `[data-type]` output elements. No globals are exposed from panel code.
-
-**Recording tests** (`e2e/recording/`) verify the recorder injection and port messaging with a real attached tab.

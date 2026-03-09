@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.13.0 — MCP Server + Dramaturg
+
+**2026-03-09**
+
+### New: `@playwright-repl/mcp`
+
+- **MCP server for AI browser control**: `playwright-repl-mcp` exposes a single `run_command` tool that lets Claude Desktop, Claude Code, or any MCP client drive your real Chrome session via the Dramaturg extension. Supports keyword commands, Playwright API, and JavaScript — no extra glue code needed.
+- **One tool, three input modes**: keyword (`.pw`), Playwright API (`await page.*`), JavaScript (`document.*`) — same as the extension console.
+- **Custom port**: `--port` arg or `BRIDGE_PORT` env var (default `9876`).
+
+### Features
+
+- **Dramaturg**: Extension renamed to **Dramaturg** in the Chrome manifest — preparation for Chrome Web Store publishing.
+
+### Documentation
+
+- Full README rewrite across all packages — root README is now a high-level landing page; each package has a dedicated README.
+- New `packages/core/README.md` — documents `Engine`, `BridgeServer`, `parseInput`, `buildCompletionItems`.
+
+---
+
 ## v0.12.0 — WebSocket CLI Bridge
 
 **2026-03-08**

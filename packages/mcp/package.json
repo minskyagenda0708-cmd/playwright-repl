@@ -1,0 +1,20 @@
+{
+    "name": "@playwright-repl/mcp",
+    "version": "0.13.0",
+    "type": "module",
+    "bin": {
+        "playwright-repl-mcp": "./dist/index.js"
+    },
+    "main": "./dist/index.js",
+    "files": [
+        "dist/"
+    ],
+    "scripts": {
+        "build": "tsc --build tsconfig.build.json"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.10.0",
+        "@playwright-repl/core": "workspace:*",
+        "zod": "^3.24.0"
+    }
+}

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Playwright REPL",
-  "version": "0.10.0",
-  "description": "A side panel for Playwright-style browser automation commands.",
+  "name": "Dramaturg",
+  "version": "0.13.0",
+  "description": "Playwright automation console inside Chrome — keyword commands, Playwright API, and JavaScript in one side panel.",
   "permissions": [
     "activeTab",
     "tabs",
@@ -20,7 +20,7 @@
     "<all_urls>"
   ],
   "action": {
-    "default_title": "Playwright REPL",
+    "default_title": "Dramaturg",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
