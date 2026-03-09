@@ -242,7 +242,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 const jsAction = (jsSource?.actions as string[] | undefined)?.[prevCount + i];
                 if (!jsAction) return [];
                 return jsAction.split('\n')
-                    .map((line: string) => line.replace(/^ {2}/, ''))          // strip 2-space base offset
+                    .map((line: string) => line.replace(/^ {2}/, ''))           // strip 2-space base offset
+                    .map((line: string) => line.replace(/^\/\/ (await expect\()/, '$1')) // uncomment assertions
                     .filter((line: string) => !line.startsWith('const page =')); // page already exists
             }).filter(Boolean);
             if (jsLines.length) editorRef.current?.insertAtCursor(jsLines.join('\n'));
@@ -303,6 +304,12 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         recorderPortRef.current!.onMessage.addListener((msg: any) => {
             if (msg.type === 'recorder' && msg.method === 'setSources') {
                 handleRecordedSources(msg.sources);
+            }
+            if (msg.type === 'recorder' && msg.method === 'elementPicked') {
+                const selector = msg.elementInfo?.selector;
+                if (selector) {
+                    dispatch({ type: 'ADD_LINE', line: { text: selector, type: 'info' } });
+                }
             }
         });
 
