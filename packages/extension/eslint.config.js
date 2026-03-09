@@ -5,7 +5,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["dist/**", "node_modules/**", "src/panel/lib/locator/**"],
   },
   {
     files: ["src/**/*.ts", "test/**/*.ts", "e2e/**/*.ts"],
