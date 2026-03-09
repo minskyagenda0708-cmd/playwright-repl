@@ -20,6 +20,7 @@
 - [ ] **Script test runner** ([#70](https://github.com/stevez/playwright-repl/issues/70)) — "Run all" button streams pass/fail per `await` statement with CM6 gutter decorations.
 - [ ] **AI test generation** ([#71](https://github.com/stevez/playwright-repl/issues/71)) — Natural language → `expect()` assertions via Claude API + snapshot context.
 - [ ] **AI browser agent** ([#72](https://github.com/stevez/playwright-repl/issues/72)) — Claude operates the browser step-by-step via `swDebugEval` pipeline.
+- [ ] **MCP `run_script` tool** — Add a second MCP tool that accepts a multi-line `.pw` script, runs each line sequentially, and returns combined results. Useful for replaying known `.pw` files without per-step round trips. Single `run_command` remains preferred for AI agents (observe-and-adapt per step).
 - [ ] **Step debugger** ([#73](https://github.com/stevez/playwright-repl/issues/73)) — Step through scripts line by line with CM6 highlighting and a variables panel.
 
 ## Medium Priority
@@ -53,6 +54,7 @@
 - [ ] **Richer console output types** ([#89](https://github.com/stevez/playwright-repl/issues/89)) — info/warning banners, code-block highlighting, screenshot rendering.
 - [ ] **Terminal → console output parity** ([#90](https://github.com/stevez/playwright-repl/issues/90)) — Terminal commands stream results into console too.
 - [ ] **Editor JS mode** ([#91](https://github.com/stevez/playwright-repl/issues/91)) — `.pw`/`JS` toggle; JS mode uses `swDebugEval` directly.
+- [ ] **Language mode setting in preferences** — Add `languageMode` to `PwReplSettings` (default `.pw`), exposed as a dropdown in `PreferencesForm`. Persisted via `chrome.storage.local`. Editor picks up the setting on load.
 - [ ] **Capture `console.log` in JS mode** — Intercept `console.log`/`console.error` in `swDebugEval` wrapper and route output to the panel console instead of service worker DevTools.
 - [ ] **Recording inserts actions before `goto` in JS mode** — When recording starts, the initial `goto` is appended to the editor but cursor-tracking may cause subsequent recorded actions to land before the `goto` line instead of after it.
 - [ ] **JS mode hangs on 2nd `await` line** — Multi-`await` scripts (e.g. `page.getByLabel(...).fill(...)` followed by another `await`) hang after the first line when run via `runJsScript`/`swDebugEval`. Root cause: likely a timing/resumption issue in the AsyncFunction wrapper inside the service worker.

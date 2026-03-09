@@ -5,6 +5,7 @@ import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab, executeCommand } from './lib/bridge'
 import { Console } from './components/Console';
+import { loadSettings } from './lib/settings';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
@@ -37,7 +38,7 @@ function App() {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let unmounted = false;
 
-    function connect(port = 9876) {
+    function connect(port: number) {
       if (unmounted) return;
       try {
         ws = new WebSocket(`ws://localhost:${port}`);
@@ -59,7 +60,7 @@ function App() {
       }
     }
 
-    connect();
+    loadSettings().then(({ bridgePort }) => connect(bridgePort));
 
     return () => {
       unmounted = true;

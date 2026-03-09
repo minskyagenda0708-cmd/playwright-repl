@@ -14,8 +14,9 @@ export class BridgeServer {
 
     async start(port = 9876): Promise<void> {
         this.wss = new WebSocketServer({ port });
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
             this.wss.on('listening', resolve);
+            this.wss.on('error', reject);
         });
         this.wss.on('connection', (ws) => {
             this.socket = ws;

@@ -1,11 +1,12 @@
 export type PwReplSettings = {
-    openAs: 'sidepanel' | 'popup'
+    openAs: 'sidepanel' | 'popup',
+    bridgePort: number, 
 };
 
-const DEFAULT: PwReplSettings = { openAs: 'sidepanel' };
+const DEFAULT: PwReplSettings = { openAs: 'sidepanel', bridgePort: 9876 };
 
 export async function loadSettings(): Promise<PwReplSettings> {
-    const stored = await chrome.storage.local.get(['openAs']) as Partial<PwReplSettings>;
+    const stored = await chrome.storage.local.get(['openAs', 'bridgePort']) as Partial<PwReplSettings>;
     return { ...DEFAULT, ...stored };
 }
 
