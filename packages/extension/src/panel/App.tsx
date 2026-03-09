@@ -43,10 +43,25 @@ function App() {
       try {
         ws = new WebSocket(`ws://localhost:${port}`);
         ws.onmessage = async (e) => {
-          const msg = JSON.parse(e.data as string) as { id: string; command: string };
-          const result = await executeCommand(msg.command).catch((err: unknown) => ({
-            text: String(err), isError: true,
-          }));
+          const msg = JSON.parse(e.data as string) as { id: string; command: string; type?: 'command' | 'script'; language?: 'pw' | 'javascript' };
+          let result: { text: string; isError: boolean; image?: string };
+          if (msg.type === 'script') {
+            if (msg.language !== 'javascript') {
+              const lines = msg.command.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+              const output: string[] = [];
+              let isError = false;
+              for (const line of lines) {
+                const r = await executeCommand(line).catch((err: unknown) => ({ text: String(err), isError: true }));
+                output.push(`${r.isError ? '✗' : '✓'} ${line}${r.text ? `\n  ${r.text}` : ''}`);
+                if (r.isError) { isError = true; break; }
+              }
+              result = { text: output.join('\n'), isError };
+            } else {
+              result = await executeCommand(msg.command).catch((err: unknown) => ({ text: String(err), isError: true }));
+            }
+          } else {
+            result = await executeCommand(msg.command).catch((err: unknown) => ({ text: String(err), isError: true }));
+          }
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ id: msg.id, ...result }));
           }

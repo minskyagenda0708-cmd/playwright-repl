@@ -78,5 +78,37 @@ server.registerTool(
     }
 );
 
+const RUN_SCRIPT_DESCRIPTION = `\
+Run a multi-line script, returning combined pass/fail results.
+Useful for replaying a known script without per-step round trips.
+Prefer run_command for AI-driven exploration where you need to observe and adapt after each step.
+
+language='pw': each line is a .pw keyword command, run sequentially. Lines starting with # are skipped. Stops on first error.
+language='javascript': the entire script is run as a single JavaScript/Playwright block.`;
+
+server.registerTool(
+    'run_script',
+    {
+        description: RUN_SCRIPT_DESCRIPTION,
+        inputSchema: {
+            script: z.string().describe('The script to execute'),
+            language: z.enum(['pw', 'javascript']).describe("'pw' for keyword commands (one per line), 'javascript' for a JS/Playwright block"),
+        },
+    },
+    async ({ script, language }) => {
+        if (!srv.connected) {
+            return {
+                content: [{ type: 'text' as const, text: 'Browser not connected. Open Chrome with the playwright-repl extension — it connects automatically.' }],
+                isError: true,
+            };
+        }
+        const result = await srv.runScript(script, language);
+        return {
+            content: [{ type: 'text' as const, text: result.text || 'Done' }],
+            isError: result.isError,
+        };
+    }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

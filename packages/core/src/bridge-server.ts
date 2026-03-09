@@ -35,7 +35,16 @@ export class BridgeServer {
         const id = Math.random().toString(36).slice(2);
         return new Promise((resolve) => {
             this.pending.set(id, resolve);
-            this.socket!.send(JSON.stringify({ id, command }));
+            this.socket!.send(JSON.stringify({ id, command, type: 'command' }));
+        });
+    }
+
+    async runScript(script: string, language: 'pw' | 'javascript' = 'pw'): Promise<EngineResult> {
+        if (!this.connected) return { text: 'Extension not connected', isError: true };
+        const id = Math.random().toString(36).slice(2);
+        return new Promise((resolve) => {
+            this.pending.set(id, resolve);
+            this.socket!.send(JSON.stringify({ id, command: script, type: 'script', language }));
         });
     }
 
