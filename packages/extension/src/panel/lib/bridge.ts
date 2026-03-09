@@ -1,7 +1,7 @@
 export type CommandResult = { text: string; isError: boolean; image?: string };
 export type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
-import { parseReplCommand } from '../../commands';
+import { parseReplCommand } from './commands';
 export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: string; image?: string };
 
 export async function cdpEvaluate(expression: string): Promise<unknown> {

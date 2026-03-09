@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 let parseReplCommand: (input: string) => any;
 
 beforeAll(async () => {
-  const mod = await import("../../src/commands");
+  const mod = await import("../../src/panel/lib/commands");
   parseReplCommand = mod.parseReplCommand;
 });
 
