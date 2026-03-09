@@ -5,6 +5,7 @@ import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
+import { asLocator } from '@/lib/locator/locatorGenerators';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
     dispatch: React.Dispatch<Action>,
@@ -308,7 +309,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             if (msg.type === 'recorder' && msg.method === 'elementPicked') {
                 const selector = msg.elementInfo?.selector;
                 if (selector) {
-                    dispatch({ type: 'ADD_LINE', line: { text: selector, type: 'info' } });
+                    const locator = asLocator(selector);
+                    dispatch({ type: 'ADD_LINE', line: { text: locator, type: 'info' } });
                 }
             }
         });
