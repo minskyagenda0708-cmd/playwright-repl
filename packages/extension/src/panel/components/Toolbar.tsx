@@ -385,12 +385,12 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
                 <div data-testid="mode-toggle" className="inline-flex rounded border border-(--border-button) overflow-hidden">
                     <button
-                        data-active={editorMode === 'pw' || undefined}
+                        data-active={editorMode === 'pw' ? '' : undefined}
                         onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'pw' })}
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >.pw</button>
                     <button
-                        data-active={editorMode === 'js' || undefined}
+                        data-active={editorMode === 'js' ? '' : undefined}
                         onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'js' })}
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >JS</button>
