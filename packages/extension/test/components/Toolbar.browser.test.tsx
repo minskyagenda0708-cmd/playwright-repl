@@ -649,29 +649,33 @@ describe('Toolbar component tests', () => {
   // ─── Editor mode toggle ────────────────────────────────────────────────────
 
   describe('editor mode toggle', () => {
-    it('should render the mode toggle button showing current mode', async () => {
+    it('should render segmented control with both modes', async () => {
       const screen = await renderToolbar({ editorMode: 'pw' });
       const toggle = screen.container.querySelector('[data-testid="mode-toggle"]');
       expect(toggle).not.toBeNull();
-      expect(toggle?.textContent).toBe('.pw');
+      expect(toggle?.textContent).toContain('.pw');
+      expect(toggle?.textContent).toContain('JS');
+      expect(toggle?.querySelector('button[data-active]')?.textContent).toBe('.pw');
     });
 
-    it('should dispatch SET_EDITOR_MODE js when toggled from pw', async () => {
+    it('should dispatch SET_EDITOR_MODE js when JS button clicked', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorMode: 'pw', dispatch });
 
-      const toggle = screen.container.querySelector('[data-testid="mode-toggle"]') as HTMLButtonElement;
-      toggle.click();
+      const buttons = screen.container.querySelectorAll('[data-testid="mode-toggle"] button');
+      const jsButton = Array.from(buttons).find(b => b.textContent === 'JS') as HTMLButtonElement;
+      jsButton.click();
 
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'js' });
     });
 
-    it('should dispatch SET_EDITOR_MODE pw when toggled from js', async () => {
+    it('should dispatch SET_EDITOR_MODE pw when .pw button clicked', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorMode: 'js', dispatch });
 
-      const toggle = screen.container.querySelector('[data-testid="mode-toggle"]') as HTMLButtonElement;
-      toggle.click();
+      const buttons = screen.container.querySelectorAll('[data-testid="mode-toggle"] button');
+      const pwButton = Array.from(buttons).find(b => b.textContent === '.pw') as HTMLButtonElement;
+      pwButton.click();
 
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'pw' });
     });
