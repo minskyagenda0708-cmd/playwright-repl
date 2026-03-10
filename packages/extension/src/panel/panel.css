@@ -139,6 +139,17 @@ html, body {
   cursor: default;
 }
 
+#toolbar [data-testid="mode-toggle"] button[data-active] {
+  background: var(--color-run-bg);
+  color: white;
+  font-weight: 600;
+}
+
+#toolbar [data-testid="mode-toggle"] button:not([data-active]) {
+  background: transparent;
+  opacity: 0.6;
+}
+
 #run-btn,
 #step-btn {
   min-width: 28px;

@@ -217,7 +217,7 @@ test('recording inserts goto in pw mode', async ({ panelPage }) => {
 });
 
 test('recording inserts goto in JS syntax in JS mode', async ({ panelPage }) => {
-  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
   await setupRecorderPort(panelPage);
   await panelPage.getByTestId('record-btn').click();
   await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
@@ -244,7 +244,7 @@ test('recorded pw action appears after goto', async ({ panelPage }) => {
 });
 
 test('recorded JS action appears after goto in JS mode', async ({ panelPage }) => {
-  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
   const fireSources = await setupRecorderPort(panelPage);
   await panelPage.getByTestId('record-btn').click();
   await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
@@ -342,28 +342,34 @@ test('recording stopped message appears when record button clicked again', async
 
 // ─── Editor mode toggle ─────────────────────────────────────────────────────
 
-test('has mode toggle button showing current mode', async ({ panelPage }) => {
+test('has mode toggle showing both modes with active indicator', async ({ panelPage }) => {
   const toggle = panelPage.getByTestId('mode-toggle');
   await expect(toggle).toBeVisible();
   await expect(toggle).toContainText('.pw');
-  await toggle.click();
   await expect(toggle).toContainText('JS');
+  // .pw is active by default
+  await expect(toggle.getByText('.pw')).toHaveAttribute('data-active', '');
+  await expect(toggle.getByText('JS')).not.toHaveAttribute('data-active');
+  // Click JS to switch
+  await toggle.getByText('JS').click();
+  await expect(toggle.getByText('JS')).toHaveAttribute('data-active', '');
+  await expect(toggle.getByText('.pw')).not.toHaveAttribute('data-active');
 });
 
 test('step button is enabled in JS mode (starts debug session)', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
-  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
   await expect(panelPage.locator('#step-btn')).toBeEnabled();
 });
 
 test('step button is enabled when switching back to pw mode', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
-  await panelPage.getByTestId('mode-toggle').click(); // pw → js
-  await panelPage.getByTestId('mode-toggle').click(); // js → pw
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
+  await panelPage.getByTestId('mode-toggle').getByText('.pw').click(); // js → pw
   await expect(panelPage.locator('#step-btn')).toBeEnabled();
 });
 
 test('editor shows JS placeholder in JS mode', async ({ panelPage }) => {
-  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
   await expect(panelPage.getByTestId('editor').locator('.cm-placeholder')).toContainText('// Type JavaScript...');
 });

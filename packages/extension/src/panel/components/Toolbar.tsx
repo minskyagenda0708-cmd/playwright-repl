@@ -383,13 +383,18 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 }
                 <button id="step-btn" data-testid="step-btn" title={editorMode === 'js' ? (isStepDebugging ? 'Step: advance to next line' : 'Step: start debug session') : 'Step: run next line'} disabled={!editorContent.trim() || (isRunning && !isStepDebugging)} onClick={handleStep}><StepForwardIcon /></button>
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
-                <button
-                    data-testid="mode-toggle"
-                    title={`Switch to ${editorMode === 'pw' ? 'JS' : '.pw'} mode`}
-                    onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: editorMode === 'pw' ? 'js' : 'pw' })}
-                >
-                    {editorMode === 'pw' ? '.pw' : 'JS'}
-                </button>
+                <div data-testid="mode-toggle" className="inline-flex rounded border border-(--border-button) overflow-hidden">
+                    <button
+                        data-active={editorMode === 'pw' || undefined}
+                        onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'pw' })}
+                        className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
+                    >.pw</button>
+                    <button
+                        data-active={editorMode === 'js' || undefined}
+                        onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'js' })}
+                        className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
+                    >JS</button>
+                </div>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                     {isDarkMode ? <SunIcon /> : <MoonIcon />}
                 </button>
