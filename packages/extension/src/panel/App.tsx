@@ -6,11 +6,22 @@ import { panelReducer, initialState } from './reducer'
 import { attachToTab, executeCommand } from './lib/bridge'
 import { Console } from './components/Console';
 import { loadSettings } from './lib/settings';
+import { onConsoleEvent } from '@/lib/sw-debugger';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorHandle | null>(null);
+
+  useEffect(() => {
+    onConsoleEvent((level, args) => {
+      for (const arg of args) {
+        const type = level === 'error' ? 'error' : level === 'warn' ? 'info' : 'success';
+        dispatch({ type: 'ADD_LINE', line: { text: '', type, value: arg } });
+      }
+    });
+    return () => onConsoleEvent(null);
+  }, [dispatch]);
 
 
   async function doAttach(tabId: number) {
@@ -69,7 +80,7 @@ function App() {
         ws.onclose = () => {
           if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
         };
-        ws.onerror = () => {};
+        ws.onerror = () => { };
       } catch {
         if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
       }
@@ -130,17 +141,17 @@ function App() {
 
       {/* Editor pane */}
       <CodeMirrorEditorPane
-         ref={editorRef}
-         containerRef={editorPaneRef}
-         editorContent={state.editorContent}
-         editorMode={state.editorMode}
-         currentRunLine={state.currentRunLine}
-         lineResults={state.lineResults}
-         dispatch={dispatch}
+        ref={editorRef}
+        containerRef={editorPaneRef}
+        editorContent={state.editorContent}
+        editorMode={state.editorMode}
+        currentRunLine={state.currentRunLine}
+        lineResults={state.lineResults}
+        dispatch={dispatch}
       />
 
       {/* Splitter */}
-      <Splitter editorPaneRef={editorPaneRef}/>
+      <Splitter editorPaneRef={editorPaneRef} />
 
       <Console outputLines={state.outputLines} dispatch={dispatch} />
     </>

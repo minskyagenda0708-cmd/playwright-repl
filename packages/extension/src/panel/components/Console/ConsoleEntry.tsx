@@ -43,7 +43,11 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                     </div>
                 )}
                 {entry.status === 'error' && (
-                    <div data-type="error" className="pt-0.5 text-(--color-error) whitespace-pre-wrap">{entry.errorText}</div>
+                    <div data-type="error" className="pt-0.5 text-(--color-error) whitespace-pre-wrap">
+                        {entry.value !== undefined ? (
+                            <ObjectTree data={entry.value} />
+                        ) : entry.errorText}
+                    </div>
                 )}
             </div>
         </div>

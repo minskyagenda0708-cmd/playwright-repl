@@ -435,3 +435,29 @@ test.describe('run-code: expect()', () => {
     expect(result.text).toBe('Done');
   });
 });
+
+// ─── Console.log capture ──────────────────────────────────────────────────────
+// console.log/error/warn in run-code (swDebugEval context) should appear in the
+// output pane via Runtime.consoleAPICalled CDP events.
+
+test.describe('Console.log capture', () => {
+  test('console.log string appears in output', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    await sendViaUI(panelPage, 'run-code console.log("e2e-log-marker")');
+    await expect(panelPage.getByTestId('output')).toContainText('e2e-log-marker');
+  });
+
+  test('console.log object shows properties', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    await sendViaUI(panelPage, 'run-code console.log({testKey: "testVal"})');
+    const output = panelPage.getByTestId('output');
+    await expect(output).toContainText('testKey');
+    await expect(output).toContainText('testVal');
+  });
+
+  test('console.warn appears in output', async ({ testPage: _, panelPage }) => {
+    await sendCommand(panelPage, `goto ${TEST_URL}`);
+    await sendViaUI(panelPage, 'run-code console.warn("e2e-warn-marker")');
+    await expect(panelPage.getByTestId('output')).toContainText('e2e-warn-marker');
+  });
+});

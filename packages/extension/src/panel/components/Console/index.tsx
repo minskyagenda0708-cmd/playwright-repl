@@ -38,16 +38,25 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
             entries.push({ id, input: line.text, status: 'done' });
             i++;
         } else if (line.type === 'info') {
-            entries.push({ id, input: '', status: 'done', text: line.text });
+            const entry: ConsoleEntry = { id, input: '', status: 'done' };
+            if (line.value !== undefined) entry.value = line.value as SerializedValue;
+            else entry.text = line.text;
+            entries.push(entry);
             i++;
         } else if (line.type === 'code-block') {
             entries.push({ id, input: '', status: 'done', codeBlock: line.text });
             i++;
         } else if (line.type === 'error') {
-            entries.push({ id, input: '', status: 'error', errorText: line.text });
+            const entry: ConsoleEntry = { id, input: '', status: 'error' };
+            if (line.value !== undefined) entry.value = line.value as SerializedValue;
+            else entry.errorText = line.text;
+            entries.push(entry);
             i++;
         } else if (line.type === 'success') {
-            entries.push({ id, input: '', status: 'done', text: line.text });
+            const entry: ConsoleEntry = { id, input: '', status: 'done' };
+            if (line.value !== undefined) entry.value = line.value as SerializedValue;
+            else entry.text = line.text;
+            entries.push(entry);
             i++;
         } else {
             i++;

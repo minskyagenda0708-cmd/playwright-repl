@@ -1,6 +1,8 @@
 // Attaches the panel's debugger client to the extension's service worker target
 // and evaluates expressions in the service worker's JS runtime.
 // The panel is a separate context so it CAN see the SW in getTargets().
+import { SerializedValue } from '@/components/Console/types';
+import { CdpRemoteObject, fromCdpRemoteObject, CdpPropertyDescriptor } from '@/components/Console/cdpToSerialized';
 
 let swTargetId: string | null = null;
 
@@ -49,6 +51,7 @@ async function ensureAttached(): Promise<string> {
                 if (/already attached/i.test(msg)) { swTargetId = targetId; resolve(); }
                 else reject(new Error(msg));
             } else {
+                chrome.debugger.sendCommand({ targetId }, 'Runtime.enable', {}, () => {});
                 swTargetId = targetId; resolve();
             }
         });
@@ -142,3 +145,55 @@ export async function swDebugEval(expression: string): Promise<unknown> {
         );
     });
 }
+
+type ConsoleCallback = (level: string, args: SerializedValue[]) => void;
+let consoleCallback: ConsoleCallback | null = null;
+
+export function onConsoleEvent(callback: ConsoleCallback | null) {
+    consoleCallback = callback;
+}
+
+async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set<string>()): Promise<SerializedValue> {
+    // Primitives — delegate to existing converter
+    if (obj.type !== 'object' || !obj.objectId) return fromCdpRemoteObject(obj);
+    if (depth > 3) return fromCdpRemoteObject(obj);  // preview-only at depth limit
+    if (visited.has(obj.objectId)) return { __type: 'circular' };
+    visited.add(obj.objectId);
+
+    // Fetch own properties eagerly
+    const raw = await swGetProperties(obj.objectId);
+    const descriptors = (raw as any)?.result as CdpPropertyDescriptor[];
+    if (!descriptors) return fromCdpRemoteObject(obj);
+
+    const props: Record<string, SerializedValue> = {};
+    for (const desc of descriptors) {
+        if (!desc.value) continue;
+        props[desc.name] = await eagerSerialize(desc.value, depth + 1, visited);
+    }
+
+    const cls = obj.className ?? 'Object';
+    if (obj.subtype === 'array') {
+        return { __type: 'array', cls, len: descriptors.length, props };
+        // No objectId — fully serialized, no lazy expand
+    }
+    return { __type: 'object', cls, props };
+}
+
+chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
+    if (method !== 'Runtime.consoleAPICalled') return;
+    if (source.targetId !== swTargetId) return;
+    if (!consoleCallback) return;
+
+    const level = params.type; // 'log', 'error', 'warn', 'info', etc.
+    try {
+        const serialized: SerializedValue[] = [];
+        for (const arg of params.args) {
+            try {
+                serialized.push(await eagerSerialize(arg));
+            } catch {
+                serialized.push(fromCdpRemoteObject(arg));
+            }
+        }
+        consoleCallback(level, serialized);
+    } catch { /* prevent unhandled rejection from killing the listener */ }
+});

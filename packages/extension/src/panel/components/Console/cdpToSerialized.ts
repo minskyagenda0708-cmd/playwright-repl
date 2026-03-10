@@ -25,7 +25,7 @@ export interface CdpRemoteObject {
     preview?: CdpPreview;
 }
 
-interface CdpPropertyDescriptor {
+export interface CdpPropertyDescriptor {
     name: string;
     value?: CdpRemoteObject;
 }
