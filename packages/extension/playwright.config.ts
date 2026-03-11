@@ -1,10 +1,29 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from '@playwright/test'
+import type { NextcovConfig } from 'nextcov';
+
+
+// Nextcov configuration
+export const nextcov: NextcovConfig = {
+  outputDir: 'coverage/e2e',
+  sourceRoot: './src',
+  collectServer: false,  // Client-only mode
+  include: ['src/**/*.{ts,tsx,js,jsx}'],
+  exclude: [
+    'src/**/__tests__/**',
+    'src/**/*.test.{ts,tsx}',
+    'src/**/*.spec.{ts,tsx}',
+  ],
+  reporters: ['html', 'lcov', 'json', 'text-summary'],
+}
 
 export default defineConfig({
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
+
   testDir: './e2e',
   timeout: 60000,
   retries: 0,
-  // Bridge tests start a WebSocket server on port 9876; any parallel extension
+  // Bridge tests start a WebSocket server; any parallel extension
   // instance would also connect to it, causing interference. Run sequentially.
   workers: 1,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',

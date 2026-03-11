@@ -19,8 +19,9 @@ export default defineConfig({
     coverage: {
       enabled: true,
       provider: "v8",
+      reportsDirectory: './coverage/unit',
       include: ["src/**/*.{ts,tsx}"],
-      reporter: ["text", "html"],
+      reporter: ["text", "json", "lcov", "html"],
     },
   },
 });

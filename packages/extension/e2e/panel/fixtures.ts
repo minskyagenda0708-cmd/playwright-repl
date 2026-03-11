@@ -5,11 +5,18 @@
  */
 
 import { test as base, chromium, type BrowserContext, type Page } from '@playwright/test';
+import { collectClientCoverage } from 'nextcov/playwright';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
+
+const transformUrl = (url: string) => {
+  if (!url.startsWith('chrome-extension://')) return url;
+  return pathToFileURL(path.join(EXTENSION_PATH, new URL(url).pathname)).href;
+};
 
 type ExtensionContext = { context: BrowserContext; extensionId: string };
 
@@ -17,7 +24,7 @@ type ExtensionContext = { context: BrowserContext; extensionId: string };
  * Custom test fixtures for the extension panel.
  *
  * Worker-scoped: browser context is shared across all tests in a worker.
- * Test-scoped: panelPage resets per test.
+ * Test-scoped: panelPage resets per test, wrapped in JS coverage tracking.
  */
 export const test = base.extend<
   { panelPage: Page },
@@ -36,7 +43,6 @@ export const test = base.extend<
       ],
     });
 
-    // Get extension ID from the service worker URL
     let sw = context.serviceWorkers()[0];
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
@@ -46,33 +52,36 @@ export const test = base.extend<
   }, { scope: 'worker' }],
 
   // Test-scoped: fresh panelPage with mocked chrome.runtime.sendMessage
-  panelPage: async ({ extensionContext }, use) => {
+  // collectClientCoverage wraps the entire lifecycle so startJSCoverage runs before goto
+  panelPage: async ({ extensionContext }, use, testInfo) => {
     const { context, extensionId } = extensionContext;
     const page = await context.newPage();
 
-    await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+    await collectClientCoverage(page, testInfo, async () => {
+      await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
 
-    // Override chrome.runtime.sendMessage after page load to stub lifecycle messages
-    await page.evaluate(() => {
-      const orig = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
-      (chrome.runtime as any).sendMessage = async (msg: any) => {
-        if (msg.type === 'health') return { ok: true };
-        if (msg.type === 'attach') return { ok: true, url: 'https://example.com' };
-        if (msg.type === 'record-start') return { ok: true, url: 'https://example.com' };
-        if (msg.type === 'record-stop') return { ok: true };
-        return orig(msg);
-      };
-      // Mock connect() so recording tests can toggle without a real port
-      (chrome.runtime as any).connect = () => ({
-        onMessage: { addListener: () => {} },
-        onDisconnect: { addListener: () => {} },
-        disconnect: () => {},
+      // Override chrome.runtime.sendMessage after page load to stub lifecycle messages
+      await page.evaluate(() => {
+        const orig = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
+        (chrome.runtime as any).sendMessage = async (msg: any) => {
+          if (msg.type === 'health') return { ok: true };
+          if (msg.type === 'attach') return { ok: true, url: 'https://example.com' };
+          if (msg.type === 'record-start') return { ok: true, url: 'https://example.com' };
+          if (msg.type === 'record-stop') return { ok: true };
+          return orig(msg);
+        };
+        // Mock connect() so recording tests can toggle without a real port
+        (chrome.runtime as any).connect = () => ({
+          onMessage: { addListener: () => {} },
+          onDisconnect: { addListener: () => {} },
+          disconnect: () => {},
+        });
       });
-    });
 
-    await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
+      await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
+      await use(page);
+    }, { transformUrl });
 
-    await use(page);
     // Clear persisted settings so the next test starts with defaults (pw mode)
     await page.evaluate(() => chrome.storage.local.clear());
     await page.close();

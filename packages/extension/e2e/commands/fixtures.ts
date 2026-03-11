@@ -7,6 +7,8 @@
  */
 
 import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { collectClientCoverage } from 'nextcov/playwright';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +16,11 @@ export { expect } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
+
+const transformUrl = (url: string) => {
+  if (!url.startsWith('chrome-extension://')) return url;
+  return pathToFileURL(path.join(EXTENSION_PATH, new URL(url).pathname)).href;
+};
 
 type ExtensionContext = { context: BrowserContext; extensionId: string; sw: Worker };
 
@@ -47,12 +54,17 @@ export const test = base.extend<
   }, { scope: 'worker' }],
 
   // Test-scoped: fresh panel page per test
-  panelPage: async ({ extensionContext }, use) => {
+  // collectClientCoverage wraps the entire lifecycle so startJSCoverage runs before goto
+  panelPage: async ({ extensionContext }, use, testInfo) => {
     const { context, extensionId } = extensionContext;
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
-    await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
-    await use(page);
+
+    await collectClientCoverage(page, testInfo, async () => {
+      await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+      await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
+      await use(page);
+    }, { transformUrl });
+
     await page.close();
   },
 
