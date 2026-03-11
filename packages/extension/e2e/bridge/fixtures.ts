@@ -1,8 +1,8 @@
 /**
  * Bridge E2E test fixtures.
  *
- * Launches Chromium with the real extension loaded + a BridgeServer on port 9876.
- * The extension's offscreen document auto-connects via WebSocket.
+ * Launches Chromium with the real extension loaded + a BridgeServer on a random port.
+ * The extension's offscreen document connects via WebSocket after bridgePort is set.
  * Commands are sent via bridge.run() — no panel UI involved.
  */
 
@@ -15,7 +15,9 @@ export { expect } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
-const BRIDGE_PORT = 9876;
+// Use port 0 so the OS assigns a random available port — avoids clashing with
+// a real extension instance that auto-connects to the default port (9876).
+const BRIDGE_PORT = 0;
 
 type BridgeContext = {
   context: BrowserContext;
@@ -57,9 +59,15 @@ export const test = base.extend<
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
 
-    // 4. Navigate initial tab away from about:blank and make it "active"
+    // 4. Tell the test extension to connect to our random port.
+    //    The offscreen doc defaults to 9876, which fails (no server there).
+    //    Setting bridgePort in chrome.storage triggers background.ts to broadcast
+    //    'bridge-port-changed', so the offscreen doc reconnects to our port.
+    const actualPort = bridge.port;
     const [initialPage] = context.pages();
     if (initialPage) {
+      await initialPage.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+      await initialPage.evaluate((p) => chrome.storage.local.set({ bridgePort: p }), actualPort);
       await initialPage.goto('https://httpbin.org');
       await initialPage.bringToFront();
     }

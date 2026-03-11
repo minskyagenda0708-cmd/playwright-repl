@@ -11,6 +11,7 @@ export class BridgeServer {
     onConnect(fn: () => void)    { this._onConnect = fn; }
     onDisconnect(fn: () => void) { this._onDisconnect = fn; }
     get connected()              { return this.socket?.readyState === WebSocket.OPEN; }
+    get port()                   { return (this.wss.address() as { port: number }).port; }
 
     async start(port = 9876): Promise<void> {
         this.wss = new WebSocketServer({
