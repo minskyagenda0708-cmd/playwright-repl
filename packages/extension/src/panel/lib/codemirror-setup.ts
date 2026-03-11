@@ -9,7 +9,7 @@ import { pwSyntax } from './pw-language';
 import { search, searchKeymap } from '@codemirror/search';
 import { StateEffect, StateField, EditorState, RangeSet, Compartment } from '@codemirror/state';
 import { Decoration, GutterMarker, gutter } from '@codemirror/view';
-import { autocompletion, acceptCompletion } from '@codemirror/autocomplete';
+import { autocompletion, acceptCompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { pwCompletion } from './pw-completion'
 import { playwrightCompletions } from './pw-completion-source'
 
@@ -172,9 +172,11 @@ export const baseExtensions = [
     highlightActiveLine(),                   // highlights content on cursor line
     history(),                               // undo/redo stack
     bracketMatching(),                       // highlight matching brackets
+    closeBrackets(),                         // auto-insert closing ), ], }, ", '
     search(),                                // Ctrl+F search panel
     keymap.of([
         { key: 'Tab', run: acceptCompletion }, // accept completion with Tab
+        ...closeBracketsKeymap,                 // Backspace deletes both brackets
         ...defaultKeymap,                      // basic editing keys
         ...historyKeymap,                      // Ctrl+Z, Ctrl+Y
         ...searchKeymap,                       // Ctrl+F, Ctrl+H

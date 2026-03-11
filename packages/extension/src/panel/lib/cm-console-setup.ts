@@ -2,7 +2,7 @@ import { EditorView, keymap, placeholder, drawSelection } from '@codemirror/view
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { history, historyKeymap } from '@codemirror/commands';
-import { autocompletion, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
+import { autocompletion, acceptCompletion, completionStatus, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import type { Extension } from '@codemirror/state';
 import { pwCompletion } from '@/lib/pw-completion';
 import { playwrightCompletions } from '@/lib/pw-completion-source';
@@ -82,10 +82,11 @@ export function consoleExtensions(opts: Opts): Extension[] {
         javascriptLanguage.data.of({ autocomplete: playwrightCompletions }),
         javascriptLanguage.data.of({ autocomplete: pwCompletion }),
         autocompletion(),
+        closeBrackets(),
         syntaxHighlighting(defaultHighlightStyle),
         drawSelection(),
         history(),
-        keymap.of(historyKeymap),
+        keymap.of([...closeBracketsKeymap, ...historyKeymap]),
         placeholder('js expression or .pw command  (Shift+Enter for newline)'),
         consoleTheme,
     ];
