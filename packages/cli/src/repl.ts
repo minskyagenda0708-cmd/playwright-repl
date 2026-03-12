@@ -403,6 +403,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     ctx.log(`${c.dim}→ ${args._[1]}${c.reset}`);
   }
 
+  ctx.session.record(line);
   const startTime = performance.now();
   try {
     const result = await ctx.conn.run(args);
@@ -413,7 +414,6 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     }
     if (result?.isError) ctx.errors++;
     ctx.commandCount++;
-    ctx.session.record(line);
 
     if (Number(elapsed) > 500) {
       ctx.log(`${c.dim}(${elapsed}ms)${c.reset}`);
@@ -621,7 +621,9 @@ export function startCommandLoop(ctx: ReplContext): void {
         try {
           fs.mkdirSync(path.dirname(ctx.historyFile), { recursive: true });
           fs.appendFileSync(ctx.historyFile, line.trim() + '\n');
-        } catch { /* ignore */ }
+        } catch (err: unknown) {
+          console.error(`${c.dim}Warning: could not write history: ${(err as Error).message}${c.reset}`);
+        }
       }
     }
     processing = false;
@@ -965,7 +967,9 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     try {
       fs.mkdirSync(path.dirname(historyFile), { recursive: true });
       fs.appendFileSync(historyFile, command + '\n');
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      console.error(`${c.dim}Warning: could not write history: ${(err as Error).message}${c.reset}`);
+    }
 
     if (!srv.connected) {
       log(`${c.yellow}[not connected] Waiting for extension...${c.reset}`);
