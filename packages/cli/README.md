@@ -235,12 +235,36 @@ Short aliases are CLI-only.
 | `upload <ref> <file>` | — | Upload a file |
 | `drag <from> <to>` | — | Drag and drop |
 
+### Locator Flags
+
+All text-based interaction commands support `--nth` and `--exact`:
+
+| Flag | Description |
+|------|-------------|
+| `--nth <n>` | Select the nth visible match (0-indexed) |
+| `--exact` | Exact text match only — skip the fallback chain |
+
+```
+pw> click "Submit" --nth 0           # click the first "Submit"
+pw> click "Submit" --exact           # only exact text match, no fuzzy fallback
+pw> fill "Email" "test" --exact      # fill only if label is exactly "Email"
+pw> highlight "npm"                  # show all matches (returns count)
+→ Highlighted 24 elements
+pw> highlight "npm" --exact          # only exact "npm", not "pnpm"
+→ Highlighted 2 elements
+pw> highlight "npm" --nth 0          # highlight just the first match
+→ Highlighted 1 of 24
+pw> highlight --clear                # dismiss the highlight overlay
+→ Cleared
+```
+
 ### Inspection
 
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `snapshot` | `s` | Accessibility tree with element refs |
 | `screenshot` | `ss` | Take a screenshot (saved to file) |
+| `highlight <text\|selector>` | `hl` | Highlight matching elements on page |
 | `eval <expr>` | `e` | Evaluate JavaScript in browser context |
 | `console` | `con` | Browser console messages |
 | `network` | `net` | Network requests log |

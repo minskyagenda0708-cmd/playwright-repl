@@ -597,22 +597,22 @@ describe('uncheckByText', () => {
 // ─── Highlight ────────────────────────────────────────────────────────────
 
 describe('highlightByText', () => {
-    it('highlights element and returns message', async () => {
+    it('highlights element and returns count', async () => {
         const loc = createLocator();
         const page = createPage({ getByText: vi.fn().mockReturnValue(loc) });
         const result = await highlightByText(page, 'hello');
         expect(loc.highlight).toHaveBeenCalled();
-        expect(result).toBe('Highlighted');
+        expect(result).toBe('Highlighted 1 element');
     });
 });
 
 describe('highlightBySelector', () => {
-    it('highlights by CSS selector', async () => {
+    it('highlights by CSS selector and returns count', async () => {
         const loc = createLocator();
         const page = createPage({ locator: vi.fn().mockReturnValue(loc) });
         const result = await highlightBySelector(page, '.my-class');
         expect(loc.highlight).toHaveBeenCalled();
-        expect(result).toBe('Highlighted');
+        expect(result).toBe('Highlighted 1 element');
     });
 });
 

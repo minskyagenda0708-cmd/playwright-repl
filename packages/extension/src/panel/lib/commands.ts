@@ -129,7 +129,7 @@ import {
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  highlightByText, highlightBySelector, chainAction, goBack, goForward,
+  highlightByText, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
   evalCode, runCode, takeScreenshot, takeSnapshot,
   refAction, pressKey, typeText,
@@ -177,7 +177,7 @@ function call(fn: any, ...args: unknown[]): string {
 
 const BOOLEAN_OPTIONS = new Set([
   'headed', 'persistent', 'extension', 'submit', 'clear',
-  'fullPage', 'includeStatic',
+  'fullPage', 'includeStatic', 'exact',
 ]);
 
 // ─── Tokenizer ───────────────────────────────────────────────────────────────
@@ -373,12 +373,15 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
 
   // ── Highlight ───────────────────────────────────────────────
   if (cmdName === 'highlight') {
-    const loc = args._.slice(1).join(' ');
+    if (args.clear) return { jsExpr: call(clearHighlight) };
+    const loc = args._[1];
     if (loc) {
+      const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+      const exact = args.exact ? true : undefined;
       const isSelector = /[.#[\]>:=]/.test(loc);
       return isSelector
-        ? { jsExpr: call(highlightBySelector, loc) }
-        : { jsExpr: call(highlightByText, loc) };
+        ? { jsExpr: call(highlightBySelector, loc, nth) }
+        : { jsExpr: call(highlightByText, loc, nth, exact) };
     }
   }
 
@@ -416,11 +419,12 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     const extraArgs = args._.slice(2);
     const fn = textFns[cmdName];
     const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    const exact = args.exact ? true : undefined;
     if (fn === actionByText)
-      return { jsExpr: call(fn, textArg, cmdName, nth) };
+      return { jsExpr: call(fn, textArg, cmdName, nth, exact) };
     if (cmdName === 'fill' || cmdName === 'select')
-      return { jsExpr: call(fn, textArg, extraArgs[0] || '', nth) };
-    return { jsExpr: call(fn, textArg, nth) };
+      return { jsExpr: call(fn, textArg, extraArgs[0] || '', nth, exact) };
+    return { jsExpr: call(fn, textArg, nth, exact) };
   }
 
   // ── Ref-based actions (e5, e7, ...) ─────────────────────────

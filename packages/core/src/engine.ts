@@ -213,13 +213,19 @@ export class Engine {
 
     // ── highlight → run-code translation ──
     if (args._[0] === 'highlight') {
-      const loc = args._.slice(1).join(' ');
-      if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
-      const isSelector = /[.#\[\]>:=]/.test(loc);
-      const locExpr = isSelector
-        ? `page.locator(${JSON.stringify(loc)})`
-        : `page.getByText(${JSON.stringify(loc)})`;
-      args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
+      if (args.clear) {
+        args = { _: ['run-code', `async (page) => { await page.evaluate(() => { document.querySelectorAll('x-pw-glass, x-pw-highlight').forEach(el => el.remove()); }); return "Cleared"; }`] };
+      } else {
+        const loc = args._[1];
+        if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
+        const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+        const isSelector = /[.#\[\]>:=]/.test(loc);
+        let locExpr = isSelector
+          ? `page.locator(${JSON.stringify(loc)})`
+          : `page.getByText(${JSON.stringify(loc)})`;
+        if (nth !== undefined) locExpr += `.nth(${nth})`;
+        args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
+      }
     }
 
     // ── >> chaining → run-code translation ──
