@@ -259,4 +259,112 @@ describe('Console component tests', () => {
         await expect.element(screen.getByText('"My Page Title"', { exact: false })).toBeInTheDocument();
     });
 
+    // ─── outputLinesToEntries branch coverage ──────────────────────────────
+
+    it('should render standalone comment line', async () => {
+        const lines: OutputLine[] = [
+            { text: '# this is a comment', type: 'comment' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('# this is a comment')).toBeInTheDocument();
+    });
+
+    it('should render standalone info line with text', async () => {
+        const lines: OutputLine[] = [
+            { text: 'Info message', type: 'info' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('Info message')).toBeInTheDocument();
+    });
+
+    it('should render standalone info line with value', async () => {
+        const lines: OutputLine[] = [
+            { text: '', type: 'info', value: { __type: 'number', v: 42 } },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('should render standalone code-block line', async () => {
+        const lines: OutputLine[] = [
+            { text: 'const x = 1;', type: 'code-block' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('const x = 1;', { exact: false })).toBeInTheDocument();
+    });
+
+    it('should render standalone error line with text', async () => {
+        const lines: OutputLine[] = [
+            { text: 'Something went wrong', type: 'error' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
+
+    it('should render standalone error line with value', async () => {
+        const lines: OutputLine[] = [
+            { text: '', type: 'error', value: { __type: 'string', v: 'Error object' } },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('"Error object"', { exact: false })).toBeInTheDocument();
+    });
+
+    it('should render standalone success line with text', async () => {
+        const lines: OutputLine[] = [
+            { text: 'Done successfully', type: 'success' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('Done successfully')).toBeInTheDocument();
+    });
+
+    it('should render standalone success line with value', async () => {
+        const lines: OutputLine[] = [
+            { text: '', type: 'success', value: { __type: 'boolean', v: true } },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('true')).toBeInTheDocument();
+    });
+
+    it('should render command followed by code-block result', async () => {
+        const lines: OutputLine[] = [
+            { text: 'snapshot', type: 'command' },
+            { text: 'const a = 1;', type: 'code-block' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('snapshot')).toBeInTheDocument();
+        await expect.element(screen.getByText('const a = 1;', { exact: false })).toBeInTheDocument();
+    });
+
+    it('should render command with no following result as pending', async () => {
+        const lines: OutputLine[] = [
+            { text: 'click e5', type: 'command' },
+            { text: 'goto url', type: 'command' },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        // Both commands should render (first is pending since next is also a command)
+        await expect.element(screen.getByText('click e5')).toBeInTheDocument();
+        await expect.element(screen.getByText('goto url')).toBeInTheDocument();
+    });
+
+    it('should render command with success value (ObjectTree)', async () => {
+        const lines: OutputLine[] = [
+            { text: 'eval obj', type: 'command' },
+            { text: '', type: 'success', value: { __type: 'number', v: 99 } },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('eval obj')).toBeInTheDocument();
+        await expect.element(screen.getByText('99')).toBeInTheDocument();
+    });
+
 });
