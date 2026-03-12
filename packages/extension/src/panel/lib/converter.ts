@@ -1,73 +1,56 @@
 // ─── JSONL → REPL conversion (for port-based recorder) ───
 
-import { parseSelector, parseAttributeSelector } from '@/lib/locator/selectorParser';
-
-function extractNth(action: any): string {
-  let node = action.locator?.next;
-  while (node) {
-    if (node.kind === 'nth') return ` --nth ${node.body}`;
-    if (node.kind === 'first') return ' --nth 0';
-    if (node.kind === 'last') return ' --nth -1';
-    node = node.next;
-  }
-  const sel = action.selector || '';
-  const nthMatch = sel.match(/>> nth=(-?\d+)/);
-  if (nthMatch) return ` --nth ${nthMatch[1]}`;
-  return '';
-}
-
-interface LocatorMeta {
-  text: string | null;
-  kind: string;
-  body: string;
-}
+import { asPwLocator } from '@/lib/pw-locator';
 
 /**
- * Traverses the full locator chain and returns the best display text + kind.
- * - 'role' locators: use options.name (accessible name)
- * - 'text'/'label'/'placeholder'/etc: use body (the text itself)
- * - 'default' (CSS/XPath): no accessible text, body is the CSS selector
+ * Convert a recorder locator chain ({ kind, body, options?, next? })
+ * to an internal selector string that parseSelector() understands.
+ * Prefers this over a.selector because the chain has role names / accessible names
+ * while a.selector often has raw CSS.
  */
-function extractLocatorMeta(action: any): LocatorMeta {
-  let loc = action.locator;
-  let meta: LocatorMeta = { text: null, kind: '', body: '' };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function locatorChainToSelector(loc: any): string {
+  const parts: string[] = [];
   while (loc) {
-    const k: string = loc.kind ?? '';
-    if (k === 'nth' || k === 'first' || k === 'last') {
-      loc = loc.next;
-      continue;
-    }
-    if (k === 'role') {
-      meta = { text: loc.options?.name ?? null, kind: 'role', body: loc.body ?? '' };
-    } else if (['text', 'label', 'placeholder', 'alt', 'title', 'test-id'].includes(k) && loc.body) {
-      meta = { text: loc.body, kind: k, body: loc.body };
-    } else if (k === 'default' && loc.body) {
-      meta = { text: null, kind: 'default', body: loc.body };
+    switch (loc.kind) {
+      case 'role':
+        if (loc.options?.name) parts.push(`internal:role=${loc.body}[name="${loc.options.name}"s]`);
+        else parts.push(`internal:role=${loc.body}`);
+        break;
+      case 'text':
+        parts.push(`internal:text="${loc.body}"i`);
+        break;
+      case 'label':
+        parts.push(`internal:label="${loc.body}"s`);
+        break;
+      case 'placeholder':
+        parts.push(`internal:attr=[placeholder="${loc.body}"s]`);
+        break;
+      case 'alt':
+        parts.push(`internal:attr=[alt="${loc.body}"s]`);
+        break;
+      case 'title':
+        parts.push(`internal:attr=[title="${loc.body}"s]`);
+        break;
+      case 'test-id':
+        parts.push(`internal:testid=[data-testid="${loc.body}"s]`);
+        break;
+      case 'nth':
+        parts.push(`nth=${loc.body}`);
+        break;
+      case 'first':
+        parts.push('nth=0');
+        break;
+      case 'last':
+        parts.push('nth=-1');
+        break;
+      default:
+        if (loc.body) parts.push(loc.body);
+        break;
     }
     loc = loc.next;
   }
-  // Fallback: parse role/text from selector string (e.g. "internal:role=checkbox[name=...]")
-  if (!meta.kind && action.selector) {
-    try {
-      const parsed = parseSelector(action.selector);
-      for (const part of parsed.parts) {
-        if (part.name === 'internal:role') {
-          const attr = parseAttributeSelector(part.body as string, true);
-          const name = attr.attributes.find(a => a.name === 'name')?.value as string | undefined;
-          meta = { text: name ?? null, kind: 'role', body: attr.name };
-        } else if (part.name === 'internal:text') {
-          meta = { text: part.body as string, kind: 'text', body: part.body as string };
-        } else if (part.name === 'internal:label') {
-          meta = { text: part.body as string, kind: 'label', body: part.body as string };
-        } else if (part.name === 'internal:testid') {
-          const attr = parseAttributeSelector(part.body as string, true);
-          const val = attr.attributes[0]?.value as string | undefined;
-          if (val) meta = { text: val, kind: 'test-id', body: val };
-        }
-      }
-    } catch { /* non-parseable selector — leave meta empty */ }
-  }
-  return meta;
+  return parts.join(' >> ');
 }
 
 /**
@@ -77,9 +60,24 @@ function extractLocatorMeta(action: any): LocatorMeta {
 export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
   try {
     const a = JSON.parse(jsonStr);
-    const { text, kind, body } = extractLocatorMeta(a);
     const q = (s: string) => `"${s}"`;
-    const nth = extractNth(a);
+
+    // Try a.locator first (has role names, readable), fall back to a.selector (CSS, reliable)
+    const fromLocator = a.locator ? asPwLocator(locatorChainToSelector(a.locator)) : null;
+    const fromSelector = a.selector ? asPwLocator(a.selector) : null;
+
+    // Use locator result if it produced a named locator (quoted), otherwise fall back to selector.
+    // Bare role names (e.g. "tab") without accessible names are unreliable — CSS is more stable.
+    const locatorIsNamed = fromLocator && fromLocator.locator.startsWith('"');
+    const pw = locatorIsNamed ? fromLocator : (fromSelector ?? fromLocator);
+    const loc = pw?.locator ?? '';
+    const role = pw?.role ?? '';
+
+    // Separate locator text from nth flag for actions that insert value between them
+    // e.g. '"Submit" --nth 0' → locText='"Submit"', nthFlag=' --nth 0'
+    const nthIdx = loc.indexOf(' --nth ');
+    const locText = nthIdx >= 0 ? loc.slice(0, nthIdx) : loc;
+    const nthFlag = nthIdx >= 0 ? loc.slice(nthIdx) : '';
 
     switch (a.name) {
       case 'navigate':
@@ -93,63 +91,55 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
         return '# tab closed';
 
       case 'click':
-        // Skip focus-clicks on text inputs — noise before fill
-        if (kind === 'role' && body === 'textbox') return null;
-        if (text) return `click ${q(text)}${nth}`;
-        if ((kind === 'role' || kind === 'default') && a.selector && !['html', 'body'].includes(a.selector.trim()))
-          return `click ${q(a.selector)}`;
-        return null;
+        if (role === 'textbox') return null;
+        if (!locText) return null;
+        if (a.selector && ['html', 'body'].includes(a.selector.trim())) return null;
+        return `click ${locText}${nthFlag}`;
 
       case 'fill':
-        if (text) return `fill ${q(text)} ${q(a.text ?? '')}${nth}`;
-        if ((kind === 'role' || kind === 'default') && a.selector) return `fill ${q(a.selector)} ${q(a.text ?? '')}`;
-        return null;
+        if (!locText) return null;
+        return `fill ${locText} ${q(a.text ?? '')}${nthFlag}`;
 
       case 'press':
-        if (text) return `press ${q(text)} ${a.key ?? ''}${nth}`;
-        // Global key press (no locator)
+        if (locText) return `press ${locText} ${a.key ?? ''}${nthFlag}`;
         return a.key ? `press ${a.key}` : null;
 
       case 'hover':
-        if (text) return `hover ${q(text)}${nth}`;
-        if ((kind === 'role' || kind === 'default') && a.selector) return `hover ${q(a.selector)}`;
-        return null;
+        if (!locText) return null;
+        return `hover ${locText}${nthFlag}`;
 
       case 'check':
-        if (text) return `check ${q(text)}${nth}`;
-        if (a.selector) return `check ${q(a.selector)}`;
-        return null;
+        if (!locText) return null;
+        return `check ${locText}${nthFlag}`;
 
       case 'uncheck':
-        if (text) return `uncheck ${q(text)}${nth}`;
-        if (a.selector) return `uncheck ${q(a.selector)}`;
-        return null;
+        if (!locText) return null;
+        return `uncheck ${locText}${nthFlag}`;
 
       case 'selectOption':
       case 'select':
-        if (text) return `select ${q(text)} ${q(a.options?.[0] ?? '')}${nth}`;
-        if (a.selector) return `select ${q(a.selector)} ${q(a.options?.[0] ?? '')}`;
-        return null;
+        if (!locText) return null;
+        return `select ${locText} ${q(a.options?.[0] ?? '')}${nthFlag}`;
 
       case 'setInputFiles':
         return '# file upload (unsupported)';
 
       // ─── Assertions ───────────────────────────────────────────
       case 'assertVisible':
-        if (!text) return null;
-        if (kind === 'role' && body) return `verify-visible ${body} ${q(text)}`;
-        return `verify text ${q(text)}`;
+        if (!locText) return null;
+        if (role) return `verify-visible ${role} ${locText}`;
+        return `verify text ${locText}`;
 
       case 'assertText':
         return a.text ? `verify text ${q(a.text)}` : null;
 
       case 'assertValue':
-        if (text && a.value != null) return `verify-value ${q(text)} ${q(String(a.value))}`;
-        return null;
+        if (!locText || a.value == null) return null;
+        return `verify-value ${locText} ${q(String(a.value))}`;
 
       case 'assertChecked':
-        if (!text) return null;
-        return `verify-value ${q(text)} ${q(a.checked ? 'checked' : 'unchecked')}`;
+        if (!locText) return null;
+        return `verify-value ${locText} ${q(a.checked ? 'checked' : 'unchecked')}`;
 
       default:
         return `# ${a.name} (unsupported)`;

@@ -14,7 +14,7 @@ export type LocatorType = 'default' | 'role' | 'text' | 'label' | 'placeholder' 
 export type LocatorBase = 'page' | 'locator' | 'frame-locator';
 export type Quote = '\'' | '"' | '`';
 
-type LocatorOptions = {
+export type LocatorOptions = {
   attrs?: { name: string, value: string | boolean | number }[],
   exact?: boolean,
   name?: string | RegExp,
@@ -22,7 +22,7 @@ type LocatorOptions = {
   hasNotText?: string | RegExp,
 };
 
-interface LocatorFactory {
+export interface LocatorFactory {
   generateLocator(base: LocatorBase, kind: LocatorType, body: string | RegExp, options?: LocatorOptions): string;
   chainLocators(locators: string[]): string;
 }
@@ -39,7 +39,7 @@ export function asLocators(selector: string, isFrameLocator = false, maxOutputSi
   }
 }
 
-function innerAsLocators(factory: LocatorFactory, parsed: ParsedSelector, isFrameLocator = false, maxOutputSize = 20): string[] {
+export function innerAsLocators(factory: LocatorFactory, parsed: ParsedSelector, isFrameLocator = false, maxOutputSize = 20): string[] {
   const parts = [...parsed.parts];
   const tokens: string[][] = [];
   let nextBase: LocatorBase = isFrameLocator ? 'frame-locator' : 'page';
