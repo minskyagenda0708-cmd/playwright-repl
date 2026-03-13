@@ -211,18 +211,43 @@ export class Engine {
     if (!this._backend)
       throw new Error('Engine not started');
 
+    // ── ARIA roles for role-based locator detection ──
+    const ARIA_ROLES = new Set([
+      'alert', 'alertdialog', 'article', 'banner', 'blockquote', 'button',
+      'caption', 'cell', 'checkbox', 'code', 'columnheader', 'combobox',
+      'complementary', 'contentinfo', 'definition', 'dialog', 'directory',
+      'document', 'feed', 'figure', 'form', 'generic', 'grid', 'gridcell',
+      'group', 'heading', 'img', 'link', 'list', 'listbox', 'listitem',
+      'log', 'main', 'marquee', 'math', 'menu', 'menubar', 'menuitem',
+      'menuitemcheckbox', 'menuitemradio', 'meter', 'navigation', 'none',
+      'note', 'option', 'paragraph', 'progressbar', 'radio', 'radiogroup',
+      'region', 'row', 'rowgroup', 'rowheader', 'scrollbar', 'search',
+      'searchbox', 'separator', 'slider', 'spinbutton', 'status', 'strong',
+      'switch', 'tab', 'table', 'tablist', 'tabpanel', 'term', 'textbox',
+      'toolbar', 'tooltip', 'tree', 'treeitem', 'treegrid',
+    ]);
+
     // ── highlight → run-code translation ──
     if (args._[0] === 'highlight') {
       if (args.clear) {
         args = { _: ['run-code', `async (page) => { await page.locator('#__pw_clear__').highlight().catch(() => {}); return "Cleared"; }`] };
       } else {
-        const loc = args._.slice(1).join(' ');
-        if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
         const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
-        const isSelector = /[.#\[\]>:=]/.test(loc);
-        let locExpr = isSelector
-          ? `page.locator(${JSON.stringify(loc)})`
-          : `page.getByText(${JSON.stringify(loc)})`;
+        let locExpr: string;
+        if (args._.length >= 2 && ARIA_ROLES.has(args._[1])) {
+          // highlight button "Submit" → getByRole('button', { name: 'Submit' })
+          // highlight tab              → getByRole('tab')
+          locExpr = args._[2]
+            ? `page.getByRole(${JSON.stringify(args._[1])}, { name: ${JSON.stringify(args._[2])} })`
+            : `page.getByRole(${JSON.stringify(args._[1])})`;
+        } else {
+          const loc = args._.slice(1).join(' ');
+          if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
+          const isSelector = /[.#\[\]>:=]/.test(loc);
+          locExpr = isSelector
+            ? `page.locator(${JSON.stringify(loc)})`
+            : `page.getByText(${JSON.stringify(loc)})`;
+        }
         if (nth !== undefined) locExpr += `.nth(${nth})`;
         args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
       }
@@ -255,6 +280,39 @@ export class Engine {
         ? `${locExpr}.${action}(${JSON.stringify(rest)})`
         : `${locExpr}.${action}()`;
       args = { _: ['run-code', `async (page) => { await ${actionCall}; return "Done"; }`] };
+    }
+
+    // ── role-based / nth locator → run-code translation ──
+    // Handles cases that parseCommand can't: bare roles, role+name, and --nth
+    if (LOCATOR_ACTIONS[args._[0]] && args._.length >= 2) {
+      const action = LOCATOR_ACTIONS[args._[0]];
+      const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+
+      if (ARIA_ROLES.has(args._[1])) {
+        // click button "Submit" → getByRole('button', { name: 'Submit' }).click()
+        // click tab --nth 0   → getByRole('tab').nth(0).click()
+        const role = args._[1];
+        const name = args._[2]; // undefined for bare role
+        let locExpr = name
+          ? `page.getByRole(${JSON.stringify(role)}, { name: ${JSON.stringify(name)} })`
+          : `page.getByRole(${JSON.stringify(role)})`;
+        if (nth !== undefined) locExpr += `.nth(${nth})`;
+        const valueArg = name ? args._[3] : args._[2];
+        const actionCall = (action === 'fill' || action === 'selectOption') && valueArg
+          ? `${locExpr}.${action}(${JSON.stringify(valueArg)})`
+          : `${locExpr}.${action}()`;
+        args = { _: ['run-code', `async (page) => { await ${actionCall}; return "Done"; }`] };
+      } else if (nth !== undefined) {
+        // click ".tabs__item" --nth 0 → page.locator('.tabs__item').nth(0).click()
+        const loc = args._.slice(1).join(' ');
+        const isSelector = /[.#\[\]>:=]/.test(loc);
+        let locExpr = isSelector
+          ? `page.locator(${JSON.stringify(loc)})`
+          : `page.getByText(${JSON.stringify(loc)})`;
+        locExpr += `.nth(${nth})`;
+        const actionCall = `${locExpr}.${action}()`;
+        args = { _: ['run-code', `async (page) => { await ${actionCall}; return "Done"; }`] };
+      }
     }
 
     const deps = this._deps || loadDeps();

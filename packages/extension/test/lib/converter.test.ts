@@ -63,7 +63,7 @@ describe("jsonlToRepl", () => {
 
   it("converts assertValue with role locator to verify-value", () => {
     const action = jsonl({ name: "assertValue", selector: roleSelector("spinbutton", "Quantity"), value: "5" });
-    expect(jsonlToRepl(action, false)).toBe('verify-value "Quantity" "5"');
+    expect(jsonlToRepl(action, false)).toBe('verify-value spinbutton "Quantity" "5"');
   });
 
   it("converts assertValue with CSS selector to verify-value", () => {
@@ -128,7 +128,7 @@ describe("jsonlToRepl", () => {
 
   it("converts click with role locator", () => {
     const action = jsonl({ name: "click", selector: roleSelector("button", "Submit") });
-    expect(jsonlToRepl(action, false)).toBe('click "Submit"');
+    expect(jsonlToRepl(action, false)).toBe('click button "Submit"');
   });
 
   it("skips click on textbox (focus-click noise)", () => {
@@ -316,24 +316,24 @@ describe("jsonlToRepl", () => {
 
   it("appends --nth from selector (nth)", () => {
     const action = jsonl({ name: "click", selector: `${roleSelector("button", "Item")} >> nth=2` });
-    expect(jsonlToRepl(action, false)).toBe('click "Item" --nth 2');
+    expect(jsonlToRepl(action, false)).toBe('click button "Item" --nth 2');
   });
 
   it("appends --nth 0 from selector (first)", () => {
     const action = jsonl({ name: "click", selector: `${roleSelector("link", "More")} >> nth=0` });
-    expect(jsonlToRepl(action, false)).toBe('click "More" --nth 0');
+    expect(jsonlToRepl(action, false)).toBe('click link "More" --nth 0');
   });
 
   it("appends --nth -1 from selector (last)", () => {
     const action = jsonl({ name: "click", selector: `${roleSelector("link", "More")} >> nth=-1` });
-    expect(jsonlToRepl(action, false)).toBe('click "More" --nth -1');
+    expect(jsonlToRepl(action, false)).toBe('click link "More" --nth -1');
   });
 
   // ─── selector-string parsing ──────────────────────────────────────────
 
   it("parses internal:role selector", () => {
     const action = jsonl({ name: "click", selector: 'internal:role=button[name="Save"s]' });
-    expect(jsonlToRepl(action, false)).toBe('click "Save"');
+    expect(jsonlToRepl(action, false)).toBe('click button "Save"');
   });
 
   it("parses internal:text selector", () => {
@@ -392,7 +392,7 @@ describe("jsonlToRepl", () => {
 
   it("locator chain: click with role + name", () => {
     const action = jsonl({ name: "click", locator: roleLocator("button", "Submit") });
-    expect(jsonlToRepl(action, false)).toBe('click "Submit"');
+    expect(jsonlToRepl(action, false)).toBe('click button "Submit"');
   });
 
   it("locator chain: click with role, no name", () => {
@@ -407,17 +407,17 @@ describe("jsonlToRepl", () => {
 
   it("locator chain: click with nth", () => {
     const action = jsonl({ name: "click", locator: roleLocator("tab", "npm", { kind: "nth", body: 0 }) });
-    expect(jsonlToRepl(action, false)).toBe('click "npm" --nth 0');
+    expect(jsonlToRepl(action, false)).toBe('click tab "npm" --nth 0');
   });
 
   it("locator chain: click with first (nth=0)", () => {
     const action = jsonl({ name: "click", locator: roleLocator("link", "More", { kind: "first" }) });
-    expect(jsonlToRepl(action, false)).toBe('click "More" --nth 0');
+    expect(jsonlToRepl(action, false)).toBe('click link "More" --nth 0');
   });
 
   it("locator chain: click with last (nth=-1)", () => {
     const action = jsonl({ name: "click", locator: roleLocator("link", "More", { kind: "last" }) });
-    expect(jsonlToRepl(action, false)).toBe('click "More" --nth -1');
+    expect(jsonlToRepl(action, false)).toBe('click link "More" --nth -1');
   });
 
   it("locator chain: skips click on textbox role", () => {
@@ -446,7 +446,7 @@ describe("jsonlToRepl", () => {
       locator: roleLocator("tab", "npm", { kind: "nth", body: 0 }),
       selector: ".tabs__item",
     });
-    expect(jsonlToRepl(action, false)).toBe('click "npm" --nth 0');
+    expect(jsonlToRepl(action, false)).toBe('click tab "npm" --nth 0');
   });
 
   // ─── edge cases ───────────────────────────────────────────────────────

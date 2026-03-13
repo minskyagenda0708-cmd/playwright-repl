@@ -66,10 +66,10 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
     const fromLocator = a.locator ? asPwLocator(locatorChainToSelector(a.locator)) : null;
     const fromSelector = a.selector ? asPwLocator(a.selector) : null;
 
-    // Use locator result if it produced a named locator (quoted), otherwise fall back to selector.
-    // Bare role names (e.g. "tab") without accessible names are unreliable — CSS is more stable.
-    const locatorIsNamed = fromLocator && fromLocator.locator.startsWith('"');
-    const pw = locatorIsNamed ? fromLocator : (fromSelector ?? fromLocator);
+    // Use locator chain if it produced a named locator (has quoted name),
+    // otherwise fall back to selector. Bare role names without accessible names are less reliable.
+    const locatorHasName = fromLocator && fromLocator.locator.includes('"');
+    const pw = locatorHasName ? fromLocator : (fromSelector ?? fromLocator);
     const loc = pw?.locator ?? '';
     const role = pw?.role ?? '';
 
@@ -127,7 +127,8 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
       // ─── Assertions ───────────────────────────────────────────
       case 'assertVisible':
         if (!locText) return null;
-        if (role) return `verify-visible ${role} ${locText}`;
+        // locText already includes role when available (e.g. button "Submit")
+        if (role) return `verify-visible ${locText}`;
         return `verify text ${locText}`;
 
       case 'assertText':

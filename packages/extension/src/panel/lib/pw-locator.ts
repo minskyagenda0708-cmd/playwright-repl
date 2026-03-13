@@ -8,8 +8,8 @@ class PwLocatorFactory implements LocatorFactory {
   generateLocator(_base: LocatorBase, kind: LocatorType, body: string | RegExp, options: LocatorOptions = {}): string {
     switch (kind) {
       case 'role':
-        // Has accessible name → quoted text; no name → unquoted role
-        if (options.name) return isRegExp(options.name) ? String(options.name) : `"${options.name}"`;
+        // Has accessible name → role + quoted name; no name → unquoted role
+        if (options.name) return isRegExp(options.name) ? String(options.name) : `${body} "${options.name}"`;
         return String(body);
       case 'text': case 'label': case 'placeholder': case 'alt': case 'title':
         return isRegExp(body) ? String(body) : `"${body}"`;
@@ -51,7 +51,7 @@ function isRegExp(obj: unknown): obj is RegExp {
  * Convert a Playwright selector string to a pw-repl locator.
  * Returns { locator, role } or null on failure.
  *
- * - locator: formatted string like `"Submit" --nth 0` or `button`
+ * - locator: formatted string like `button "Submit" --nth 0` or `button`
  * - role: the ARIA role name (e.g. 'textbox', 'button') or '' if not a role selector
  */
 export function asPwLocator(selector: string): { locator: string; role: string } | null {
