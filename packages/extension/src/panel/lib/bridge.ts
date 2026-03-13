@@ -57,12 +57,15 @@ export async function executeCommand(command: string): Promise<CommandResult> {
   if ('error' in parsed) {
     // Not a keyword command — check if it's a raw playwright/JS expression
     const { detectMode } = await import('@/lib/execute');
-    const mode = detectMode(command.trim());
+    const expr = command.trim();
+    const isMultiLine = expr.includes('\n');
+    const mode = detectMode(expr);
 
-    if (mode === 'playwright') {
+    // Multi-line input → evaluate in SW context (AsyncFunction supports await)
+    if (mode === 'playwright' || isMultiLine) {
       // Evaluate in SW context (page, crxApp globals available)
       try {
-        const raw = await withTimeout(swDebugEval(command.trim())) as { result?: CdpResult };
+        const raw = await withTimeout(swDebugEval(expr)) as { result?: CdpResult };
         return formatResult(raw?.result);
       } catch (e: any) {
         return { text: e?.message ?? String(e), isError: true };
@@ -72,7 +75,6 @@ export async function executeCommand(command: string): Promise<CommandResult> {
     if (mode === 'js' || mode === 'pw') {
       // Evaluate in tab context, serializing objects via JSON.stringify
       try {
-        const expr = command.trim();
         const wrapped = `(function(){try{var __v=(${expr});`
           + `if(__v===undefined)return undefined;`
           + `try{return JSON.stringify(__v,null,2);}catch(_){return String(__v);}`

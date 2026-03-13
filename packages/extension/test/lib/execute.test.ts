@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectMode } from '@/lib/execute';
+import { detectMode, resolveConsoleMode } from '@/lib/execute';
 
 describe('detectMode', () => {
 
@@ -84,4 +84,21 @@ describe('detectMode', () => {
         expect(detectMode('"hello"')).toBe('js');
     });
 
+});
+
+describe('resolveConsoleMode', () => {
+
+    it('returns playwright for multi-line input', () => {
+        expect(resolveConsoleMode('const el = await page.$(\'a\');\nawait el._generateLocatorString()')).toBe('playwright');
+    });
+
+    it('returns playwright for multi-line input even without playwright globals', () => {
+        expect(resolveConsoleMode('const x = 1;\nconsole.log(x)')).toBe('playwright');
+    });
+
+    it('delegates to detectMode for single-line input', () => {
+        expect(resolveConsoleMode('page.title()')).toBe('playwright');
+        expect(resolveConsoleMode('click e5')).toBe('pw');
+        expect(resolveConsoleMode('document.title')).toBe('js');
+    });
 });

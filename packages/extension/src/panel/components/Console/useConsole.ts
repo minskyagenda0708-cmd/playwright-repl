@@ -4,7 +4,7 @@ import { addCommand, getCommandHistory, clearHistory } from '@/lib/command-histo
 import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
 import { cdpEvaluate, executeCommandForConsole } from '@/lib/bridge';
 import { fromCdpRemoteObject, type CdpRemoteObject } from './cdpToSerialized';
-import { detectMode } from '@/lib/execute';
+import { resolveConsoleMode } from '@/lib/execute';
 import { runJsScript } from '@/lib/run';
 import type { Action } from '@/reducer';
 import type React from 'react';
@@ -100,7 +100,7 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
 
         addCommand(trimmed);
 
-        const mode = detectMode(trimmed);
+        const mode = resolveConsoleMode(trimmed);
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: trimmed, type: 'command' } });
 
         try {
