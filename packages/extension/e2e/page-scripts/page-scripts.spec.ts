@@ -218,12 +218,12 @@ test.describe('checkByText / uncheckByText', () => {
 test.describe('highlight', () => {
     test('highlightByText returns message', async ({ page }) => {
         const result = await highlightByText(page, 'Welcome');
-        expect(result).toBe('Highlighted');
+        expect(result).toMatch(/^Highlighted \d+ element/);
     });
 
     test('highlightBySelector returns message', async ({ page }) => {
         const result = await highlightBySelector(page, 'h1');
-        expect(result).toBe('Highlighted');
+        expect(result).toMatch(/^Highlighted \d+ element/);
     });
 });
 
