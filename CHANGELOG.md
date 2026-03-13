@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.16.2 — Pick Element & Recording Fix
+
+**2026-03-13**
+
+### Features
+
+- **Pick element**: Replaced Playwright's recorder-based picker with a custom content script. Hover shows a blue highlight overlay + locator tooltip; click picks the element instantly with clean cleanup. ([#166](https://github.com/stevez/playwright-repl/issues/166), [#175](https://github.com/stevez/playwright-repl/pull/175))
+- **Pick element pw output**: Picked elements now show role + name + nth in the `.pw` command row (e.g. `highlight tab "npm" --nth 2`). ([#176](https://github.com/stevez/playwright-repl/pull/176))
+
+### Fixes
+
+- **Recording regression**: Fixed recording producing unexecutable bare-role commands (e.g. `click tab --nth 0` instead of CSS selectors). Nameless roles now fall back to CSS selector from `a.selector`. ([#176](https://github.com/stevez/playwright-repl/pull/176))
+- **Remove `host_permissions`**: Removed `<all_urls>` host permission again — `activeTab` is sufficient and avoids the scary Chrome Web Store warning.
+- **Pick element icon**: Replaced the browser-window-with-pointer icon with a crosshair/target icon for the pick element toolbar button.
+
+---
+
 ## v0.16.1 — Exact Match & Highlight Improvements
 
 **2026-03-13**
