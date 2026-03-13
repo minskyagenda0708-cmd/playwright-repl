@@ -216,7 +216,7 @@ export class Engine {
       if (args.clear) {
         args = { _: ['run-code', `async (page) => { await page.evaluate(() => { document.querySelectorAll('x-pw-glass, x-pw-highlight').forEach(el => el.remove()); }); return "Cleared"; }`] };
       } else {
-        const loc = args._[1];
+        const loc = args._.slice(1).join(' ');
         if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
         const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
         const isSelector = /[.#\[\]>:=]/.test(loc);
