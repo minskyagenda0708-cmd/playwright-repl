@@ -457,41 +457,36 @@ describe('Toolbar component tests', () => {
   });
 
 
-  // ─── Attach status indicator ───────────────────────────────────────────────
+  // ─── Attach icon toggle ────────────────────────────────────────────────────
 
-  it('shows disconnected status dot when not attached', async () => {
+  it('shows attach button when not attached', async () => {
     const screen = await renderToolbar({ attachedUrl: null, isAttaching: false });
-    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-    expect(dot.dataset.status).toBe('disconnected');
+    const btn = screen.container.querySelector('[data-testid="attach-btn"]') as HTMLElement;
+    expect(btn.title).toBe('Attach to tab');
   });
 
-  it('shows attaching status dot when isAttaching is true', async () => {
+  it('shows connecting title when isAttaching', async () => {
     const screen = await renderToolbar({ attachedUrl: null, isAttaching: true });
-    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-    expect(dot.dataset.status).toBe('attaching');
+    const btn = screen.container.querySelector('[data-testid="attach-btn"]') as HTMLElement;
+    expect(btn.title).toBe('Connecting...');
   });
 
-  it('shows connected status dot with attachedUrl', async () => {
+  it('shows detach title with URL when connected', async () => {
     const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
-    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-    expect(dot.dataset.status).toBe('connected');
+    const btn = screen.container.querySelector('[data-testid="attach-btn"]') as HTMLElement;
+    expect(btn.title).toContain('example.com');
   });
 
-  it('shows hostname in dot tooltip when attached', async () => {
-    const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
-    const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
-    expect(dot.title).toContain('example.com');
-  });
-
-  it('shows no extra text when disconnected (only dot)', async () => {
-    const screen = await renderToolbar({ attachedUrl: null, isAttaching: false });
-    const statusIndicator = screen.container.querySelector('[data-testid="status-indicator"]');
-    expect(statusIndicator?.textContent?.trim()).toBe('');
-  });
-
-  it('shows Connecting text when isAttaching', async () => {
+  it('attach button is disabled when isAttaching', async () => {
     const screen = await renderToolbar({ attachedUrl: null, isAttaching: true });
-    await expect.element(screen.getByText('Connecting...')).toBeInTheDocument();
+    const btn = screen.container.querySelector('[data-testid="attach-btn"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('attach button is enabled when connected (for detach)', async () => {
+    const screen = await renderToolbar({ attachedUrl: 'https://example.com', isAttaching: false });
+    const btn = screen.container.querySelector('[data-testid="attach-btn"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
   });
 
   // ─── Tab switcher ──────────────────────────────────────────────────────────
