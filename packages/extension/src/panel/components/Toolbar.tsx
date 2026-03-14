@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
@@ -312,6 +312,12 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         setIsPicking(true);
     }
 
+    function handleDetach() {
+        dispatch({ type: 'DETACH' });
+        // Let background know we're detaching (for cleanup)
+        chrome.runtime.sendMessage({ type: 'detach' }).catch(() => { });
+    }
+
     // ─── Theme toggle ───
 
     useEffect(() => {
@@ -395,20 +401,14 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                         <option key={tab.id} value={tab.id}>{getTabLabel(tab)}</option>
                     ))}
                 </select>
-                <div
-                    className="flex items-center gap-1 text-[11px] text-(--text-dim)"
-                    data-testid="status-indicator"
+                <button
+                    data-testid="attach-btn"
+                    title={isAttaching ? 'Connecting...' : attachedUrl ? `Detach from ${attachedUrl}` : 'Attach to tab'}
+                    disabled={!attachedUrl && (isAttaching || !canAttach || availableTabs.some(t => t.id === selectedTabId && isInternalUrl(t.url)))}
+                    onClick={attachedUrl ? handleDetach : handleAttach}
+                    style={{ color: isAttaching ? 'var(--color-warning, #facc15)' : attachedUrl ? 'var(--color-success)' : 'var(--color-error)' }}
                 >
-                    <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${isAttaching ? 'bg-yellow-400' : attachedUrl ? 'bg-(--color-success)' : 'bg-(--color-error)'}`}
-                        data-testid="status-dot"
-                        data-status={isAttaching ? 'attaching' : attachedUrl ? 'connected' : 'disconnected'}
-                        title={isAttaching ? 'Connecting...' : attachedUrl ? `Attached: ${attachedUrl}` : 'Not attached'}
-                    />
-                    {isAttaching && <span>Connecting...</span>}
-                </div>
-                <button id="attach-btn" title="Attach to active tab" disabled={isAttaching || !canAttach || availableTabs.some(t => t.id === selectedTabId && isInternalUrl(t.url))} onClick={handleAttach}>
-                    Attach
+                    {attachedUrl ? <UnplugIcon /> : <PlugIcon />}
                 </button>
             </div>
         </div>

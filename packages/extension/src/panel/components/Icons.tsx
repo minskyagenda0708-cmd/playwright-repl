@@ -76,6 +76,30 @@ export function AbortIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function PlugIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <path d="M3 8a2 2 0 0 1 2-2h2v12H5a2 2 0 0 1-2-2z" />
+      <rect x="7" y="8" width="3" height="8" rx="1" />
+      <path d="M16 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2z" />
+      <line x1="20" y1="12" x2="23" y2="12" />
+    </svg>
+  );
+}
+
+export function UnplugIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="1" y1="12" x2="5" y2="12" />
+      <path d="M5 8a2 2 0 0 1 2-2h2v12H7a2 2 0 0 1-2-2z" />
+      <rect x="9" y="8" width="6" height="8" rx="1" />
+      <path d="M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2z" />
+      <line x1="19" y1="12" x2="23" y2="12" />
+    </svg>
+  );
+}
+
 export function CrosshairIcon({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 16 16" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">

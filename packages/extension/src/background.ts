@@ -371,6 +371,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'attach')        { attachToTab(msg.tabId).then(sendResponse); return true; }
+  if (msg.type === 'detach')        {
+    if (activeTabId !== null && crxApp) {
+      crxApp.detach(activeTabId).catch(() => {});
+      currentPage = null;
+      activeTabId = null;
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg.type === 'health')        { sendResponse({ ok: !!crxApp }); return false; }
   if (msg.type === 'record-start')  { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
