@@ -1043,6 +1043,9 @@ describe('tab operations', () => {
     beforeEach(() => {
         (globalThis as any).activeTabId = 1;
         (globalThis as any).chrome = {
+            runtime: {
+                getURL: vi.fn((path: string) => `chrome-extension://test-id/${path}`),
+            },
             tabs: {
                 get: vi.fn().mockResolvedValue({ windowId: 10 }),
                 query: vi.fn().mockResolvedValue([
@@ -1072,6 +1075,10 @@ describe('tab operations', () => {
 
     it('tabNew without URL', async () => {
         const result = await tabNew({}, undefined);
+        expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({
+            url: 'chrome-extension://test-id/newtab/newtab.html',
+            windowId: 10,
+        });
         expect(result).toBe('Opened new tab');
     });
 
