@@ -54,12 +54,12 @@ test.describe('Recording flow', () => {
       await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
       await waitForEditorText(panelPage, 'goto "');
 
-      // Interact with the test page
       await testPage.bringToFront();
       await testPage.getByRole('button', { name: 'Submit' }).click();
 
-      // Verify recorded action appears in editor
-      await panelPage.bringToFront();
+      // No bringToFront — waitForFunction works via CDP regardless of which tab
+      // is active, and keeping the test page in front avoids Chrome throttling
+      // the recorder's JS in the background tab.
       await waitForEditorText(panelPage, 'click "Submit"');
     });
 
@@ -73,7 +73,6 @@ test.describe('Recording flow', () => {
       // Press Tab to commit the fill (recorder batches fill on blur/navigation)
       await testPage.getByLabel('Name').press('Tab');
 
-      await panelPage.bringToFront();
       await waitForEditorText(panelPage, 'fill');
     });
 
@@ -85,7 +84,6 @@ test.describe('Recording flow', () => {
       await testPage.bringToFront();
       await testPage.getByLabel('Accept terms').click();
 
-      await panelPage.bringToFront();
       await waitForEditorText(panelPage, 'check');
     });
 
@@ -128,7 +126,6 @@ test.describe('Recording flow', () => {
       await testPage.bringToFront();
       await testPage.getByRole('button', { name: 'Submit' }).click();
 
-      await panelPage.bringToFront();
       await waitForEditorText(panelPage, '.click()');
     });
 
@@ -141,7 +138,6 @@ test.describe('Recording flow', () => {
       await testPage.getByLabel('Name').fill('Bob');
       await testPage.getByLabel('Name').press('Tab');
 
-      await panelPage.bringToFront();
       await waitForEditorText(panelPage, '.fill(');
     });
   });
