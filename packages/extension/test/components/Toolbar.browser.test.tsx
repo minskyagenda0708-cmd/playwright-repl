@@ -458,6 +458,75 @@ describe('Toolbar component tests', () => {
   });
 
 
+  // ─── Record: goto insertion depends on editor content ─────────────────────
+
+  it('should insert goto when recording starts with empty editor', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    const screen = await renderToolbar({ editorContent: '', editorRef: editorRef as any });
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    await vi.waitFor(() => {
+      expect(insertAtCursor).toHaveBeenCalledWith('goto "https://example.com"');
+    });
+  });
+
+  it('should insert goto when editor has only comments in pw mode', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    const screen = await renderToolbar({ editorContent: '# this is a comment\n\n# another', editorMode: 'pw', editorRef: editorRef as any });
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    await vi.waitFor(() => {
+      expect(insertAtCursor).toHaveBeenCalledWith('goto "https://example.com"');
+    });
+  });
+
+  it('should insert goto when editor has only comments in js mode', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    const screen = await renderToolbar({ editorContent: '// comment\n/* block */', editorMode: 'js', editorRef: editorRef as any });
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    await vi.waitFor(() => {
+      expect(insertAtCursor).toHaveBeenCalledWith(expect.stringContaining('await page.goto'));
+    });
+  });
+
+  it('should NOT insert goto when editor has existing commands', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    const screen = await renderToolbar({ editorContent: 'click "Submit"', editorMode: 'pw', editorRef: editorRef as any });
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    await vi.waitFor(() => {
+      expect(window.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'record-start' });
+    });
+    expect(insertAtCursor).not.toHaveBeenCalled();
+  });
+
+  it('should NOT insert goto when editor has existing JS code', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js', editorRef: editorRef as any });
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    await vi.waitFor(() => {
+      expect(window.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'record-start' });
+    });
+    expect(insertAtCursor).not.toHaveBeenCalled();
+  });
+
   // ─── Attach icon toggle ────────────────────────────────────────────────────
 
   it('shows attach button when not attached', async () => {

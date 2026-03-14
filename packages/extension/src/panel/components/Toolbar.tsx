@@ -223,6 +223,15 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     // ─── Recording (content script-based) ───
 
+    function isEditorEmpty(): boolean {
+        return editorContent.split('\n').every(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return true;
+            if (editorMode === 'pw') return trimmed.startsWith('#');
+            return trimmed.startsWith('//') || trimmed.startsWith('/*');
+        });
+    }
+
     useEffect(() => {
         if (!chrome.runtime?.onMessage) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -261,7 +270,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         setIsRecording(true);
 
-        if (result.url && result.url !== 'about:blank' && !result.url.startsWith('chrome://')) {
+        if (result.url && result.url !== 'about:blank' && !result.url.startsWith('chrome://') && isEditorEmpty()) {
             const gotoCmd = editorMode === 'js'
                 ? `await page.goto(${JSON.stringify(result.url)});`
                 : `goto "${result.url}"`;
