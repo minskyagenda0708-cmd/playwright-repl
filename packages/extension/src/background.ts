@@ -161,7 +161,17 @@ async function stopPicking(): Promise<{ ok: boolean }> {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!crxApp) return;
   if (!tab.pendingUrl || tab.pendingUrl === 'about:blank') {
-    chrome.tabs.update(tab.id!, { url: chrome.runtime.getURL('newtab/newtab.html') });
+    const tabId = tab.id!;
+    // Delay to let any immediate navigation (e.g. page.goto()) take effect first.
+    // If the tab is still at about:blank after 200ms, redirect to our static page.
+    setTimeout(async () => {
+      try {
+        const current = await chrome.tabs.get(tabId);
+        if (current.url === 'about:blank' || !current.url) {
+          chrome.tabs.update(tabId, { url: chrome.runtime.getURL('newtab/newtab.html') });
+        }
+      } catch { /* tab already closed */ }
+    }, 200);
   }
 });
 
