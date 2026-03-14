@@ -154,27 +154,6 @@ async function stopPicking(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-// ─── New Tab Redirect ────────────────────────────────────────────────────────
-
-// When the extension is active and a new tab opens at about:blank (e.g. context.newPage()),
-// redirect it to our static page so it can be attached.
-chrome.tabs.onCreated.addListener((tab) => {
-  if (!crxApp) return;
-  if (!tab.pendingUrl || tab.pendingUrl === 'about:blank') {
-    const tabId = tab.id!;
-    // Delay to let any immediate navigation (e.g. page.goto()) take effect first.
-    // If the tab is still at about:blank after 200ms, redirect to our static page.
-    setTimeout(async () => {
-      try {
-        const current = await chrome.tabs.get(tabId);
-        if (current.url === 'about:blank' || !current.url) {
-          chrome.tabs.update(tabId, { url: chrome.runtime.getURL('newtab/newtab.html') });
-        }
-      } catch { /* tab already closed */ }
-    }, 200);
-  }
-});
-
 // ─── CDP Helpers ─────────────────────────────────────────────────────────────
 
 function cdpCommand(tabId: number, method: string, params: Record<string, unknown> = {}): Promise<any> {
