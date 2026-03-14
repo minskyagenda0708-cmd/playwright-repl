@@ -35,6 +35,7 @@ export type Action =
    | { type: 'ATTACH_SUCCESS', url: string, tabId: number }
    | { type: 'ATTACH_FAIL' }
    | { type: 'DETACH' }
+   | { type: 'UPDATE_URL', url: string }
    | { type: 'SET_EDITOR_MODE', mode: 'pw' | 'js' }
 
 export const initialState : PanelState = {
@@ -124,6 +125,8 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, isAttaching: false, attachedUrl: null, attachedTabId: null }
         case 'DETACH':
             return { ...state, attachedUrl: null, attachedTabId: null }
+        case 'UPDATE_URL':
+            return { ...state, attachedUrl: action.url }
         case 'SET_EDITOR_MODE':
             return { ...state, editorMode: action.mode }
         default:

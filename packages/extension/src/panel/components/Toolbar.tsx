@@ -51,7 +51,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         if (!chrome.tabs?.query) return;
         const tabs = await chrome.tabs.query({});
         // Keep chrome:// tabs (to preserve tab order) but exclude chrome-extension:// and about: tabs
-        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('chrome-extension://') && !t.url.startsWith('about:')));
+        const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
+        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('about:') && (!t.url.startsWith('chrome-extension://') || t.url.startsWith(ownOrigin))));
     }
 
     async function checkActiveTab() {
@@ -65,8 +66,10 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         checkActiveTab();
         if (!chrome.tabs?.onActivated) return;
         const onActivated = (info: chrome.tabs.TabActiveInfo) => { setSelectedTabId(info.tabId); checkActiveTab(); };
+        const onUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => { if (changeInfo.url) loadTabs(); };
         chrome.tabs.onActivated.addListener(onActivated);
-        return () => chrome.tabs.onActivated.removeListener(onActivated);
+        chrome.tabs.onUpdated.addListener(onUpdated);
+        return () => { chrome.tabs.onActivated.removeListener(onActivated); chrome.tabs.onUpdated.removeListener(onUpdated); };
     }, []);
 
     async function doAttach(tabId: number) {

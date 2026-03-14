@@ -68,7 +68,9 @@ function App() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
       const url = tab?.url ?? '';
-      if (tab?.id && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://') && !url.startsWith('about:')) {
+      const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
+      if (tab?.id && !url.startsWith('chrome://') && !url.startsWith('about:') &&
+          (!url.startsWith('chrome-extension://') || url.startsWith(ownOrigin))) {
         doAttach(tab.id);
       }
     });
@@ -76,7 +78,8 @@ function App() {
     const onActivated = async (info: chrome.tabs.TabActiveInfo) => {
       const tab = await chrome.tabs.get(info.tabId).catch(() => null);
       const url = tab?.url ?? '';
-      if (url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
+      if (url.startsWith('about:')) return;
+      if (url.startsWith('chrome-extension://') && !url.startsWith(`chrome-extension://${chrome.runtime.id}/`)) return;
       if (url.startsWith('chrome://')) {
         attachedTabRef.current = null;
         dispatch({ type: 'DETACH' });
@@ -90,8 +93,12 @@ function App() {
     // (e.g. user opens a new tab from chrome://extensions and types a URL).
     // Skip if already attached to this tab — re-attaching interrupts in-progress commands.
     const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-      if (attachedTabRef.current === tabId) return;
-      if (changeInfo.url && !changeInfo.url.startsWith('chrome://') && !changeInfo.url.startsWith('chrome-extension://') && !changeInfo.url.startsWith('about:')) {
+      if (attachedTabRef.current === tabId) {
+        if (changeInfo.url) dispatch({ type: 'UPDATE_URL', url: changeInfo.url });
+        return;
+      }
+      if (changeInfo.url && !changeInfo.url.startsWith('chrome://') && !changeInfo.url.startsWith('about:') &&
+          (!changeInfo.url.startsWith('chrome-extension://') || changeInfo.url.startsWith(`chrome-extension://${chrome.runtime.id}/`))) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id === tabId) doAttach(tabId);
         });
