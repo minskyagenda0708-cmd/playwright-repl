@@ -40,6 +40,8 @@ async function findSwTarget(): Promise<string | null> {
 }
 
 async function ensureAttached(): Promise<string> {
+    // Fast path: already attached — skip ping/poll (critical when SW is debugger-paused)
+    if (swTargetId) return swTargetId;
     const targetId = await findSwTarget();
     if (!targetId) throw new Error('Background worker target not found. Try reloading the extension.');
     if (swTargetId === targetId) return targetId;
@@ -101,12 +103,23 @@ export async function swDebugEval(expression: string): Promise<unknown> {
     // Wrap {…} in parens so V8 parses it as an object literal, not a block statement.
     // This is the same approach Chrome DevTools and Node REPL use.
     const expr = expression.trimStart().startsWith('{') ? `(${expression})` : expression;
-    // replMode: true enables top-level await and returns completion values automatically.
+
+    // When paused at a breakpoint, evaluate in the call frame scope (access to local variables)
+    const method = pausedCallFrameId ? 'Debugger.evaluateOnCallFrame' : 'Runtime.evaluate';
+    const params: Record<string, unknown> = {
+        expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console',
+    };
+    if (pausedCallFrameId) {
+        params.callFrameId = pausedCallFrameId;
+    } else {
+        params.replMode = true;
+    }
+
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand(
             { targetId },
-            'Runtime.evaluate',
-            { expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console', replMode: true },
+            method,
+            params,
             (result: any) => {
                 if (chrome.runtime.lastError) {
                     swTargetId = null;
@@ -131,6 +144,103 @@ let consoleCallback: ConsoleCallback | null = null;
 
 export function onConsoleEvent(callback: ConsoleCallback | null) {
     consoleCallback = callback;
+}
+
+// ─── CDP Debugger Domain ─────────────────────────────────────────────────────
+
+type PauseCallback = (lineNumber: number) => void;
+let pauseCallback: PauseCallback | null = null;
+let pausedCallFrameId: string | null = null;
+
+export function onDebugPaused(callback: PauseCallback | null) {
+    pauseCallback = callback;
+}
+
+export async function swDebuggerEnable(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.enable', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swDebuggerDisable(): Promise<void> {
+    pausedCallFrameId = null;
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.disable', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swSetBreakpointByUrl(url: string, lineNumber: number): Promise<string> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand(
+            { targetId },
+            'Debugger.setBreakpointByUrl',
+            { url, lineNumber },
+            (result: any) => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve(result?.breakpointId ?? '');
+            }
+        );
+    });
+}
+
+/** Like swDebugEval but returns raw result (doesn't reject on exceptions). */
+export async function swDebugEvalRaw(expression: string): Promise<{ result?: any; exceptionDetails?: any }> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand(
+            { targetId },
+            'Runtime.evaluate',
+            { expression, awaitPromise: true, returnByValue: false, generatePreview: true, replMode: true },
+            (result: any) => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve(result);
+            }
+        );
+    });
+}
+
+export async function swRemoveBreakpoint(breakpointId: string): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand(
+            { targetId },
+            'Debugger.removeBreakpoint',
+            { breakpointId },
+            () => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve();
+            }
+        );
+    });
+}
+
+export async function swDebugResume(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.resume', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swTerminateExecution(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Runtime.terminateExecution', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
 }
 
 async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set<string>()): Promise<SerializedValue> {
@@ -160,8 +270,21 @@ async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set
 }
 
 chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
-    if (method !== 'Runtime.consoleAPICalled') return;
     if (source.targetId !== swTargetId) return;
+
+    if (method === 'Debugger.paused') {
+        if (params.callFrames?.length > 0) {
+            pausedCallFrameId = params.callFrames[0].callFrameId;
+            pauseCallback?.(params.callFrames[0].location.lineNumber);
+        }
+        return;
+    }
+    if (method === 'Debugger.resumed') {
+        pausedCallFrameId = null;
+        return;
+    }
+
+    if (method !== 'Runtime.consoleAPICalled') return;
     if (!consoleCallback) return;
 
     const level = params.type; // 'log', 'error', 'warn', 'info', etc.

@@ -4,10 +4,9 @@ import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
-import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
+import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swSetBreakpointByUrl, swRemoveBreakpoint, onDebugPaused } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
-import { injectBreakpoints } from '@/lib/js-step-transform';
 
 function trimStack(msg: string): string {
     return msg.split('\n    at ')[0].split('\nCall log:')[0].trim();
@@ -101,27 +100,58 @@ export async function runJsScript(code: string, dispatch: React.Dispatch<Action>
 
 export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
-    const transformed = injectBreakpoints(code);
+
+    const breakpointIds: string[] = [];
+    const lines = code.split('\n');
+    const lineCount = lines.length;
+    const sourceURL = 'pw-repl-debug.js';
+
     try {
-        const raw = await swDebugEval(transformed) as { result?: CdpRemoteObject };
-        const r = raw?.result;
-        if (!r || r.type === 'undefined') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
-        } else if (r.type === 'string') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success' } });
-        } else if (r.type === 'number' || r.type === 'boolean') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
+        await swDebuggerEnable();
+
+        for (let i = 0; i < lineCount; i++) {
+            if (!lines[i].trim()) continue;
+            const bpId = await swSetBreakpointByUrl(sourceURL, i);
+            if (bpId) breakpointIds.push(bpId);
+        }
+
+        onDebugPaused((line: number) => {
+            if (line >= 0 && line < lineCount) {
+                dispatch({ type: 'SET_RUN_LINE', currentRunLine: line });
+            }
+        });
+
+        const codeWithSource = code + '\n//# sourceURL=' + sourceURL;
+        const result = await swDebugEvalRaw(codeWithSource);
+
+        // 5. Handle result
+        if (result.exceptionDetails) {
+            const msg: string = result.exceptionDetails.exception?.description
+                ?? result.exceptionDetails.text ?? 'Unknown error';
+            if (msg.includes('terminated')) {
+                dispatch({ type: 'ADD_LINE', line: { text: 'Stopped.', type: 'info' } });
+            } else {
+                dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(msg), type: 'error' } });
+            }
         } else {
-            const value = fromCdpRemoteObject(r);
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
+            const r = result.result;
+            if (!r || r.type === 'undefined') {
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+            } else if (r.type === 'string') {
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success' } });
+            } else if (r.type === 'number' || r.type === 'boolean') {
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
+            } else {
+                const value = fromCdpRemoteObject(r);
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
+            }
         }
     } catch (e: any) {
-        const msg: string = e?.message ?? String(e);
-        if (msg.includes('__debug_stopped__')) {
-            dispatch({ type: 'ADD_LINE', line: { text: 'Stopped.', type: 'info' } });
-        } else {
-            dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(msg), type: 'error' } });
-        }
+        dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(e?.message ?? String(e)), type: 'error' } });
+    } finally {
+        onDebugPaused(null);
+        for (const id of breakpointIds) await swRemoveBreakpoint(id).catch(() => {});
+        await swDebuggerDisable().catch(() => {});
     }
 }
 

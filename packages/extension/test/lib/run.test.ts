@@ -31,20 +31,28 @@ vi.mock('@/lib/command-history', () => ({
 }));
 
 const mockSwDebugEval = vi.fn();
+const mockSwDebugEvalRaw = vi.fn();
 const mockSwGetProperties = vi.fn();
+const mockSwDebuggerEnable = vi.fn().mockResolvedValue(undefined);
+const mockSwDebuggerDisable = vi.fn().mockResolvedValue(undefined);
+const mockSwSetBreakpointByUrl = vi.fn().mockResolvedValue('bp-1');
+const mockSwRemoveBreakpoint = vi.fn().mockResolvedValue(undefined);
+let capturedPauseCallback: ((line: number) => void) | null = null;
+const mockOnDebugPaused = vi.fn((cb: any) => { capturedPauseCallback = cb; });
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: (...args: any[]) => mockSwDebugEval(...args),
+    swDebugEvalRaw: (...args: any[]) => mockSwDebugEvalRaw(...args),
     swGetProperties: (...args: any[]) => mockSwGetProperties(...args),
+    swDebuggerEnable: (...args: any[]) => mockSwDebuggerEnable(...args),
+    swDebuggerDisable: (...args: any[]) => mockSwDebuggerDisable(...args),
+    swSetBreakpointByUrl: (...args: any[]) => mockSwSetBreakpointByUrl(...args),
+    swRemoveBreakpoint: (...args: any[]) => mockSwRemoveBreakpoint(...args),
+    onDebugPaused: (...args: any[]) => mockOnDebugPaused(...args),
 }));
 
 const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as any);
 vi.mock('@/components/Console/cdpToSerialized', () => ({
     fromCdpRemoteObject: (obj: any) => mockFromCdpRemoteObject(obj),
-}));
-
-const mockInjectBreakpoints = vi.fn((code: string) => code);
-vi.mock('@/lib/js-step-transform', () => ({
-    injectBreakpoints: (code: string) => mockInjectBreakpoints(code),
 }));
 
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
@@ -371,15 +379,16 @@ describe('runJsScript', () => {
 // ─── runJsScriptStep ────────────────────────────────────────────────────────
 
 describe('runJsScriptStep', () => {
-    it('calls injectBreakpoints before eval', async () => {
-        mockSwDebugEval.mockResolvedValue({ result: { type: 'undefined' } });
-        const dispatch = createDispatch();
-        await runJsScriptStep('await page.click("a")', dispatch);
-        expect(mockInjectBreakpoints).toHaveBeenCalledWith('await page.click("a")');
+    beforeEach(() => {
+        mockSwDebuggerEnable.mockResolvedValue(undefined);
+        mockSwDebuggerDisable.mockResolvedValue(undefined);
+        mockSwDebugEvalRaw.mockResolvedValue({ result: { type: 'undefined' } });
+        mockSwSetBreakpointByUrl.mockResolvedValue('bp-1');
+        mockSwRemoveBreakpoint.mockResolvedValue(undefined);
+        capturedPauseCallback = null;
     });
 
     it('dispatches debug script label', async () => {
-        mockSwDebugEval.mockResolvedValue({ result: { type: 'undefined' } });
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
@@ -389,7 +398,6 @@ describe('runJsScriptStep', () => {
     });
 
     it('dispatches Done for undefined result', async () => {
-        mockSwDebugEval.mockResolvedValue({ result: { type: 'undefined' } });
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
@@ -398,8 +406,32 @@ describe('runJsScriptStep', () => {
         });
     });
 
-    it('dispatches Stopped for __debug_stopped__ error', async () => {
-        mockSwDebugEval.mockRejectedValue(new Error('__debug_stopped__'));
+    it('sets breakpoints by URL for each non-empty line', async () => {
+        const dispatch = createDispatch();
+        await runJsScriptStep('line1\nline2\n\nline4', dispatch);
+        // 3 non-empty lines (0, 1, 3) — line 2 is blank
+        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledTimes(3);
+        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 0);
+        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 1);
+        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 3);
+    });
+
+    it('skips blank lines when setting breakpoints', async () => {
+        const dispatch = createDispatch();
+        await runJsScriptStep('code\n\n\nmore', dispatch);
+        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledTimes(2);
+    });
+
+    it('evaluates code with sourceURL suffix', async () => {
+        const dispatch = createDispatch();
+        await runJsScriptStep('await page.title()', dispatch);
+        expect(mockSwDebugEvalRaw).toHaveBeenCalledWith('await page.title()\n//# sourceURL=pw-repl-debug.js');
+    });
+
+    it('dispatches Stopped for terminated execution', async () => {
+        mockSwDebugEvalRaw.mockResolvedValue({
+            exceptionDetails: { exception: { description: 'Script execution was terminated' } },
+        });
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
@@ -409,7 +441,9 @@ describe('runJsScriptStep', () => {
     });
 
     it('dispatches COMMAND_ERROR for other errors', async () => {
-        mockSwDebugEval.mockRejectedValue(new Error('TypeError: cannot read\n    at eval:1:1'));
+        mockSwDebugEvalRaw.mockResolvedValue({
+            exceptionDetails: { exception: { description: 'TypeError: cannot read\n    at eval:1:1' } },
+        });
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
@@ -418,13 +452,31 @@ describe('runJsScriptStep', () => {
         });
     });
 
+    it('cleans up breakpoints and disables debugger on completion', async () => {
+        mockSwSetBreakpointByUrl.mockResolvedValue('bp-42');
+        const dispatch = createDispatch();
+        await runJsScriptStep('code', dispatch);
+        expect(mockSwRemoveBreakpoint).toHaveBeenCalledWith('bp-42');
+        expect(mockSwDebuggerDisable).toHaveBeenCalled();
+        expect(mockOnDebugPaused).toHaveBeenLastCalledWith(null);
+    });
+
     it('dispatches string result', async () => {
-        mockSwDebugEval.mockResolvedValue({ result: { type: 'string', value: 'ok' } });
+        mockSwDebugEvalRaw.mockResolvedValue({ result: { type: 'string', value: 'ok' } });
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
             line: { text: 'ok', type: 'success' },
         });
+    });
+
+    it('registers and unregisters pause callback', async () => {
+        const dispatch = createDispatch();
+        await runJsScriptStep('code', dispatch);
+        // First call registers callback, last call unregisters with null
+        expect(mockOnDebugPaused).toHaveBeenCalledTimes(2);
+        expect(mockOnDebugPaused.mock.calls[0][0]).toBeTypeOf('function');
+        expect(mockOnDebugPaused.mock.calls[1][0]).toBeNull();
     });
 });

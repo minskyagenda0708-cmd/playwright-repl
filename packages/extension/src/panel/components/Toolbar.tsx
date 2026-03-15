@@ -2,6 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
+import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
@@ -181,7 +182,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     function handleStop() {
         cancelRunRef.current = true;
         if (isStepDebugging) {
-            chrome.runtime.sendMessage({ type: 'debug-stop' }).catch(() => {});
+            swTerminateExecution().catch(() => {});
+            swDebugResume().catch(() => {}); // unpause so termination takes effect
         }
         dispatch({ type: 'RUN_STOP' });
     }
@@ -199,12 +201,10 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     async function handleStep() {
         if (isStepDebugging) {
-            // JS debug mode: advance past the current breakpoint
-            chrome.runtime.sendMessage({ type: 'debug-resume' }).catch(() => {});
+            swDebugResume().catch(() => {});
             return;
         }
         if (editorMode === 'js') {
-            // Start JS debug session on first press
             dispatch({ type: 'RUN_START', stepDebug: true });
             await runJsScriptStep(editorContent, dispatch);
             dispatch({ type: 'RUN_STOP' });

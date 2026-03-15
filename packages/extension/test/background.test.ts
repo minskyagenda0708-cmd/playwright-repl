@@ -221,18 +221,6 @@ describe("background.ts message handlers", () => {
     expect(result).toBe(9876);
   });
 
-  // ─── debug-resume / debug-stop ────────────────────────────────────────────
-
-  it("debug-resume returns ok:true", async () => {
-    const result = await sendMessage({ type: 'debug-resume' });
-    expect(result).toEqual({ ok: true });
-  });
-
-  it("debug-stop returns ok:true", async () => {
-    const result = await sendMessage({ type: 'debug-stop' });
-    expect(result).toEqual({ ok: true });
-  });
-
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
   it("attach retries on 'Frame has been detached' error", async () => {
@@ -753,35 +741,6 @@ describe("background.ts message handlers", () => {
     expect(result.text).toContain('parse crash');
   });
 
-  // ─── __breakpoint__ + debug-resume/debug-stop ──────────────────────────────
-
-  it("debug-resume resolves pending __breakpoint__", async () => {
-    // Call __breakpoint__ directly (set on globalThis during module init)
-    const bp = (globalThis as any).__breakpoint__;
-    expect(typeof bp).toBe('function');
-
-    const bpPromise = bp(0);
-    // Give the promise time to register __dbgResolve
-    await new Promise(r => setTimeout(r, 10));
-
-    // Resume debugging (stop=false → continues normally)
-    await sendMessage({ type: 'debug-resume' });
-    await expect(bpPromise).resolves.toBeUndefined();
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'debug-paused', line: 0 })
-    );
-  });
-
-  it("debug-stop causes __breakpoint__ to throw __debug_stopped__", async () => {
-    const bp = (globalThis as any).__breakpoint__;
-    const bpPromise = bp(5);
-    await new Promise(r => setTimeout(r, 10));
-
-    // Stop debugging (stop=true → throws)
-    await sendMessage({ type: 'debug-stop' });
-    await expect(bpPromise).rejects.toThrow('__debug_stopped__');
-  });
-
   // ─── replMode expression handling ──────────────────────────────────────────
 
   it("bridge-command wraps object literal in parens", async () => {
@@ -922,17 +881,6 @@ describe("background.ts message handlers", () => {
     expect(result.text).toContain('\u2717 snapshot');
   });
 
-  // ─── __breakpoint__ sendMessage catch ──────────────────────────────────────
-
-  it("__breakpoint__ sendMessage catch is exercised when sendMessage rejects", async () => {
-    (chrome.runtime as any).sendMessage = vi.fn().mockRejectedValue(new Error('no listener'));
-    const bp = (globalThis as any).__breakpoint__;
-    const bpPromise = bp(3);
-    await new Promise(r => setTimeout(r, 10));
-    await sendMessage({ type: 'debug-resume' });
-    await bpPromise;
-  });
-
   // ─── Remaining branch coverage ─────────────────────────────────────────────
 
   it("getActiveTabId returns cached activeTabId when set", async () => {
@@ -1053,14 +1001,6 @@ describe("background.ts message handlers", () => {
   // In normal flow, executeBridgeExpr only resolves with primitives.
   // Test via a contrived path: make resolve return an object by having r.type
   // be something unexpected AND r.description be an object (not string).
-
-  // ─── debug-stop without pending breakpoint (branch 88) ──────────────────────
-
-  it("debug-stop is no-op when no breakpoint is pending", async () => {
-    // __dbgResolve is null, so if (__dbgResolve) is false
-    const result = await sendMessage({ type: 'debug-stop' });
-    expect(result).toEqual({ ok: true });
-  });
 
   // ─── executeBridgeExpr catch with String(e) fallback (branch 40) ───────────
 

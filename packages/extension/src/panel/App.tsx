@@ -43,16 +43,6 @@ function App() {
   }
 
   useEffect(() => {
-    function onMessage(msg: { type: string; line?: number }) {
-      if (msg.type === 'debug-paused' && msg.line !== undefined) {
-        dispatch({ type: 'SET_RUN_LINE', currentRunLine: msg.line });
-      }
-    }
-    chrome.runtime.onMessage.addListener(onMessage);
-    return () => chrome.runtime.onMessage.removeListener(onMessage);
-  }, []);
-
-  useEffect(() => {
     if (!chrome.tabs?.query) return;
 
     const params = new URLSearchParams(window.location.search);
