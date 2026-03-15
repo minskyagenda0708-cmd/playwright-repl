@@ -59,3 +59,5 @@ chrome.runtime.onMessage.addListener((msg) => {
         connect(msg.port as number);
     }
 });
+
+export {};

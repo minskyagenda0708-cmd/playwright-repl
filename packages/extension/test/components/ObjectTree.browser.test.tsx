@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { ObjectTree } from '@/components/Console/ObjectTree';

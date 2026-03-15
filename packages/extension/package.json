@@ -7,7 +7,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite dev",
-    "typecheck": "tsc",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",

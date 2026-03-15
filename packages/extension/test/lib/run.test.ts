@@ -9,7 +9,7 @@ vi.mock('@/lib/bridge', () => ({
 
 const mockFilterResponse = vi.fn((text: string) => text);
 vi.mock('@/lib/filter', () => ({
-    filterResponse: (...args: any[]) => mockFilterResponse(...args),
+    filterResponse: (...args: [string]) => mockFilterResponse(...args),
 }));
 
 vi.mock('@/lib/commands', () => ({
@@ -37,7 +37,7 @@ vi.mock('@/lib/sw-debugger', () => ({
     swGetProperties: (...args: any[]) => mockSwGetProperties(...args),
 }));
 
-const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }));
+const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as any);
 vi.mock('@/components/Console/cdpToSerialized', () => ({
     fromCdpRemoteObject: (obj: any) => mockFromCdpRemoteObject(obj),
 }));
@@ -52,7 +52,7 @@ import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function createDispatch() {
-    return vi.fn() as React.Dispatch<any>;
+    return vi.fn() as unknown as React.Dispatch<any> & ReturnType<typeof vi.fn>;
 }
 
 // ─── Setup ──────────────────────────────────────────────────────────────────

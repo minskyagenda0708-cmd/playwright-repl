@@ -106,7 +106,7 @@ export async function verifyInputValue(page, label, expected) {
 
 // ─── Text locator actions ───────────────────────────────────────────────────
 
-export async function actionByText(page, text, action, nth, exact) {
+export async function actionByText(page, text, action, nth?, exact?) {
   let loc = page.getByText(text, { exact: true });
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
@@ -120,7 +120,7 @@ export async function actionByText(page, text, action, nth, exact) {
   await loc[action]();
 }
 
-export async function fillByText(page, text, value, nth, exact) {
+export async function fillByText(page, text, value, nth?, exact?) {
   let loc = page.getByLabel(text);
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByPlaceholder(text);
@@ -130,7 +130,7 @@ export async function fillByText(page, text, value, nth, exact) {
   await loc.fill(value);
 }
 
-export async function selectByText(page, text, value, nth, exact) {
+export async function selectByText(page, text, value, nth?, exact?) {
   let loc = page.getByLabel(text);
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
@@ -139,7 +139,7 @@ export async function selectByText(page, text, value, nth, exact) {
   await loc.selectOption(value);
 }
 
-export async function checkByText(page, text, nth, exact) {
+export async function checkByText(page, text, nth?, exact?) {
   if (!exact) {
     const item = page.getByRole('listitem').filter({ hasText: text });
     if (await item.count() > 0) {
@@ -156,7 +156,7 @@ export async function checkByText(page, text, nth, exact) {
   await loc.check();
 }
 
-export async function uncheckByText(page, text, nth, exact) {
+export async function uncheckByText(page, text, nth?, exact?) {
   if (!exact) {
     const item = page.getByRole('listitem').filter({ hasText: text });
     if (await item.count() > 0) {
@@ -195,7 +195,7 @@ export async function selectByRole(page, role, name, value, nth) {
 
 // ─── Highlight ──────────────────────────────────────────────────────────────
 
-export async function highlightByText(page, text, nth, exact) {
+export async function highlightByText(page, text, nth?, exact?) {
   let loc = exact ? page.getByText(text, { exact: true }) : page.getByText(text);
   const count = await loc.count();
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
@@ -215,7 +215,7 @@ export async function highlightByRole(page, role, name, nth) {
     : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
-export async function highlightBySelector(page, selector, nth) {
+export async function highlightBySelector(page, selector, nth?) {
   let loc = page.locator(selector);
   const count = await loc.count();
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
