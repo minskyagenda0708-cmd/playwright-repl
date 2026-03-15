@@ -15,7 +15,15 @@ vi.mock('@/lib/bridge', () => ({
 
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: vi.fn(),
+    swDebugEvalRaw: vi.fn().mockResolvedValue({ result: { type: 'undefined' } }),
     swGetProperties: vi.fn(),
+    swDebuggerEnable: vi.fn().mockResolvedValue(undefined),
+    swDebuggerDisable: vi.fn().mockResolvedValue(undefined),
+    swSetBreakpointByUrl: vi.fn().mockResolvedValue('bp-1'),
+    swRemoveBreakpoint: vi.fn().mockResolvedValue(undefined),
+    swDebugResume: vi.fn().mockResolvedValue(undefined),
+    swTerminateExecution: vi.fn().mockResolvedValue(undefined),
+    onDebugPaused: vi.fn(),
 }));
 
 vi.mock('@/lib/file-utils', () => ({
