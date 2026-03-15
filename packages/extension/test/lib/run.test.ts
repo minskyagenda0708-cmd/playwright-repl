@@ -37,8 +37,7 @@ const mockSwDebuggerEnable = vi.fn().mockResolvedValue(undefined);
 const mockSwDebuggerDisable = vi.fn().mockResolvedValue(undefined);
 const mockSwSetBreakpointByUrl = vi.fn().mockResolvedValue('bp-1');
 const mockSwRemoveBreakpoint = vi.fn().mockResolvedValue(undefined);
-let capturedPauseCallback: ((line: number) => void) | null = null;
-const mockOnDebugPaused = vi.fn((cb: any) => { capturedPauseCallback = cb; });
+const mockOnDebugPaused = vi.fn();
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: (...args: any[]) => mockSwDebugEval(...args),
     swDebugEvalRaw: (...args: any[]) => mockSwDebugEvalRaw(...args),
@@ -385,7 +384,6 @@ describe('runJsScriptStep', () => {
         mockSwDebugEvalRaw.mockResolvedValue({ result: { type: 'undefined' } });
         mockSwSetBreakpointByUrl.mockResolvedValue('bp-1');
         mockSwRemoveBreakpoint.mockResolvedValue(undefined);
-        capturedPauseCallback = null;
     });
 
     it('dispatches debug script label', async () => {
