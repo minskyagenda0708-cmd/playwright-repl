@@ -3,7 +3,7 @@ import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
@@ -199,15 +199,15 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         return executableIndex;
     }
 
+    async function handleDebug() {
+        dispatch({ type: 'RUN_START', stepDebug: true });
+        await runJsScriptStep(editorContent, dispatch);
+        dispatch({ type: 'RUN_STOP' });
+    }
+
     async function handleStep() {
         if (isStepDebugging) {
             swDebugResume().catch(() => {});
-            return;
-        }
-        if (editorMode === 'js') {
-            dispatch({ type: 'RUN_START', stepDebug: true });
-            await runJsScriptStep(editorContent, dispatch);
-            dispatch({ type: 'RUN_STOP' });
             return;
         }
         // pw step mode: run next line via runAndDispatch
@@ -368,7 +368,10 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title={isStepDebugging ? "Abort" : "Stop"} onClick={handleStop}>{isStepDebugging ? <AbortIcon /> : <StopIcon />}</button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 }
-                <button id="step-btn" data-testid="step-btn" title={editorMode === 'js' ? (isStepDebugging ? 'Step: advance to next line' : 'Step: start debug session') : 'Step: run next line'} disabled={!editorContent.trim() || (isRunning && !isStepDebugging)} onClick={handleStep}><StepForwardIcon /></button>
+                {editorMode === 'js' && !isRunning && stepLine === -1 && (
+                    <button id="debug-btn" data-testid="debug-btn" title="Debug script" disabled={!editorContent.trim()} onClick={handleDebug}><BugIcon /></button>
+                )}
+                <button id="step-btn" data-testid="step-btn" title={isStepDebugging ? 'Step: advance to next line' : 'Step: run next line'} disabled={!editorContent.trim() || (editorMode === 'js' && !isStepDebugging) || (isRunning && !isStepDebugging)} onClick={handleStep}><StepForwardIcon /></button>
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
                 <div data-testid="mode-toggle" className="inline-flex rounded border border-(--border-button) overflow-hidden">
                     <button

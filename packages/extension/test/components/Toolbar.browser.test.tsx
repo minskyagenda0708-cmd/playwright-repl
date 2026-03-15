@@ -716,14 +716,35 @@ describe('Toolbar component tests', () => {
       });
     });
 
-    it('step button is enabled in JS mode (starts debug session)', async () => {
+    it('step button is disabled in JS mode when not debugging', async () => {
       const screen = await renderToolbar({
         editorContent: 'goto https://example.com',
         editorMode: 'js',
       });
 
       const stepBtn = screen.container.querySelector('#step-btn') as HTMLButtonElement;
-      expect(stepBtn.disabled).toBe(false);
+      expect(stepBtn.disabled).toBe(true);
+    });
+
+    it('debug button is visible in JS mode', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'goto https://example.com',
+        editorMode: 'js',
+      });
+
+      const debugBtn = screen.container.querySelector('#debug-btn') as HTMLButtonElement;
+      expect(debugBtn).not.toBeNull();
+      expect(debugBtn.disabled).toBe(false);
+    });
+
+    it('debug button is hidden in pw mode', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'goto https://example.com',
+        editorMode: 'pw',
+      });
+
+      const debugBtn = screen.container.querySelector('#debug-btn');
+      expect(debugBtn).toBeNull();
     });
 
     it('step button is enabled in pw mode with content', async () => {
