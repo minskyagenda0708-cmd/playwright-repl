@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.17.0 — JS Debugger
+
+**2026-03-16**
+
+### Features
+
+- **JS step debugger**: Debug JS scripts with Step Over, Step Into, Step Out, and Continue. Set breakpoints by clicking the gutter, then click Debug to run. ([#217](https://github.com/stevez/playwright-repl/issues/217), [#218](https://github.com/stevez/playwright-repl/issues/218), [#220](https://github.com/stevez/playwright-repl/pull/220), [#222](https://github.com/stevez/playwright-repl/issues/222), [#226](https://github.com/stevez/playwright-repl/pull/226))
+- **Floating debug toolbar**: Step Over / Step Into / Step Out / Continue buttons appear during debug sessions. ([#221](https://github.com/stevez/playwright-repl/issues/221), [#225](https://github.com/stevez/playwright-repl/pull/225))
+- **Variables tab**: Auto-displays scope variables (Local, Block, Closure, Script) when the debugger pauses. Expandable tree view using the existing CDP object tree. ([#223](https://github.com/stevez/playwright-repl/issues/223), [#227](https://github.com/stevez/playwright-repl/pull/227))
+- **Contextual assertions**: Pick element now includes contextual assertions (`verify-text`, `verify-visible`). ([#181](https://github.com/stevez/playwright-repl/issues/181), [#182](https://github.com/stevez/playwright-repl/pull/182))
+- **Custom recorder**: Replaced Playwright's built-in recorder with a custom content script for cleaner output. ([#183](https://github.com/stevez/playwright-repl/pull/183))
+- **New tab support**: Static newtab page allows the extension to work with newly opened tabs. ([#179](https://github.com/stevez/playwright-repl/pull/179))
+- **Only prepend goto on empty editor**: Recording start only adds `goto` when the editor is empty. ([#189](https://github.com/stevez/playwright-repl/issues/189), [#191](https://github.com/stevez/playwright-repl/pull/191))
+
+### Fixes
+
+- **Trailing empty line debugger crash**: Fixed debugger failing when editor content ends with empty lines. ([#228](https://github.com/stevez/playwright-repl/issues/228), [#229](https://github.com/stevez/playwright-repl/pull/229))
+- **Console object rendering**: Improved display for Promise, Map/Set, arrays, and object literals. ([#203](https://github.com/stevez/playwright-repl/issues/203), [#204](https://github.com/stevez/playwright-repl/pull/204), [#212](https://github.com/stevez/playwright-repl/pull/212))
+- **JS eval with replMode**: Simplified JS evaluation with `replMode` and block scoping. ([#201](https://github.com/stevez/playwright-repl/issues/201), [#202](https://github.com/stevez/playwright-repl/pull/202))
+- **Tab switch activation**: Browser tab now activates when switching via the dropdown. ([#190](https://github.com/stevez/playwright-repl/pull/190))
+- **Bridge eval alignment**: Bridge mode eval now matches panel behavior. ([#215](https://github.com/stevez/playwright-repl/pull/215))
+
+### Refactoring
+
+- **Unified JS mode**: Dropped CDP JS mode — console now has 2 modes (`.pw` and JS). ([#196](https://github.com/stevez/playwright-repl/pull/196))
+- **Renamed console mode**: Renamed `playwright` mode to `js` for consistency. ([#197](https://github.com/stevez/playwright-repl/pull/197))
+
+### Tests
+
+- Unit tests for content scripts (locator, picker, recorder). ([#184](https://github.com/stevez/playwright-repl/pull/184))
+- Resolved all TypeScript type-check errors in extension tests. ([#192](https://github.com/stevez/playwright-repl/pull/192))
+
+---
+
 ## v0.16.2 — Pick Element & Recording Fix
 
 **2026-03-13**

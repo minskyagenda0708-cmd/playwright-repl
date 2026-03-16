@@ -53,7 +53,8 @@ cd packages/extension && npm run build
 | Feature | |
 |---------|---|
 | Console with 2 input modes | `.pw` keywords, Playwright API / JavaScript — auto-detected |
-| Script editor | Syntax highlighting, pass/fail gutter, step debugger |
+| Script editor | Syntax highlighting, pass/fail gutter, autocompletion |
+| JS debugger | Breakpoints, Step Over/Into/Out, Variables tab with scope inspection |
 | Recorder | Captures clicks/fills/navigations as `.pw` commands and JS Playwright code |
 | Object tree | Expandable CDP object tree, just like Chrome DevTools |
 | Side panel & popup | Opens as side panel by default; switch to popup in Options |
