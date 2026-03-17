@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.18.1
+
+**2026-03-17**
+
+### Fixes
+
+- **Popup tab filter**: Tab switcher dropdown no longer shows the extension's own popup window URL. ([#251](https://github.com/stevez/playwright-repl/pull/251))
+
+---
+
 ## v0.18.0 — Stability & Recording
 
 **2026-03-17**

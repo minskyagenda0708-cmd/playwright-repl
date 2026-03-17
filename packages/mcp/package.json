@@ -1,6 +1,6 @@
 {
     "name": "@playwright-repl/mcp",
-    "version": "0.18.0",
+    "version": "0.18.1",
     "type": "module",
     "bin": {
         "playwright-repl-mcp": "./dist/index.js"

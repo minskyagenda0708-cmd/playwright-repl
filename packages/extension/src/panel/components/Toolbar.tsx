@@ -45,9 +45,11 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     async function loadTabs() {
         if (!chrome.tabs?.query) return;
         const tabs = await chrome.tabs.query({});
-        // Keep chrome:// tabs (to preserve tab order) but exclude chrome-extension:// and about: tabs
+        // Keep chrome:// tabs (to preserve tab order) but exclude other extensions' and about: tabs.
+        // Allow our own extension pages (newtab) but exclude the panel/popup itself.
         const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
-        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('about:') && (!t.url.startsWith('chrome-extension://') || t.url.startsWith(ownOrigin))));
+        const panelUrl = `${ownOrigin}panel/panel.html`;
+        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('about:') && !t.url.startsWith(panelUrl) && (!t.url.startsWith('chrome-extension://') || t.url.startsWith(ownOrigin))));
     }
 
     async function checkActiveTab() {
