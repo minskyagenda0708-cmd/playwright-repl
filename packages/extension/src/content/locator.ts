@@ -232,7 +232,6 @@ export function buildCommands(action: string, el: Element, opts?: {
     key?: string;
     checked?: boolean;
     option?: string;
-    submit?: boolean;
 }): { pw: string; js: string } | null {
     const locator = generateLocator(el);
     const jsLoc = `page.${locator}`;
@@ -248,9 +247,8 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'fill': {
             const val = opts?.value ?? '';
-            const submitFlag = opts?.submit ? ' --submit' : '';
             return {
-                pw: `fill ${pwArgs} ${q(val)}${submitFlag}`,
+                pw: `fill ${pwArgs} ${q(val)}`,
                 js: `await ${jsLoc}.fill(${escapeString(val)});`,
             };
         }

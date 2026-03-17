@@ -546,11 +546,11 @@ describe('locator', () => {
             expect(cmds!.js).toContain(".fill('test@example.com')");
         });
 
-        it('builds fill with --submit flag', () => {
+        it('builds fill without --submit flag', () => {
             document.body.innerHTML = '<label for="q">Search</label><input id="q" type="text">';
             const input = document.querySelector('input')!;
-            const cmds = buildCommands('fill', input, { value: 'query', submit: true });
-            expect(cmds!.pw).toContain('--submit');
+            const cmds = buildCommands('fill', input, { value: 'query' });
+            expect(cmds!.pw).not.toContain('--submit');
         });
 
         it('builds fill with empty value', () => {

@@ -101,17 +101,7 @@ export function onKeyDownCapture(e: KeyboardEvent) {
 
     const target = e.target as Element;
 
-    // Enter during fill → submit variant
-    if (e.key === 'Enter' && pendingFill) {
-        const cmds = buildCommands('fill', pendingFill.el, { value: pendingFill.value, submit: true });
-        if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-fill-submit', action: cmds });
-        }
-        flushPendingFill();
-        return;
-    }
-
-    // Other special key → flush fill, emit press
+    // Any special key during fill → flush fill, then fall through to emit press
     flushPendingFill();
 
     const cmds = target && target !== document.body && target !== document.documentElement

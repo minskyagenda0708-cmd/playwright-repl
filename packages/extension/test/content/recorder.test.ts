@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
     SPECIAL_KEYS,
+    pendingFill,
     flushPendingFill,
     onClickCapture,
     onInputCapture,
@@ -244,7 +245,7 @@ describe('recorder', () => {
             );
         });
 
-        it('sends fill-submit on Enter during pending fill', () => {
+        it('sends press Enter as separate action after flushing pending fill', () => {
             document.body.innerHTML = '<label for="q">Query</label><input id="q" type="text" value="test">';
             const input = document.querySelector('input')!;
 
@@ -254,13 +255,14 @@ describe('recorder', () => {
             onInputCapture(inputEvent);
             vi.mocked(chrome.runtime.sendMessage).mockClear();
 
-            // Then Enter
+            // Then Enter — should flush fill and emit separate press Enter
             const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
             Object.defineProperty(enterEvent, 'target', { value: input });
             onKeyDownCapture(enterEvent);
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-                expect.objectContaining({ type: 'recorded-fill-submit' })
+                expect.objectContaining({ type: 'recorded-action' })
             );
+            expect(pendingFill).toBeNull();
         });
     });
 

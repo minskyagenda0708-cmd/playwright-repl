@@ -235,7 +235,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             if (msg.type === 'recorded-action') {
                 editorRef.current?.insertAtCursor(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
-            if (msg.type === 'recorded-fill-update' || msg.type === 'recorded-fill-submit') {
+            if (msg.type === 'recorded-fill-update') {
                 editorRef.current?.replaceLastInsert(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
         };
