@@ -113,6 +113,13 @@ export function onKeyDownCapture(e: KeyboardEvent) {
 
     const target = e.target as Element;
 
+    // Tab changes focus but is navigation noise — flush fill, don't emit
+    if (e.key === 'Tab') { flushPendingFill(); return; }
+
+    // Inside a text field, only Enter is a meaningful action —
+    // everything else (Backspace, arrows, etc.) is editing noise
+    if (e.key !== 'Enter' && target && isTextField(target)) return;
+
     // Any special key during fill → flush fill, then fall through to emit press
     flushPendingFill();
 
