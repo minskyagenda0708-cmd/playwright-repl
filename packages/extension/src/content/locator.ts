@@ -147,9 +147,9 @@ export function isHoverRevealed(el: Element): boolean {
                     s.visibility === 'visible' ||
                     (s.opacity && s.opacity !== '0');
                 if (!reveals) continue;
-                try { if (el.matches(rule.selectorText)) return true; } catch {}
+                try { if (el.matches(rule.selectorText)) return true; } catch { /* invalid selector */ }
             }
-        } catch {} // Cross-origin stylesheets
+        } catch { /* cross-origin stylesheet */ }
     }
     return false;
 }
