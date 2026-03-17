@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.18.0 — Stability & Recording
+
+**2026-03-17**
+
+### Features
+
+- **Ancestor context disambiguation**: Recorder and PW mode now use ancestor context to disambiguate ambiguous locators (e.g. `click "Save" --in "Settings"`). ([#187](https://github.com/stevez/playwright-repl/issues/187), [#240](https://github.com/stevez/playwright-repl/pull/240), [#243](https://github.com/stevez/playwright-repl/pull/243))
+- **Inline variable values**: Debug mode shows inline variable values on the paused line. ([#224](https://github.com/stevez/playwright-repl/issues/224), [#231](https://github.com/stevez/playwright-repl/pull/231))
+
+### Fixes
+
+- **Tab close stability**: Added `chrome.tabs.onRemoved` listener to clear stale `currentPage` when a tab is closed. ([#247](https://github.com/stevez/playwright-repl/issues/247), [#249](https://github.com/stevez/playwright-repl/pull/249))
+- **Stale page recovery**: Commands that hit `TargetClosedError` now auto-reattach and retry. ([#247](https://github.com/stevez/playwright-repl/issues/247), [#249](https://github.com/stevez/playwright-repl/pull/249))
+- **Command serialization**: Bridge commands now execute sequentially via a promise queue, preventing concurrent race conditions. ([#248](https://github.com/stevez/playwright-repl/issues/248), [#249](https://github.com/stevez/playwright-repl/pull/249))
+- **Attach reliability**: Fixed attach failing after tab switching by using `playwright-crx` 0.15.2. ([#242](https://github.com/stevez/playwright-repl/issues/242), [#245](https://github.com/stevez/playwright-repl/pull/245))
+- **Auto-stop recording**: Recording now auto-stops when run/debug starts. ([#234](https://github.com/stevez/playwright-repl/issues/234), [#237](https://github.com/stevez/playwright-repl/pull/237))
+- **Record hover before click**: Hover is now recorded before click on hover-revealed elements. ([#235](https://github.com/stevez/playwright-repl/pull/235))
+- **Record Enter as press command**: Enter is now recorded as a separate `press Enter` instead of `--submit` flag. ([#232](https://github.com/stevez/playwright-repl/pull/232))
+- **Skip noise keys in recorder**: Backspace, Tab, arrows, and other noise keys are no longer recorded. ([#239](https://github.com/stevez/playwright-repl/pull/239))
+
+---
+
 ## v0.17.0 — JS Debugger
 
 **2026-03-16**

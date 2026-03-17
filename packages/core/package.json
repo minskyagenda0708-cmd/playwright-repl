@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/core",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {

@@ -6,7 +6,8 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 |---------|-------------|
 | 🧠 **Mode Detection** | Console auto-detects input type — `.pw` keyword or Playwright API / JavaScript (`await page.*`, `1 + 1`) — no prefix needed |
 | 🎬 **Record** | Capture clicks, fills, and navigations — generates `.pw` commands and JS Playwright code, inserted into the editor live |
-| ▶ **Run / Step Into** | Run scripts line-by-line with pass/fail gutter indicators; step debugger pauses at each line |
+| ▶ **Run** | Run scripts line-by-line with pass/fail gutter indicators |
+| 🐛 **Debug** | Step Over / Step Into / Step Out / Continue with breakpoints, inline variable values, and a Variables tab showing scope variables |
 | 📂 **Load / Save** | Open `.pw` or `.js` files from disk; save editor content with one click |
 | 🔗 **Auto-attach** | Automatically attaches to the active tab when the panel opens |
 | 🗂 **Tab Switcher** | Switch the active browser target to any open tab from the toolbar dropdown |
@@ -93,16 +94,18 @@ Write and run multi-line `.pw` scripts or JavaScript (Playwright API, DOM) direc
 - **Auto-closing brackets** — parentheses, brackets, and quotes close automatically
 - **Pass/fail gutter** — ✓/✗ markers per line after execution
 - **Run / Step / Stop** — run all lines, step through one at a time, or abort
-- **JS step debugger** — pauses at each line, resumes on Step
+- **JS step debugger** — pauses at each line with inline variable values, resumes on Step
 - **Open / Save** — load `.pw` or `.js` files from disk; save with timestamp filename
 - **Ctrl+Enter** — run the script from keyboard
 
 ### Recording
 
-Click **Record**, interact with the page — clicks, fills, and navigations are captured automatically and inserted into the editor at the cursor in two formats:
+Click **Record**, interact with the page — clicks, hovers, fills, and navigations are captured automatically and inserted into the editor at the cursor in two formats:
 
 - **`.pw` commands** — `goto`, `click`, `fill`, `press` — ready to replay with the CLI or extension
 - **JS Playwright code** — `await page.click(...)` — ready to paste into a Playwright test
+
+Ambiguous elements are automatically disambiguated with ancestor context (e.g. `click "Save" --in "Settings"`).
 
 > Recording captures only human interactions — not AI-driven or programmatic commands.
 
