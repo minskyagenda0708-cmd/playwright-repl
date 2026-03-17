@@ -9,6 +9,7 @@ import {
     locatorToPwArgs,
     escapeString,
     generateLocator,
+    generateLocatorPair,
     buildCssSelector,
     isTextField,
     isCheckable,
@@ -399,6 +400,142 @@ describe('locator', () => {
         });
     });
 
+    // ─── ancestor context disambiguation ────────────────────────────────────
+
+    describe('ancestor context disambiguation', () => {
+        it('uses ancestor listitem context instead of .nth()', () => {
+            document.body.innerHTML = `
+                <ul>
+                    <li><span>reading</span><button>Delete</button></li>
+                    <li><span>shopping</span><button>Delete</button></li>
+                    <li><span>learning</span><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toBe(
+                "getByRole('listitem').filter({ hasText: 'reading' }).getByRole('button', { name: 'Delete' })"
+            );
+            expect(generateLocator(buttons[1])).toBe(
+                "getByRole('listitem').filter({ hasText: 'shopping' }).getByRole('button', { name: 'Delete' })"
+            );
+            expect(generateLocator(buttons[2])).toBe(
+                "getByRole('listitem').filter({ hasText: 'learning' }).getByRole('button', { name: 'Delete' })"
+            );
+        });
+
+        it('falls back to .nth() when ancestor text is not unique', () => {
+            document.body.innerHTML = `
+                <ul>
+                    <li><span>same</span><button>Delete</button></li>
+                    <li><span>same</span><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toContain('.first()');
+            expect(generateLocator(buttons[1])).toContain('.nth(1)');
+        });
+
+        it('falls back to .nth() when no container ancestor exists', () => {
+            document.body.innerHTML = '<button>Save</button><button>Save</button>';
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toContain('.first()');
+            expect(generateLocator(buttons[1])).toContain('.nth(1)');
+        });
+
+        it('falls back to .nth() when context text is empty', () => {
+            document.body.innerHTML = `
+                <ul>
+                    <li><button>Delete</button></li>
+                    <li><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toContain('.first()');
+            expect(generateLocator(buttons[1])).toContain('.nth(1)');
+        });
+
+        it('falls back to .nth() when context text is too long', () => {
+            const longText = 'x'.repeat(51);
+            document.body.innerHTML = `
+                <ul>
+                    <li><span>${longText}</span><button>Delete</button></li>
+                    <li><span>short</span><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toContain('.first()');
+        });
+
+        it('works with article container role', () => {
+            document.body.innerHTML = `
+                <article><h2>Post A</h2><button>Like</button></article>
+                <article><h2>Post B</h2><button>Like</button></article>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toContain("filter({ hasText: 'Post A' })");
+            expect(generateLocator(buttons[1])).toContain("filter({ hasText: 'Post B' })");
+        });
+
+        it('works with table row container role', () => {
+            document.body.innerHTML = `
+                <table>
+                    <tr><td>Alice</td><td><button>Edit</button></td></tr>
+                    <tr><td>Bob</td><td><button>Edit</button></td></tr>
+                    <tr><td>Carol</td><td><button>Edit</button></td></tr>
+                </table>`;
+            const buttons = document.querySelectorAll('button');
+            expect(generateLocator(buttons[0])).toBe(
+                "getByRole('row').filter({ hasText: 'Alice' }).getByRole('button', { name: 'Edit' })"
+            );
+            expect(generateLocator(buttons[1])).toBe(
+                "getByRole('row').filter({ hasText: 'Bob' }).getByRole('button', { name: 'Edit' })"
+            );
+            expect(generateLocator(buttons[2])).toBe(
+                "getByRole('row').filter({ hasText: 'Carol' }).getByRole('button', { name: 'Edit' })"
+            );
+        });
+
+        it('works with multi-column table rows with multiple buttons', () => {
+            document.body.innerHTML = `
+                <table>
+                    <tr><td>Alice</td><td>alice@example.com</td><td><button>Edit</button> <button>Delete</button></td></tr>
+                    <tr><td>Bob</td><td>bob@example.com</td><td><button>Edit</button> <button>Delete</button></td></tr>
+                    <tr><td>Carol</td><td>carol@example.com</td><td><button>Edit</button> <button>Delete</button></td></tr>
+                </table>`;
+            const editButtons = [...document.querySelectorAll('button')].filter(b => b.textContent === 'Edit');
+            const deleteButtons = [...document.querySelectorAll('button')].filter(b => b.textContent === 'Delete');
+            expect(generateLocator(editButtons[0])).toBe(
+                "getByRole('row').filter({ hasText: 'Alice' }).getByRole('button', { name: 'Edit' })"
+            );
+            expect(generateLocator(editButtons[2])).toBe(
+                "getByRole('row').filter({ hasText: 'Carol' }).getByRole('button', { name: 'Edit' })"
+            );
+            expect(generateLocator(deleteButtons[1])).toBe(
+                "getByRole('row').filter({ hasText: 'Bob' }).getByRole('button', { name: 'Delete' })"
+            );
+        });
+    });
+
+    // ─── generateLocatorPair ──────────────────────────────────────────────
+
+    describe('generateLocatorPair', () => {
+        it('returns same locator for both modes when no disambiguation needed', () => {
+            document.body.innerHTML = '<button>Submit</button>';
+            const btn = document.querySelector('button')!;
+            const pair = generateLocatorPair(btn);
+            expect(pair.js).toBe(pair.pw);
+            expect(pair.js).toBe("getByRole('button', { name: 'Submit' })");
+        });
+
+        it('returns ancestor context for JS and .nth() for PW', () => {
+            document.body.innerHTML = `
+                <ul>
+                    <li><span>reading</span><button>Delete</button></li>
+                    <li><span>shopping</span><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            const pair = generateLocatorPair(buttons[1]);
+            expect(pair.js).toContain('.filter(');
+            expect(pair.js).toContain('shopping');
+            expect(pair.pw).toContain('.nth(1)');
+        });
+    });
+
     // ─── locatorToPwArgs ───────────────────────────────────────────────────
 
     describe('locatorToPwArgs', () => {
@@ -665,6 +802,19 @@ describe('locator', () => {
         it('returns null for unknown action', () => {
             const el = document.createElement('div');
             expect(buildCommands('unknown', el)).toBeNull();
+        });
+
+        it('uses ancestor context in JS and .nth() in PW for click', () => {
+            document.body.innerHTML = `
+                <ul>
+                    <li><span>reading</span><button>Delete</button></li>
+                    <li><span>shopping</span><button>Delete</button></li>
+                </ul>`;
+            const buttons = document.querySelectorAll('button');
+            const cmds = buildCommands('click', buttons[1]);
+            expect(cmds!.js).toContain(".filter({ hasText: 'shopping' })");
+            expect(cmds!.js).toContain('.click()');
+            expect(cmds!.pw).toContain('--nth 1');
         });
     });
 

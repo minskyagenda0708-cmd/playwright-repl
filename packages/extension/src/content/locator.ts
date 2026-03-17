@@ -28,8 +28,12 @@ export const IMPLICIT_ROLES: Record<string, string | ((el: Element) => string | 
     UL: 'list', OL: 'list',
     LI: 'listitem',
     TABLE: 'table',
+    TR: 'row',
+    TH: 'columnheader',
+    TD: 'cell',
     FORM: 'form',
     DIALOG: 'dialog',
+    ARTICLE: 'article',
 };
 
 export function getImplicitRole(el: Element): string | null {
@@ -97,6 +101,74 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
         if (text) return text;
     }
     return '';
+}
+
+// ─── Ancestor context disambiguation ─────────────────────────────────────
+
+/** Container roles suitable for ancestor-context disambiguation. */
+const CONTAINER_ROLES = new Set(['listitem', 'row', 'article', 'group']);
+
+/**
+ * Find distinctive text in an ancestor that doesn't come from the excluded element's subtree.
+ * Returns text from the first child subtree that doesn't contain the excluded element,
+ * recursing into wrappers that do contain it. This ensures the returned text is a
+ * contiguous substring of the ancestor's full textContent (needed for hasText matching).
+ */
+function getContextText(ancestor: Element, exclude: Element): string {
+    function findText(node: Node): string {
+        for (const child of node.childNodes) {
+            if (child === exclude) continue;
+            if (child.nodeType === Node.ELEMENT_NODE && (child as Element).contains(exclude)) {
+                // This subtree contains the target — recurse to find non-target siblings
+                const inner = findText(child);
+                if (inner) return inner;
+                continue;
+            }
+            const text = (child.textContent || '').trim();
+            if (text && text.length <= 50) return text;
+        }
+        return '';
+    }
+    return findText(ancestor);
+}
+
+/** Walk up from el to find nearest ancestor with a container role. */
+function findContainerAncestor(el: Element): { ancestor: Element; role: string } | null {
+    let current = el.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+        const role = getImplicitRole(current);
+        if (role && CONTAINER_ROLES.has(role)) return { ancestor: current, role };
+        current = current.parentElement;
+    }
+    return null;
+}
+
+/**
+ * Try to disambiguate using ancestor context.
+ * Returns a chained locator like:
+ *   getByRole('listitem').filter({ hasText: 'reading' }).getByRole('button', { name: 'Delete' })
+ * or null if ancestor context doesn't produce a unique result.
+ */
+function tryAncestorContext(el: Element, role: string, name: string, matches: Element[]): string | null {
+    const container = findContainerAncestor(el);
+    if (!container) return null;
+
+    const contextText = getContextText(container.ancestor, el);
+    if (!contextText || contextText.length > 50) return null;
+
+    // Verify uniqueness: only one match's container ancestor should contain this text
+    let count = 0;
+    for (const match of matches) {
+        const mc = findContainerAncestor(match);
+        if (!mc || mc.role !== container.role) continue;
+        if ((mc.ancestor.textContent || '').includes(contextText)) {
+            count++;
+            if (count > 1) return null;
+        }
+    }
+    if (count !== 1) return null;
+
+    return `getByRole(${escapeString(container.role)}).filter({ hasText: ${escapeString(contextText)} }).getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
 }
 
 // ─── Locator disambiguation ─────────────────────────────────────────────
@@ -211,7 +283,10 @@ export function generateLocator(el: Element): string {
         // Disambiguate when multiple elements share same role + name
         const matches = findByRoleAndName(role, name);
         if (matches.length > 1) {
-            // exact: true so Playwright matches same elements as our exact comparison
+            // Try ancestor context first (readable chained locators)
+            const ancestorLocator = tryAncestorContext(el, role, name, matches);
+            if (ancestorLocator) return ancestorLocator;
+            // Fallback to nth-based disambiguation
             const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
             const idx = matches.indexOf(el);
             return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
@@ -249,6 +324,24 @@ export function generateLocator(el: Element): string {
     return `locator(${escapeString(buildCssSelector(el))})`;
 }
 
+/**
+ * Generate separate JS and PW locators.
+ * JS uses ancestor context when available; PW always uses .nth() (no --in flag yet).
+ */
+export function generateLocatorPair(el: Element): { js: string; pw: string } {
+    const jsLocator = generateLocator(el);
+    if (!jsLocator.includes('.filter(')) return { js: jsLocator, pw: jsLocator };
+
+    // JS used ancestor context — generate a .nth() locator for PW
+    const role = getImplicitRole(el)!;
+    const name = getAccessibleName(el);
+    const matches = findByRoleAndName(role, name);
+    const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
+    const idx = matches.indexOf(el);
+    const pwLocator = idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
+    return { js: jsLocator, pw: pwLocator };
+}
+
 // ─── Element classification ─────────────────────────────────────────────
 
 /** Check if element is a text-entry field */
@@ -277,9 +370,9 @@ export function buildCommands(action: string, el: Element, opts?: {
     checked?: boolean;
     option?: string;
 }): { pw: string; js: string } | null {
-    const locator = generateLocator(el);
-    const jsLoc = `page.${locator}`;
-    const pwArgs = locatorToPwArgs(locator);
+    const { js: jsLocator, pw: pwLocator } = generateLocatorPair(el);
+    const jsLoc = `page.${jsLocator}`;
+    const pwArgs = locatorToPwArgs(pwLocator);
     const q = (s: string) => `"${s}"`;
 
     switch (action) {
