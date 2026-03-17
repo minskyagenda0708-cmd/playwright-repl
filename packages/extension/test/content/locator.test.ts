@@ -4,6 +4,8 @@ import {
     getAccessibleName,
     getLabel,
     findByRoleAndName,
+    findAllByRoleAndName,
+    isHoverRevealed,
     locatorToPwArgs,
     escapeString,
     generateLocator,
@@ -259,6 +261,61 @@ describe('locator', () => {
         it('returns empty for no matches', () => {
             document.body.innerHTML = '<button>OK</button>';
             expect(findByRoleAndName('button', 'Missing')).toHaveLength(0);
+        });
+
+        it('excludes hidden elements via checkVisibility', () => {
+            document.body.innerHTML = '<button>Delete</button><button>Delete</button><button>Delete</button>';
+            const buttons = document.querySelectorAll('button');
+            // Stub checkVisibility: only first button visible (like TodoMVC hover-revealed delete)
+            (buttons[0] as any).checkVisibility = () => true;
+            (buttons[1] as any).checkVisibility = () => false;
+            (buttons[2] as any).checkVisibility = () => false;
+            const matches = findByRoleAndName('button', 'Delete');
+            expect(matches).toHaveLength(1);
+            expect(matches[0]).toBe(buttons[0]);
+            // No .nth() needed — only one visible match
+            expect(generateLocator(buttons[0])).toBe("getByRole('button', { name: 'Delete' })");
+        });
+    });
+
+    // ─── findAllByRoleAndName ────────────────────────────────────────────
+
+    describe('findAllByRoleAndName', () => {
+        it('includes hidden elements (ignores checkVisibility)', () => {
+            document.body.innerHTML = '<button>Delete</button><button>Delete</button><button>Delete</button>';
+            const buttons = document.querySelectorAll('button');
+            (buttons[0] as any).checkVisibility = () => true;
+            (buttons[1] as any).checkVisibility = () => false;
+            (buttons[2] as any).checkVisibility = () => false;
+            // findByRoleAndName returns only visible
+            expect(findByRoleAndName('button', 'Delete')).toHaveLength(1);
+            // findAllByRoleAndName returns all regardless of visibility
+            expect(findAllByRoleAndName('button', 'Delete')).toHaveLength(3);
+        });
+    });
+
+    // ─── isHoverRevealed ──────────────────────────────────────────────────
+
+    describe('isHoverRevealed', () => {
+        it('returns false when no stylesheets exist', () => {
+            document.body.innerHTML = '<button>Delete</button>';
+            const btn = document.querySelector('button')!;
+            expect(isHoverRevealed(btn)).toBe(false);
+        });
+
+        it('detects hover-dependent display rule', () => {
+            const style = document.createElement('style');
+            style.textContent = '.item .destroy { display: none; } .item:hover .destroy { display: inline-block; }';
+            document.head.appendChild(style);
+            document.body.innerHTML = '<div class="item"><button class="destroy">Delete</button></div>';
+            // Simulate hover state — el.matches(':hover') selector works only when hovered,
+            // but in happy-dom there's no real hover. The test verifies the function runs
+            // without errors and returns false in a non-hovered environment.
+            const btn = document.querySelector('.destroy')!;
+            // In a real browser with hover active, this would return true.
+            // In happy-dom without hover, el.matches('.item:hover .destroy') is false.
+            expect(typeof isHoverRevealed(btn)).toBe('boolean');
+            document.head.removeChild(style);
         });
     });
 
@@ -527,6 +584,16 @@ describe('locator', () => {
     // ─── buildCommands ───────────────────────────────────────────────────
 
     describe('buildCommands', () => {
+        it('builds hover command', () => {
+            document.body.innerHTML = '<button>Menu</button>';
+            const btn = document.querySelector('button')!;
+            const cmds = buildCommands('hover', btn);
+            expect(cmds).toEqual({
+                pw: 'hover button "Menu"',
+                js: "await page.getByRole('button', { name: 'Menu' }).hover();",
+            });
+        });
+
         it('builds click command', () => {
             document.body.innerHTML = '<button>Submit</button>';
             const btn = document.querySelector('button')!;

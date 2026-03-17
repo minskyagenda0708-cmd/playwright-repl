@@ -8,6 +8,9 @@
         label { display: block; margin: 8px 0; }
         input[type="text"] { padding: 4px; }
         button { padding: 6px 12px; margin: 4px; }
+        /* TodoMVC-style: delete buttons hidden until hover */
+        .todo-item .destroy { display: none; }
+        .todo-item:hover .destroy { display: inline-block; }
     </style>
 </head>
 <body>
@@ -16,5 +19,17 @@
     <label>Name <input type="text" /></label>
     <label><input type="checkbox" /> Accept terms</label>
     <button>Submit</button>
+
+    <!-- TodoMVC-style list: delete buttons hidden until hover -->
+    <ul class="todo-list">
+        <li class="todo-item"><span>reading</span><button class="destroy">Delete</button></li>
+        <li class="todo-item"><span>shopping</span><button class="destroy">Delete</button></li>
+        <li class="todo-item"><span>learning</span><button class="destroy">Delete</button></li>
+    </ul>
+
+    <!-- Single-item edge case: only one hover-revealed button -->
+    <ul class="single-todo">
+        <li class="todo-item"><span>only item</span><button class="destroy">Delete</button></li>
+    </ul>
 </body>
 </html>

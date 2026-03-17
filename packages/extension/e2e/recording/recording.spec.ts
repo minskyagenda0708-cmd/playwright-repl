@@ -84,6 +84,41 @@ test.describe('Recording flow', () => {
       await waitForEditorText(panelPage, 'check');
     });
 
+    test('clicking hover-revealed delete button records hover + click without .nth()', async ({ panelPage, testPage }) => {
+      await panelPage.getByTestId('record-btn').click();
+      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
+      await waitForEditorText(panelPage, 'goto "');
+
+      await testPage.bringToFront();
+      // Hover over "shopping" item to reveal its Delete button, then click it
+      await testPage.locator('.todo-item', { hasText: 'shopping' }).hover();
+      await testPage.locator('.todo-item', { hasText: 'shopping' }).getByRole('button', { name: 'Delete' }).click();
+
+      // Should record hover on ancestor + click without .nth()
+      await waitForEditorText(panelPage, 'click button "Delete"');
+      const editorText = await panelPage.getByTestId('editor').getByRole('textbox').textContent() ?? '';
+      expect(editorText).toContain('hover');
+      expect(editorText).toContain('click');
+      expect(editorText).not.toContain('.nth(');
+      expect(editorText).not.toContain('.first()');
+    });
+
+    test('single hover-revealed button still records hover', async ({ panelPage, testPage }) => {
+      await panelPage.getByTestId('record-btn').click();
+      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
+      await waitForEditorText(panelPage, 'goto "');
+
+      await testPage.bringToFront();
+      // Only one Delete button in .single-todo — edge case where count-based check would fail
+      await testPage.locator('.single-todo .todo-item').hover();
+      await testPage.locator('.single-todo .todo-item').getByRole('button', { name: 'Delete' }).click();
+
+      await waitForEditorText(panelPage, 'click button "Delete"');
+      const editorText = await panelPage.getByTestId('editor').getByRole('textbox').textContent() ?? '';
+      expect(editorText).toContain('hover');
+      expect(editorText).toContain('click');
+    });
+
     test('stop recording resets button state', async ({ panelPage }) => {
       const btn = panelPage.getByTestId('record-btn');
 

@@ -5,7 +5,7 @@
  *
  * Transparent: never calls preventDefault/stopPropagation — user actions flow normally.
  */
-import { escapeString, isTextField, isCheckable, buildCommands } from './locator';
+import { escapeString, isTextField, isCheckable, buildCommands, findHoverAncestor, isHoverRevealed } from './locator';
 
 // ─── Special key detection ────────────────────────────────────────────────
 
@@ -38,6 +38,18 @@ export function onClickCapture(e: MouseEvent) {
 
     // Flush any pending fill
     flushPendingFill();
+
+    // Detect hover-revealed elements: if a :hover CSS rule reveals this element,
+    // emit a hover command on the :hover ancestor so replay works.
+    if (isHoverRevealed(target)) {
+        const hoverTarget = findHoverAncestor(target);
+        if (hoverTarget) {
+            const hoverCmds = buildCommands('hover', hoverTarget);
+            if (hoverCmds) {
+                chrome.runtime.sendMessage({ type: 'recorded-action', action: hoverCmds });
+            }
+        }
+    }
 
     const cmds = buildCommands('click', target);
     if (cmds) {

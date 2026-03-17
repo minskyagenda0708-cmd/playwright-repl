@@ -104,10 +104,54 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
 export function findByRoleAndName(role: string, name: string): Element[] {
     const matches: Element[] = [];
     for (const el of document.querySelectorAll('*')) {
+        if (getImplicitRole(el) === role && getAccessibleName(el) === name
+            && (el as HTMLElement).checkVisibility?.() !== false)
+            matches.push(el);
+    }
+    return matches;
+}
+
+/** Like findByRoleAndName but includes hidden elements (for hover detection). */
+export function findAllByRoleAndName(role: string, name: string): Element[] {
+    const matches: Element[] = [];
+    for (const el of document.querySelectorAll('*')) {
         if (getImplicitRole(el) === role && getAccessibleName(el) === name)
             matches.push(el);
     }
     return matches;
+}
+
+/** Find the nearest :hover ancestor (for recording hover before click). */
+export function findHoverAncestor(el: Element): Element | null {
+    let ancestor = el.parentElement;
+    while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
+        if (ancestor.matches(':hover')) return ancestor;
+        ancestor = ancestor.parentElement;
+    }
+    return null;
+}
+
+/**
+ * Check if element is revealed by a :hover CSS rule.
+ * Scans stylesheets for rules like `.parent:hover .child { display: inline-block }`.
+ * At click time the ancestor IS hovered, so el.matches() works against :hover selectors.
+ */
+export function isHoverRevealed(el: Element): boolean {
+    for (const sheet of document.styleSheets) {
+        try {
+            for (const rule of sheet.cssRules) {
+                if (!(rule instanceof CSSStyleRule)) continue;
+                if (!rule.selectorText.includes(':hover')) continue;
+                const s = rule.style;
+                const reveals = (s.display && s.display !== 'none') ||
+                    s.visibility === 'visible' ||
+                    (s.opacity && s.opacity !== '0');
+                if (!reveals) continue;
+                try { if (el.matches(rule.selectorText)) return true; } catch {}
+            }
+        } catch {} // Cross-origin stylesheets
+    }
+    return false;
 }
 
 // ─── Locator string conversion ──────────────────────────────────────────
@@ -239,6 +283,12 @@ export function buildCommands(action: string, el: Element, opts?: {
     const q = (s: string) => `"${s}"`;
 
     switch (action) {
+        case 'hover':
+            return {
+                pw: `hover ${pwArgs}`,
+                js: `await ${jsLoc}.hover();`,
+            };
+
         case 'click':
             return {
                 pw: `click ${pwArgs}`,
