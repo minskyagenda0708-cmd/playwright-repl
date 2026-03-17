@@ -243,6 +243,14 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         return () => chrome.runtime.onMessage.removeListener(listener);
     }, [editorMode]);
 
+    // Auto-stop recording when run/debug starts
+    useEffect(() => {
+        if (isRunning && isRecording) {
+            setIsRecording(false);
+            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
+        }
+    }, [isRunning]);
+
     async function handleRecord() {
         if (!chrome.tabs?.query) return;
 
@@ -355,7 +363,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     data-testid="record-btn"
                     className={isRecording ? 'recording' : ''}
                     title={isRecording ? "Stop recording" : "Start Recording"}
-                    disabled={isPicking}
+                    disabled={isPicking || isRunning}
                     onClick={handleRecord}
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
