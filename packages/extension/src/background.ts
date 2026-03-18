@@ -116,8 +116,10 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       (globalThis as any).__consoleMessages.push('[' + msg.type() + '] ' + msg.text());
     });
     currentPage.on('response', (resp: any) => {
+      const url = resp.url();
+      if (url.startsWith('chrome-extension://')) return;
       const req = resp.request();
-      (globalThis as any).__networkRequests.push({ status: resp.status(), method: req.method(), url: resp.url(), type: req.resourceType() });
+      (globalThis as any).__networkRequests.push({ status: resp.status(), method: req.method(), url, type: req.resourceType() });
     });
     currentPage.on('dialog', async (dialog: any) => {
       const mode = (globalThis as any).__dialogMode;
