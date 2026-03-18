@@ -2,6 +2,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { BridgeServer } from '@playwright-repl/core';
 
 const argv = process.argv.slice(2);
@@ -110,6 +112,27 @@ server.registerTool(
     }
 );
 
+
+server.registerTool(
+    'write_file',
+    {
+        description: 'Write content to a file. Creates the file if it does not exist, overwrites if it does.',
+        inputSchema: {
+            path: z.string().describe('File path (relative to working directory or absolute)'),
+            content: z.string().describe('The content to write'),
+        },
+    },
+    async ({ path, content }) => {
+        try {
+            const resolved = resolve(path);
+            await mkdir(dirname(resolved), { recursive: true });
+            await writeFile(resolved, content, 'utf-8');
+            return { content: [{ type: 'text' as const, text: `Wrote ${resolved}` }] };
+        } catch (err: any) {
+            return { content: [{ type: 'text' as const, text: `Error: ${err.message}` }], isError: true };
+        }
+    }
+);
 
 const GENERATE_TEST_PROMPT = (steps: string, url?: string) => `\
 Generate a passing Playwright test for the following scenario:
