@@ -451,9 +451,96 @@ export async function cookieGet(page, name) {
   return c ? JSON.stringify(c, null, 2) : 'Cookie not found: ' + name;
 }
 
+export async function cookieSet(page, name, value) {
+  const url = page.url();
+  await page.context().addCookies([{ name, value, url }]);
+  return 'Cookie set: ' + name;
+}
+
+export async function cookieDelete(page, name) {
+  await page.context().clearCookies({ name });
+  return 'Cookie deleted: ' + name;
+}
+
 export async function cookieClear(page) {
   await page.context().clearCookies();
   return 'Cleared';
+}
+
+// ─── Drag ─────────────────────────────────────────────────────────────────────
+
+export async function dragDrop(page, source, target) {
+  const srcLoc = /^e\d+$/.test(source) ? page.locator('aria-ref=' + source) : page.getByText(source);
+  const tgtLoc = /^e\d+$/.test(target) ? page.locator('aria-ref=' + target) : page.getByText(target);
+  await srcLoc.dragTo(tgtLoc);
+  return 'Dragged';
+}
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+
+export async function resizeViewport(page, width, height) {
+  await page.setViewportSize({ width: parseInt(width), height: parseInt(height) });
+  return 'Resized to ' + width + 'x' + height;
+}
+
+// ─── PDF ─────────────────────────────────────────────────────────────────────
+
+export async function takePdf(page) {
+  const data = await page.pdf();
+  return { __image: data.toString('base64'), mimeType: 'application/pdf' };
+}
+
+// ─── Console / Network / Dialog / Route (globalThis state) ───────────────────
+
+export async function getConsoleMessages(_page, clear) {
+  if (clear) { globalThis.__consoleMessages = []; return 'Console cleared'; }
+  const msgs = globalThis.__consoleMessages || [];
+  return msgs.length === 0 ? 'No console messages (listening...)' : msgs.join('\n');
+}
+
+export async function getNetworkRequests(_page, clear, includeStatic) {
+  if (clear) { globalThis.__networkRequests = []; return 'Network log cleared'; }
+  let reqs = globalThis.__networkRequests || [];
+  if (!includeStatic) {
+    const skip = new Set(['stylesheet', 'image', 'font', 'media', 'other']);
+    reqs = reqs.filter(r => !skip.has(r.type));
+  }
+  return reqs.length === 0
+    ? 'No network requests (listening...)'
+    : reqs.map(r => r.status + ' ' + r.method + ' ' + r.url).join('\n');
+}
+
+export async function setDialogAccept(_page) {
+  globalThis.__dialogMode = 'accept';
+  return 'Dialogs will be auto-accepted';
+}
+
+export async function setDialogDismiss(_page) {
+  globalThis.__dialogMode = 'dismiss';
+  return 'Dialogs will be auto-dismissed';
+}
+
+export async function addRoute(page, pattern) {
+  if (!globalThis.__activeRoutes) globalThis.__activeRoutes = [];
+  const handler = route => route.abort();
+  await page.route(pattern, handler);
+  globalThis.__activeRoutes.push({ pattern, handler });
+  return 'Route added (blocked): ' + pattern;
+}
+
+export async function listRoutes(_page) {
+  const routes = globalThis.__activeRoutes || [];
+  return routes.length === 0 ? 'No active routes' : routes.map(r => r.pattern).join('\n');
+}
+
+export async function removeRoute(page, pattern) {
+  if (!globalThis.__activeRoutes || globalThis.__activeRoutes.length === 0)
+    return 'No routes to remove';
+  const idx = globalThis.__activeRoutes.findIndex(r => r.pattern === pattern);
+  if (idx === -1) return 'Route not found: ' + pattern;
+  await page.unroute(pattern, globalThis.__activeRoutes[idx].handler);
+  globalThis.__activeRoutes.splice(idx, 1);
+  return 'Route removed: ' + pattern;
 }
 
 // ─── Tab operations ───────────────────────────────────────────────────────────

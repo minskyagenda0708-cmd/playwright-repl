@@ -1,4 +1,4 @@
-import { saveImageToFile } from '@/lib/file-utils';
+import { saveToFile } from '@/lib/file-utils';
 
 interface LightboxProps {
     image: string
@@ -15,7 +15,7 @@ function Lightbox({image, onClose} :LightboxProps) {
             </button>
             <button
                 id="lightbox-save-btn"
-                onClick={() => saveImageToFile(image)}
+                onClick={() => saveToFile(image)}
                 className="absolute top-[10px] right-[50px] bg-white/15 text-white border border-solid border-white/30 rounded-[4px] py-1 px-[14px] font-[inherit] text-[12px] cursor-pointer hover:bg-white/30"
             >
                 Save

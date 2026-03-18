@@ -795,12 +795,15 @@ function isComplete(code: string): boolean {
 
 function displayBridgeResult(result: EngineResult, silent: boolean): void {
   if (result.image) {
-    const screenshotDir = path.join(os.homedir(), 'pw-screenshots');
-    fs.mkdirSync(screenshotDir, { recursive: true });
-    const imgPath = path.join(screenshotDir, `pw-screenshot-${Date.now()}.png`);
+    const isPdf = result.image.startsWith('data:application/pdf');
+    const outDir = path.join(os.homedir(), isPdf ? 'pw-pdfs' : 'pw-screenshots');
+    fs.mkdirSync(outDir, { recursive: true });
+    const ext = isPdf ? '.pdf' : '.png';
+    const prefix = isPdf ? 'pw-pdf' : 'pw-screenshot';
+    const outPath = path.join(outDir, `${prefix}-${Date.now()}${ext}`);
     const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
-    fs.writeFileSync(imgPath, Buffer.from(b64, 'base64'));
-    if (!silent) console.log(`Screenshot saved to ${imgPath}`);
+    fs.writeFileSync(outPath, Buffer.from(b64, 'base64'));
+    if (!silent) console.log(`${isPdf ? 'PDF' : 'Screenshot'} saved to ${outPath}`);
   } else if (result.text) {
     const t = result.text.trim();
     if (!result.isError && (t.startsWith('{') || t.startsWith('['))) {

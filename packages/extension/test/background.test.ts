@@ -12,7 +12,7 @@ vi.mock('@playwright-repl/playwright-crx/test', () => ({
 }));
 
 vi.mock('@playwright-repl/playwright-crx', () => {
-  mockPage = { url: vi.fn().mockReturnValue('https://example.com') };
+  mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
   const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
   mockCrxApp = {
     attach: vi.fn().mockResolvedValue(mockPage),
@@ -53,7 +53,7 @@ describe("background.ts message handlers", () => {
     mockDetectMode = vi.fn().mockReturnValue('js');
 
     // Reset playwright-crx mocks
-    mockPage = { url: vi.fn().mockReturnValue('https://example.com') };
+    mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
     const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
     mockCrxApp = {
       attach: vi.fn().mockResolvedValue(mockPage),
@@ -186,7 +186,7 @@ describe("background.ts message handlers", () => {
 
   it("attach switches to new tab without detaching previous tab", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    mockCrxApp.attach.mockResolvedValue({ url: vi.fn().mockReturnValue('https://new.com') });
+    mockCrxApp.attach.mockResolvedValue({ url: vi.fn().mockReturnValue('https://new.com'), on: vi.fn() });
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 99, url: 'https://new.com' });
     await sendMessage({ type: 'attach', tabId: 99 });
     // playwright-crx supports multiple attached pages, so we don't detach when switching tabs
@@ -247,7 +247,7 @@ describe("background.ts message handlers", () => {
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
   it("attach retries on 'Frame has been detached' error via detachAll", async () => {
-    const retryPage = { url: vi.fn().mockReturnValue('https://example.com') };
+    const retryPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
     let callCount = 0;
     mockCrxApp.attach.mockImplementation(() => {
       callCount++;

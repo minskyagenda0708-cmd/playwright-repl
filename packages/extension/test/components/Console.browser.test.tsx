@@ -33,11 +33,11 @@ vi.mock('@/lib/sw-debugger', () => ({
 }));
 
 vi.mock('@/lib/file-utils', () => ({
-    saveImageToFile: vi.fn(),
+    saveToFile: vi.fn(),
 }));
 
 import { executeCommandForConsole } from '@/lib/bridge';
-import { saveImageToFile } from '@/lib/file-utils';
+import { saveToFile } from '@/lib/file-utils';
 
 const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
@@ -246,7 +246,7 @@ describe('Console component tests', () => {
         (screen.container.querySelector('img') as HTMLElement).click();
         await screen.getByRole('button', { name: 'Save' }).click();
 
-        expect(saveImageToFile).toHaveBeenCalledWith(testImage);
+        expect(saveToFile).toHaveBeenCalledWith(testImage);
     });
 
     it('should render screenshot image when command returns image', async () => {

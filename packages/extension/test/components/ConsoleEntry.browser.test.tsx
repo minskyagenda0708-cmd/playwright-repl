@@ -4,9 +4,9 @@ import { ConsoleEntry } from '@/components/Console/ConsoleEntry';
 import type { ConsoleEntry as Entry } from '@/components/Console/types';
 
 vi.mock('@/lib/file-utils', () => ({
-    saveImageToFile: vi.fn(),
+    saveToFile: vi.fn(),
 }));
-import { saveImageToFile } from '@/lib/file-utils';
+import { saveToFile } from '@/lib/file-utils';
 
 const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
@@ -80,11 +80,11 @@ describe('ConsoleEntry component tests', () => {
         await expect.element(screen.getByRole('button', { name: '×' })).not.toBeInTheDocument();
     });
 
-    it('should call saveImageToFile when clicking Save in lightbox', async () => {
+    it('should call saveToFile when clicking Save in lightbox', async () => {
         const screen = await render(<ConsoleEntry entry={makeEntry({ image: testImage })} />);
         (screen.container.querySelector('img') as HTMLElement).click();
         await screen.getByRole('button', { name: 'Save' }).click();
-        expect(saveImageToFile).toHaveBeenCalledWith(testImage);
+        expect(saveToFile).toHaveBeenCalledWith(testImage);
     });
 
     // ─── ObjectTree rendering ─────────────────────────────────────────────────

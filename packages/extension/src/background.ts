@@ -107,6 +107,24 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
 
     activeTabId = tabId;
     Object.assign(globalThis, { page: currentPage, context: app.context(), crxApp: app, activeTabId, expect });
+
+    // Set up event listeners on globalThis so page-scripts can read them
+    (globalThis as any).__consoleMessages = [];
+    (globalThis as any).__networkRequests = [];
+    (globalThis as any).__activeRoutes = [];
+    currentPage.on('console', (msg: any) => {
+      (globalThis as any).__consoleMessages.push('[' + msg.type() + '] ' + msg.text());
+    });
+    currentPage.on('response', (resp: any) => {
+      const req = resp.request();
+      (globalThis as any).__networkRequests.push({ status: resp.status(), method: req.method(), url: resp.url(), type: req.resourceType() });
+    });
+    currentPage.on('dialog', async (dialog: any) => {
+      const mode = (globalThis as any).__dialogMode;
+      if (mode === 'accept') await dialog.accept();
+      else if (mode === 'dismiss') await dialog.dismiss();
+    });
+
     return { ok: true, url: currentPage.url() };
   } catch (e) {
     // Don't reset crxApp — the browser connection is likely still valid.

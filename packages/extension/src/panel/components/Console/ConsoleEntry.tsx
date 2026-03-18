@@ -4,6 +4,7 @@ import { SnapshotTree } from './SnapshotTree';
 import { PickResult } from './PickResult';
 import { parseSnapshot } from '@/lib/snapshot-parser';
 import Lightbox from '../Lightbox';
+import { saveToFile } from '@/lib/file-utils';
 import type { ConsoleEntry as Entry } from './types';
 
 export function ConsoleEntry({ entry }: { entry: Entry }) {
@@ -28,14 +29,24 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                         ) : entry.codeBlock !== undefined ? (
                             <SnapshotCodeBlock codeBlock={entry.codeBlock} />
                         ) : entry.image !== undefined ? (
-                            <div data-type="screenshot">
-                                <img
-                                    src={entry.image}
-                                    className="max-w-100 cursor-zoom-in rounded"
-                                    onClick={() => setLightbox(true)}
-                                />
-                                {lightbox && <Lightbox image={entry.image} onClose={() => setLightbox(false)} />}
-                            </div>
+                            entry.image.startsWith('data:application/pdf') ? (
+                                <div data-type="pdf" className="flex items-center gap-2 py-1">
+                                    <span className="text-(--color-success)">PDF generated</span>
+                                    <button
+                                        className="bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[11px] cursor-pointer hover:bg-(--bg-button-hover)"
+                                        onClick={() => saveToFile(entry.image!)}
+                                    >Save PDF</button>
+                                </div>
+                            ) : (
+                                <div data-type="screenshot">
+                                    <img
+                                        src={entry.image}
+                                        className="max-w-100 cursor-zoom-in rounded"
+                                        onClick={() => setLightbox(true)}
+                                    />
+                                    {lightbox && <Lightbox image={entry.image} onClose={() => setLightbox(false)} />}
+                                </div>
+                            )
                         ) : (
                             <div data-type="success" className="whitespace-pre-wrap text-(--color-success)">{entry.text}</div>
                         )}

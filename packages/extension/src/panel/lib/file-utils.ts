@@ -1,9 +1,13 @@
-export async function saveImageToFile(dataUrl: string | undefined) {
+export async function saveToFile(dataUrl: string | undefined) {
     if (!dataUrl) return;
+    const isPdf = dataUrl.startsWith('data:application/pdf');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
     try {
         const handle = await window.showSaveFilePicker({
-            suggestedName: "screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png",
-            types: [{ description: "PNG images", accept: { "image/png": [".png"] } }],
+            suggestedName: isPdf ? `page-${timestamp}.pdf` : `screenshot-${timestamp}.png`,
+            types: isPdf
+                ? [{ description: "PDF documents", accept: { "application/pdf": [".pdf"] } }]
+                : [{ description: "PNG images", accept: { "image/png": [".png"] } }],
         });
         const res = await fetch(dataUrl);
         const blob = await res.blob();

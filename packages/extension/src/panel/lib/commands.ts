@@ -11,16 +11,15 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'clear':                { desc: 'Clear the console' },
     'click':                { desc: 'Click an element', usage: 'click <text> | click <ref>',
                               examples: ['click "Submit"', 'click e5', 'click "Submit" --button right'] },
-    'config-print':         { desc: 'Print config' },
-    'console':              { desc: 'Console messages', usage: 'console [--clear]' },
     'cookie-clear':         { desc: 'Clear cookies' },
     'cookie-delete':        { desc: 'Delete cookie', usage: 'cookie-delete <name>' },
     'cookie-get':           { desc: 'Get cookie', usage: 'cookie-get <name>' },
     'cookie-list':          { desc: 'List cookies' },
+    'console':              { desc: 'Show console messages', usage: 'console [--clear]' },
     'cookie-set':           { desc: 'Set cookie', usage: 'cookie-set <name> <value>' },
     'dblclick':             { desc: 'Double-click', usage: 'dblclick <text> | dblclick <ref>' },
-    'dialog-accept':        { desc: 'Accept dialog' },
-    'dialog-dismiss':       { desc: 'Dismiss dialog' },
+    'dialog-accept':        { desc: 'Auto-accept dialogs' },
+    'dialog-dismiss':       { desc: 'Auto-dismiss dialogs' },
     'drag':                 { desc: 'Drag and drop', usage: 'drag <source> <target>' },
     'eval':                 { desc: 'Evaluate JavaScript', usage: 'eval <expression>',
                               examples: ['eval document.title'] },
@@ -43,15 +42,15 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'localstorage-get':     { desc: 'Get localStorage', usage: 'localstorage-get <key>' },
     'localstorage-list':    { desc: 'List localStorage' },
     'localstorage-set':     { desc: 'Set localStorage', usage: 'localstorage-set <key> <value>' },
-    'network':              { desc: 'Network requests', usage: 'network [--clear] [--includeStatic]' },
+    'network':              { desc: 'Show network requests', usage: 'network [--clear] [--includeStatic]' },
     'open':                 { desc: 'Open the browser' },
-    'pdf':                  { desc: 'Save as PDF', usage: 'pdf [--filename <file>]' },
+    'pdf':                  { desc: 'Save page as PDF', usage: 'pdf' },
     'press':                { desc: 'Press a keyboard key', usage: 'press <key> | press <ref> <key>',
                               examples: ['press Enter', 'press e5 Tab'] },
     'reload':               { desc: 'Reload page' },
-    'resize':               { desc: 'Resize window', usage: 'resize <width> <height>' },
-    'route':                { desc: 'Add network route' },
-    'route-list':           { desc: 'List routes' },
+    'resize':               { desc: 'Resize viewport', usage: 'resize <width> <height>' },
+    'route':                { desc: 'Block requests by pattern', usage: 'route <pattern>' },
+    'route-list':           { desc: 'List active routes' },
     'run-code':             { desc: 'Run Playwright code', usage: 'run-code <code>' },
     'screenshot':           { desc: 'Take a screenshot', usage: 'screenshot [--filename <file>] [--fullPage]' },
     'select':               { desc: 'Select dropdown option', usage: 'select <text|ref> <value>',
@@ -62,8 +61,6 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'sessionstorage-list':  { desc: 'List sessionStorage' },
     'sessionstorage-set':   { desc: 'Set sessionStorage', usage: 'sessionstorage-set <key> <value>' },
     'snapshot':             { desc: 'Accessibility snapshot', usage: 'snapshot [--filename <file>]' },
-    'state-load':           { desc: 'Load storage state' },
-    'state-save':           { desc: 'Save storage state', usage: 'state-save [--filename <file>]' },
     'tab-close':            { desc: 'Close tab', usage: 'tab-close [index]' },
     'tab-list':             { desc: 'List tabs' },
     'tab-new':              { desc: 'New tab', usage: 'tab-new [url]' },
@@ -71,8 +68,7 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'type':                 { desc: 'Type text key by key', usage: 'type <text>',
                               examples: ['type "hello world"'] },
     'uncheck':              { desc: 'Uncheck a checkbox', usage: 'uncheck <text> | uncheck <ref>' },
-    'unroute':              { desc: 'Remove route' },
-    'upload':               { desc: 'Upload a file', usage: 'upload <ref> <filepath>' },
+    'unroute':              { desc: 'Remove a route', usage: 'unroute <pattern>' },
     'verify':               { desc: 'Assert page state', usage: 'verify <type> <args>',
                               examples: ['verify title "My Page"', 'verify text "Hello"', 'verify element button "Submit"'] },
     'verify-element':       { desc: 'Verify element exists by role', usage: 'verify-element <role> <name>' },
@@ -91,13 +87,12 @@ export const CATEGORIES: Record<string, string[]> = {
     'Navigation':     ['goto', 'open', 'go-back', 'go-forward', 'reload'],
     'Interaction':    ['click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag'],
     'Verification':   ['verify', 'verify-text', 'verify-no-text', 'verify-title', 'verify-url', 'verify-element', 'verify-no-element', 'verify-value', 'verify-visible'],
-    'Inspection':     ['snapshot', 'screenshot', 'eval', 'console', 'network', 'run-code'],
+    'Inspection':     ['snapshot', 'screenshot', 'pdf', 'eval', 'run-code', 'console', 'network'],
     'Tabs':           ['tab-list', 'tab-new', 'tab-close', 'tab-select'],
     'Cookies':        ['cookie-list', 'cookie-get', 'cookie-set', 'cookie-delete', 'cookie-clear'],
     'LocalStorage':   ['localstorage-list', 'localstorage-get', 'localstorage-set', 'localstorage-delete', 'localstorage-clear'],
     'SessionStorage': ['sessionstorage-list', 'sessionstorage-get', 'sessionstorage-set', 'sessionstorage-delete', 'sessionstorage-clear'],
-    'State':          ['state-save', 'state-load'],
-    'Other':          ['highlight', 'dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'export', 'config-print'],
+    'Other':          ['highlight', 'export', 'resize', 'dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute'],
 };
 
 // ─── JavaScript mode help ────────────────────────────────────────────────────
@@ -136,7 +131,10 @@ import {
   refAction, pressKey, typeText,
   localStorageGet, localStorageSet, localStorageDelete, localStorageClear, localStorageList,
   sessionStorageGet, sessionStorageSet, sessionStorageDelete, sessionStorageClear, sessionStorageList,
-  cookieList, cookieGet, cookieClear,
+  cookieList, cookieGet, cookieSet, cookieDelete, cookieClear,
+  dragDrop, resizeViewport, takePdf,
+  getConsoleMessages, getNetworkRequests, setDialogAccept, setDialogDismiss,
+  addRoute, listRoutes, removeRoute,
   tabList, tabNew, tabClose, tabSelect,
 } from './page-scripts';
 
@@ -373,6 +371,10 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   if (cmdName === 'screenshot')
     return { jsExpr: `JSON.stringify(await (${takeScreenshot.toString()})(page, ${!!(args.fullPage)}))` };
 
+  // ── PDF ─────────────────────────────────────────────────────
+  if (cmdName === 'pdf')
+    return { jsExpr: `JSON.stringify(await (${takePdf.toString()})(page))` };
+
   // ── Snapshot ────────────────────────────────────────────────
   if (cmdName === 'snapshot')
     return { jsExpr: call(takeSnapshot) };
@@ -519,6 +521,10 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     return { jsExpr: call(cookieList) };
   if (cmdName === 'cookie-get')
     return { jsExpr: call(cookieGet, args._[1]) };
+  if (cmdName === 'cookie-set')
+    return { jsExpr: call(cookieSet, args._[1], args._.slice(2).join(' ')) };
+  if (cmdName === 'cookie-delete')
+    return { jsExpr: call(cookieDelete, args._[1]) };
   if (cmdName === 'cookie-clear')
     return { jsExpr: call(cookieClear) };
 
@@ -536,6 +542,34 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     if (isNaN(idx)) return args; // let error bubble
     return { jsExpr: call(tabSelect, idx) };
   }
+
+  // ── Drag ────────────────────────────────────────────────────
+  if (cmdName === 'drag' && args._[1] && args._[2])
+    return { jsExpr: call(dragDrop, args._[1], args._[2]) };
+
+  // ── Resize ─────────────────────────────────────────────────
+  if (cmdName === 'resize' && args._[1] && args._[2])
+    return { jsExpr: call(resizeViewport, args._[1], args._[2]) };
+
+  // ── Console / Network ─────────────────────────────────────
+  if (cmdName === 'console')
+    return { jsExpr: call(getConsoleMessages, args.clear) };
+  if (cmdName === 'network')
+    return { jsExpr: call(getNetworkRequests, args.clear, args.includeStatic) };
+
+  // ── Dialog ────────────────────────────────────────────────
+  if (cmdName === 'dialog-accept')
+    return { jsExpr: call(setDialogAccept) };
+  if (cmdName === 'dialog-dismiss')
+    return { jsExpr: call(setDialogDismiss) };
+
+  // ── Routes ────────────────────────────────────────────────
+  if (cmdName === 'route' && args._[1])
+    return { jsExpr: call(addRoute, args._[1]) };
+  if (cmdName === 'route-list')
+    return { jsExpr: call(listRoutes) };
+  if (cmdName === 'unroute' && args._[1])
+    return { jsExpr: call(removeRoute, args._[1]) };
 
   return args;
 }
