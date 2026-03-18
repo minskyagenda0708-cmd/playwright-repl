@@ -79,6 +79,8 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'verify-url':           { desc: 'Verify page URL', usage: 'verify-url <text>' },
     'verify-value':         { desc: 'Verify input / checkbox / radio value', usage: 'verify-value <ref|text> <value>' },
     'verify-visible':       { desc: 'Verify element is visible by role', usage: 'verify-visible <role> <name>' },
+    'wait-for-text':        { desc: 'Wait until text appears', usage: 'wait-for-text <text>',
+                              examples: ['wait-for-text "Loading complete"'] },
 };
 
 export const COMMAND_NAMES = Object.keys(COMMANDS);
@@ -86,7 +88,7 @@ export const COMMAND_NAMES = Object.keys(COMMANDS);
 export const CATEGORIES: Record<string, string[]> = {
     'Navigation':     ['goto', 'open', 'go-back', 'go-forward', 'reload'],
     'Interaction':    ['click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag'],
-    'Verification':   ['verify', 'verify-text', 'verify-no-text', 'verify-title', 'verify-url', 'verify-element', 'verify-no-element', 'verify-value', 'verify-visible'],
+    'Verification':   ['verify', 'verify-text', 'verify-no-text', 'verify-title', 'verify-url', 'verify-element', 'verify-no-element', 'verify-value', 'verify-visible', 'wait-for-text'],
     'Inspection':     ['snapshot', 'screenshot', 'pdf', 'eval', 'run-code', 'console', 'network'],
     'Tabs':           ['tab-list', 'tab-new', 'tab-close', 'tab-select'],
     'Cookies':        ['cookie-list', 'cookie-get', 'cookie-set', 'cookie-delete', 'cookie-clear'],
@@ -122,7 +124,7 @@ export const JS_CATEGORIES: Record<string, string[]> = {
 import {
   verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue,
+  verifyVisible, verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole,
   highlightByText, highlightByRole, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
@@ -327,6 +329,12 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
       return { jsExpr: call(fn, pos[0], rest) };
     }
+  }
+
+  // ── Wait-for-text ──────────────────────────────────────────
+  if (cmdName === 'wait-for-text') {
+    const text = args._.slice(1).join(' ');
+    if (text) return { jsExpr: call(waitForText, text) };
   }
 
   // ── Navigation ──────────────────────────────────────────────
@@ -579,6 +587,33 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
 export function parseReplCommand(input: string): ParseResult {
   const tokens = tokenize(input.trim());
   if (tokens.length === 0) return { error: 'Empty command' };
+
+  // ── Help (local command, never sent to the bridge) ──
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed === 'help') {
+    const lines = Object.entries(CATEGORIES)
+      .map(([cat, cmds]) => `  ${cat}: ${cmds.join(', ')}`)
+      .join('\n');
+    return { help: `Available commands:\n${lines}\n\nType "help <command>" for details.` };
+  }
+  if (trimmed.startsWith('help ')) {
+    const cmd = trimmed.slice(5).trim();
+    if (cmd === 'js' || cmd === 'javascript') {
+      const jsLines = Object.entries(JS_CATEGORIES)
+        .map(([cat, methods]) => `  ${cat}: ${methods.join(', ')}`)
+        .join('\n');
+      return { help: `JavaScript mode — Playwright API:\n  Prefix with await for async methods\n\n${jsLines}` };
+    }
+    const info = COMMANDS[cmd];
+    if (!info) return { error: `Unknown command: "${cmd}". Type "help" for available commands.` };
+    const parts = [`${cmd} — ${info.desc}`];
+    if (info.usage) parts.push(`Usage: ${info.usage}`);
+    if (info.examples?.length) {
+      parts.push('Examples:');
+      for (const ex of info.examples) parts.push(`  ${ex}`);
+    }
+    return { help: parts.join('\n') };
+  }
 
   // Parse input (tokenize + alias + options)
   const args = parseInput(input);

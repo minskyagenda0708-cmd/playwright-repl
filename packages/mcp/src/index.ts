@@ -2,9 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { BridgeServer } from '@playwright-repl/core';
+import { BridgeServer, COMMANDS, CATEGORIES } from '@playwright-repl/core';
 
 const argv = process.argv.slice(2);
 const portIdx = argv.indexOf('--port');
@@ -48,7 +46,9 @@ Run a command in the connected Chrome browser. Supports three input modes:
    document.title, window.location.href,
    document.querySelectorAll('a').length
 
-Use snapshot to understand the page structure before interacting. Use screenshot to visually verify the current state.`;
+Use snapshot to understand the page structure before interacting. Use screenshot to visually verify the current state.
+
+IMPORTANT: Before writing .pw commands, run 'help' to get the full list of available commands. Only use commands that appear in the help output. Do not invent commands.`;
 
 const server = new McpServer({ name: 'playwright-repl', version: '0.12.0' });
 
@@ -61,6 +61,27 @@ server.registerTool(
         },
     },
     async ({ command }) => {
+        const trimmed = command.trim().toLowerCase();
+        if (trimmed === 'help') {
+            const lines = Object.entries(CATEGORIES)
+                .map(([cat, cmds]) => `  ${cat}: ${cmds.join(', ')}`)
+                .join('\n');
+            return { content: [{ type: 'text' as const, text: `Available commands:\n${lines}\n\nType "help <command>" for details.` }] };
+        }
+        if (trimmed.startsWith('help ')) {
+            const cmd = trimmed.slice(5).trim();
+            const info = COMMANDS[cmd];
+            if (!info) {
+                return { content: [{ type: 'text' as const, text: `Unknown command: "${cmd}". Type "help" for available commands.` }], isError: true };
+            }
+            const parts = [`${cmd} — ${info.desc}`];
+            if (info.usage) parts.push(`Usage: ${info.usage}`);
+            if (info.examples?.length) {
+                parts.push('Examples:');
+                for (const ex of info.examples) parts.push(`  ${ex}`);
+            }
+            return { content: [{ type: 'text' as const, text: parts.join('\n') }] };
+        }
         if (!srv.connected) {
             return {
                 content: [{ type: 'text' as const, text: 'Browser not connected. Open Chrome with the playwright-repl extension — it connects automatically.' }],
@@ -86,7 +107,9 @@ Useful for replaying a known script without per-step round trips.
 Prefer run_command for AI-driven exploration where you need to observe and adapt after each step.
 
 language='pw': each line is a .pw keyword command, run sequentially. Lines starting with # are skipped. Stops on first error.
-language='javascript': the entire script is run as a single JavaScript/Playwright block.`;
+language='javascript': the entire script is run as a single JavaScript/Playwright block.
+
+IMPORTANT: Only use commands listed by 'help'. Run run_command('help') first if unsure which commands are available.`;
 
 server.registerTool(
     'run_script',
@@ -112,33 +135,12 @@ server.registerTool(
     }
 );
 
-
-server.registerTool(
-    'write_file',
-    {
-        description: 'Write content to a file. Creates the file if it does not exist, overwrites if it does.',
-        inputSchema: {
-            path: z.string().describe('File path (relative to working directory or absolute)'),
-            content: z.string().describe('The content to write'),
-        },
-    },
-    async ({ path, content }) => {
-        try {
-            const resolved = resolve(path);
-            await mkdir(dirname(resolved), { recursive: true });
-            await writeFile(resolved, content, 'utf-8');
-            return { content: [{ type: 'text' as const, text: `Wrote ${resolved}` }] };
-        } catch (err: any) {
-            return { content: [{ type: 'text' as const, text: `Error: ${err.message}` }], isError: true };
-        }
-    }
-);
-
 const GENERATE_TEST_PROMPT = (steps: string, url?: string) => `\
 Generate a passing Playwright test for the following scenario:
 ${steps}
 
 Workflow:
+0. Run run_command('help') to see all available keyword commands. Only use commands from this list — do not invent commands.
 1. ${url ? `Navigate to ${url} using run_command('goto ${url}').` : 'Navigate to the target URL using run_command.'}
 2. Take a snapshot using run_command('snapshot') to understand the page structure.
 3. Interact with the page as needed (click, fill, press) using run_command.

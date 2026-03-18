@@ -73,6 +73,31 @@ test.describe("Bridge command tests", () => {
     });
   });
 
+  // ─── Help ───────────────────────────────────────────────────────────────────
+
+  test.describe('Help', () => {
+    test('help returns command categories', async ({ bridgeContext }) => {
+      const r = await bridgeContext.bridge.run('help');
+      expectOk(r);
+      expect(r.text).toContain('Navigation');
+      expect(r.text).toContain('Interaction');
+      expect(r.text).toContain('Verification');
+    });
+
+    test('help <command> returns command details', async ({ bridgeContext }) => {
+      const r = await bridgeContext.bridge.run('help click');
+      expectOk(r);
+      expect(r.text).toContain('click');
+      expect(r.text).toContain('Click');
+    });
+
+    test('help <unknown> returns error', async ({ bridgeContext }) => {
+      const r = await bridgeContext.bridge.run('help nonexistent_cmd');
+      expect(r.isError).toBe(true);
+      expect(r.text).toContain('Unknown command');
+    });
+  });
+
   // ─── Interaction ─────────────────────────────────────────────────────────────
 
   test.describe('Interaction', () => {
