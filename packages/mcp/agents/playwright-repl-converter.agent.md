@@ -108,6 +108,37 @@ When converting `.pw` → JS, use `snapshot` to determine the correct locator st
 
 When converting JS → `.pw`, map locators back to the simplest keyword form using visible text.
 
+## Idiomatic patterns
+
+When converting `.pw` → JS, apply these patterns to produce clean, idiomatic Playwright code:
+
+**Chain `press` to the preceding locator** — don't use low-level `page.keyboard`:
+```javascript
+// Bad — low-level keyboard event
+await page.getByPlaceholder('What needs to be done?').fill('Buy groceries');
+await page.keyboard.press('Enter');
+
+// Good — chained to the same locator
+await page.getByPlaceholder('What needs to be done?').fill('Buy groceries');
+await page.getByPlaceholder('What needs to be done?').press('Enter');
+```
+
+**Extract repeated locators into variables** — when the same locator is used multiple times:
+```javascript
+// Bad — repeated locator
+await page.getByPlaceholder('What needs to be done?').fill('Buy groceries');
+await page.getByPlaceholder('What needs to be done?').press('Enter');
+await page.getByPlaceholder('What needs to be done?').fill('Walk the dog');
+await page.getByPlaceholder('What needs to be done?').press('Enter');
+
+// Good — extracted to variable
+const todoInput = page.getByPlaceholder('What needs to be done?');
+await todoInput.fill('Buy groceries');
+await todoInput.press('Enter');
+await todoInput.fill('Walk the dog');
+await todoInput.press('Enter');
+```
+
 ## JavaScript globals
 
 When using `run_script(code, "javascript")`:
