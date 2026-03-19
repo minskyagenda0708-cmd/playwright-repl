@@ -53,7 +53,7 @@ npm install -g @playwright-repl/mcp
 
 Load `packages/extension/dist/` as an unpacked extension in Chrome (`chrome://extensions` → Enable Developer mode → Load unpacked).
 
-Or install from the Chrome Web Store (coming soon).
+Or install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa).
 
 ### 3. Configure your MCP client
 
@@ -181,6 +181,53 @@ A prompt template that guides the AI to generate a passing Playwright test from 
 **In Claude Code:** `/mcp__playwright-repl__generate-test`
 
 The AI navigates the page, takes snapshots, writes Playwright assertions, runs them via `run_script(language="javascript")`, and iterates until all pass.
+
+## AI Agents
+
+The MCP package includes four ready-to-use AI agents in `packages/mcp/agents/`:
+
+| Agent | Purpose |
+|-------|---------|
+| **playwright-repl-planner** | Explore a web page and create a comprehensive workflow plan |
+| **playwright-repl-generator** | Turn a plan or description into a working `.pw` or JS script |
+| **playwright-repl-healer** | Debug and fix a failing script |
+| **playwright-repl-converter** | Convert scripts between `.pw` keyword syntax and JavaScript |
+
+### playwright-repl-planner
+
+Systematically explores a web page — takes snapshots, screenshots, maps out navigation, forms, and interactive elements — and produces a structured workflow plan. Use it as the first step before generating a script: give it a URL and a goal, and it returns a step-by-step plan with the exact text/labels discovered on the page.
+
+### playwright-repl-generator
+
+Takes a workflow plan (from the planner or your own description) and turns it into a working `.pw` keyword script or JavaScript Playwright script. It executes each step in the real browser, assembles the commands, runs the full script via `run_script`, and iterates until it passes. Output is a tested, ready-to-use script.
+
+### playwright-repl-healer
+
+Debugs and fixes a failing `.pw` or JS script. Give it a script that's broken — wrong selectors, timing issues, changed page structure — and it will run it, diagnose failures using snapshots and screenshots, fix the commands, and re-run until all lines pass.
+
+### playwright-repl-converter
+
+Converts scripts between `.pw` keyword syntax and JavaScript Playwright API. Includes a comprehensive conversion reference table and produces idiomatic output — chaining `.press()` to locators instead of `page.keyboard`, extracting repeated locators into variables, and choosing the right locator strategy (`getByRole`, `getByLabel`, `getByText`, etc.) based on the actual page structure.
+
+### Setup
+
+Copy the agent files into your project's `.claude/agents/` folder:
+
+```bash
+mkdir -p .claude/agents
+cp node_modules/@playwright-repl/mcp/agents/*.agent.md .claude/agents/
+```
+
+Then invoke them with `@agent-name`:
+
+```
+@playwright-repl-planner explore https://demo.playwright.dev/todomvc and plan a test for adding/completing todos
+@playwright-repl-generator create a .pw script from this plan: [paste plan]
+@playwright-repl-healer fix this script: [paste failing script]
+@playwright-repl-converter convert this .pw script to JavaScript: [paste script]
+```
+
+Each agent has access to `run_command` and `run_script` via the MCP server and runs autonomously — exploring the page, executing commands, and iterating until the output is verified.
 
 ## Tips for AI agents
 

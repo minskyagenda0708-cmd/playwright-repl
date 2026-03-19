@@ -23,11 +23,11 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 
 ## Setup
 
-1. Build the extension (or download a release):
+1. Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa), or build from source:
    ```bash
    npm run build   # from packages/extension/
    ```
-2. Open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `packages/extension/dist/`
+   Then open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `packages/extension/dist/`
 3. Click the **Dramaturg** icon to open the side panel (or popup — configure in Options)
 
 ## Features

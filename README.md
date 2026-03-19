@@ -45,6 +45,8 @@ Two modes:
 
 Chrome side panel extension that runs the full Playwright API directly inside your browser — no Node.js backend required.
 
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa), or build from source:
+
 ```bash
 cd packages/extension && npm run build
 # Load in Chrome: chrome://extensions → Developer mode → Load unpacked → dist/
