@@ -1,0 +1,16 @@
+# TodoMVC demo workflow
+goto https://demo.playwright.dev/todomvc
+localstorage-clear
+goto https://demo.playwright.dev/todomvc
+fill "What needs to be done?" "Buy groceries"
+press Enter
+fill "What needs to be done?" "Walk the dog"
+press Enter
+fill "What needs to be done?" "Read a book"
+press Enter
+check checkbox "Toggle Todo" --nth 1
+click "Active"
+verify-text "Buy groceries"
+verify-text "Read a book"
+verify-no-text "Walk the dog"
+ 

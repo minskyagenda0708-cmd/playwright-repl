@@ -1,0 +1,21 @@
+# TodoMVC — add items, complete one, verify filter
+goto https://demo.playwright.dev/todomvc
+localstorage-clear
+goto https://demo.playwright.dev/todomvc
+
+# Add three todos
+fill "What needs to be done?" "Buy groceries"
+press Enter
+fill "What needs to be done?" "Walk the dog"
+press Enter
+fill "What needs to be done?" "Read a book"
+press Enter
+
+# Complete "Walk the dog"
+check checkbox "Toggle Todo" --nth 1
+
+# Filter to Active — completed item should disappear
+click "Active"
+verify-text "Buy groceries"
+verify-text "Read a book"
+verify-no-text "Walk the dog"
