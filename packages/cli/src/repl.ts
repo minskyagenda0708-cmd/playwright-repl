@@ -13,7 +13,7 @@ import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  Engine, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
+  Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -27,6 +27,7 @@ export interface ReplOpts extends EngineOpts {
   record?: string;
   step?: boolean;
   silent?: boolean;
+  server?: boolean;
   bridge?: boolean;
   bridgePort?: number;
 }
@@ -1070,6 +1071,12 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
 
+  // ─── Deprecation warning ─────────────────────────────────────────
+
+  if (opts.extension) {
+    console.log(`${c.yellow}Warning: --extension is deprecated. Use --server for HTTP API or --bridge for extension.${c.reset}`);
+  }
+
   // ─── Bridge mode ─────────────────────────────────────────────────
 
   if (opts.bridge) {
@@ -1091,7 +1098,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   if (opts.extension) {
     log(`${c.dim}Extension mode: starting CDP relay server...${c.reset}`);
     log('');
-  } else {
+  } else if (!opts.server) {
     log(`${c.dim}Type .help for commands${c.reset}\n`);
   }
 
@@ -1105,6 +1112,29 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   } catch (err: unknown) {
     console.error(`${c.red}✗${c.reset} Failed to start: ${(err as Error).message}`);
     process.exit(1);
+  }
+
+  // ─── Server mode (HTTP-only, no REPL) ─────────────────────────────
+
+  if (opts.server) {
+    const serverPort = opts.port || 6781;
+    const cmdServer = new CommandServer(conn);
+    await cmdServer.start(serverPort);
+    log(`${c.green}✓${c.reset} HTTP server listening on http://localhost:${serverPort}`);
+    log(`${c.dim}  POST /run     — execute a command${c.reset}`);
+    log(`${c.dim}  GET  /health  — server status${c.reset}`);
+    log(`${c.dim}  Ctrl+C to stop${c.reset}\n`);
+
+    // Keep process alive — clean shutdown on SIGINT
+    process.on('SIGINT', async () => {
+      log(`\n${c.dim}Shutting down...${c.reset}`);
+      await cmdServer.close();
+      await conn.close();
+      process.exit(0);
+    });
+    // Block forever (SIGINT handler will exit)
+    await new Promise(() => {});
+    return;
   }
 
   // ─── Session + readline ──────────────────────────────────────────

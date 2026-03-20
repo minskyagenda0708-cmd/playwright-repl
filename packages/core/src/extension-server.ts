@@ -1,9 +1,11 @@
 /**
- * CommandServer — HTTP server for the side panel extension.
+ * CommandServer — HTTP server for external command execution.
+ *
+ * Used by --server mode (AI agents) and --extension mode (side panel).
  *
  * Endpoints:
- *   POST /run     Panel commands → engine.run()
- *   GET  /health  Panel checks if server is running
+ *   POST /run     Execute a command → engine.run()
+ *   GET  /health  Server status check
  */
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';

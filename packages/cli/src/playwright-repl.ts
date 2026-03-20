@@ -16,7 +16,7 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge'],
+  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge', 'server'],
   string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
@@ -40,12 +40,12 @@ Options:
   --persistent           Use persistent browser profile
   --profile <dir>        Persistent profile directory
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
-  --extension            Connect to Chrome with side panel extension
-  --spawn                Spawn Chrome automatically (default: connect to existing)
+  --server               Start HTTP server mode (no interactive REPL)
   --bridge               Connect to extension via WebSocket bridge (no CDP required)
   --bridge-port <port>   WebSocket bridge port (default: 9876)
-  --port <number>        Extension server port (default: 6781)
+  --port <number>        HTTP server port (default: 6781)
   --cdp-port <number>    Chrome CDP port (default: 9222)
+  --extension            (deprecated) Use --server or --bridge instead
   --config <file>        Path to config file
   --replay <files...>   Replay .pw file(s) or folder(s)
   --record <file>        Start REPL with recording to file
@@ -70,10 +70,9 @@ Examples:
   playwright-repl --headed               # start with visible browser
   playwright-repl --connect              # connect to Chrome on port 9222
   playwright-repl --connect 9333         # connect to Chrome on custom port
-  playwright-repl --extension            # connect to existing Chrome + side panel
-  playwright-repl --extension --spawn    # spawn Chrome automatically
-  playwright-repl --extension --port 7000  # custom server port
-  playwright-repl --extension --cdp-port 9333  # custom CDP port
+  playwright-repl --server               # HTTP server mode (for AI agents)
+  playwright-repl --server --headed      # HTTP server + visible browser
+  playwright-repl --server --port 8080   # custom server port
   playwright-repl --bridge               # connect to extension via WebSocket bridge
   playwright-repl --bridge --bridge-port 9877  # custom bridge port
   playwright-repl --replay login.pw      # replay a session
@@ -108,6 +107,7 @@ startRepl({
   record: args.record as string,
   step: args.step as boolean,
   silent: args.silent as boolean,
+  server: args.server as boolean,
   bridge: args.bridge as boolean,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
 }).catch((err: Error) => {
