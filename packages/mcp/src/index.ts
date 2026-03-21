@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { BridgeServer, COMMANDS, CATEGORIES, refToLocator } from '@playwright-repl/core';
+import pkg from '../package.json' with { type: 'json' };
 
 const argv = process.argv.slice(2);
 const portIdx = argv.indexOf('--port');
@@ -51,7 +52,7 @@ Use snapshot to understand the page structure before interacting. Use screenshot
 
 IMPORTANT: Before writing .pw commands, run 'help' to get the full list of available commands. Only use commands that appear in the help output. Do not invent commands.`;
 
-const server = new McpServer({ name: 'playwright-repl', version: '0.12.0' });
+const server = new McpServer({ name: 'playwright-repl', version: pkg.version });
 
 server.registerTool(
     'run_command',
