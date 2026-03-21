@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.19.0 — Playwright Selector Integration
+
+**2026-03-21**
+
+### Features
+
+- **Playwright-quality locators for recording**: Recorder now uses Playwright's `InjectedScript` for locator generation via `extendInjectedScript`, producing high-quality selectors like `getByRole('button', { name: 'Submit' })` instead of the custom fallback. ([#294](https://github.com/stevez/playwright-repl/issues/294))
+
+### Fixes
+
+- **Attach race condition**: Fixed "Another debugger is already attached" error after stopping recording by properly awaiting `detach()` before re-attaching.
+
+---
+
 ## v0.18.1
 
 **2026-03-17**

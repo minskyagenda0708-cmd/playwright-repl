@@ -27,4 +27,10 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": "off",
     },
   },
+  {
+    files: ["src/pw-selector.js"],
+    languageOptions: {
+      globals: { document: "readonly", module: "writable" },
+    },
+  },
 );

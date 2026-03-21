@@ -9,7 +9,9 @@
     "test:cli": "pnpm --filter playwright-repl run test"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@types/minimist": "^1.2.5",

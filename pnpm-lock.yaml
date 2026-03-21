@@ -95,8 +95,8 @@ importers:
         specifier: ^1.2.3
         version: 1.2.3
       '@playwright-repl/playwright-crx':
-        specifier: ^0.15.2
-        version: 0.15.2
+        specifier: ^0.15.3
+        version: 0.15.3
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
@@ -857,8 +857,8 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@playwright-repl/playwright-crx@0.15.2':
-    resolution: {integrity: sha512-y2Xu+OLqHos3p72uEGyTepLPSRSrQwMdUTBYvSoTcdZZi8xG6ikZPG12pO+Ra2sLgJCU5daze6zI3ZKz60cWmQ==}
+  '@playwright-repl/playwright-crx@0.15.3':
+    resolution: {integrity: sha512-sxcJMHhCf/4uLXoB5J1dd1riRWc7BoO/VcOtqixL41jqMcYewrX2photoyoUqbbqlS+uriNP2SyeCyhSLTg36Q==}
     engines: {node: '>=18'}
 
   '@playwright/test@1.59.0-alpha-2026-02-21':
@@ -3021,7 +3021,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@playwright-repl/playwright-crx@0.15.2': {}
+  '@playwright-repl/playwright-crx@0.15.3': {}
 
   '@playwright/test@1.59.0-alpha-2026-02-21':
     dependencies:
