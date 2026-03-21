@@ -30,7 +30,6 @@ export type PickResultData = {
 
 export type ElementPickInfo = {
     locator: string;
-    pwLocator?: string | null;
     tag: string;
     text: string;
     html: string;

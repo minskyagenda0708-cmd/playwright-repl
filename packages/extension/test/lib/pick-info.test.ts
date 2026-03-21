@@ -29,17 +29,18 @@ describe('buildPickResult', () => {
         expect(result.jsExpression).toBe("await page.getByRole('button', { name: 'Submit' }).highlight();");
     });
 
-    it('prefers content script locator over pwLocator for getByRole', () => {
-        const result = buildPickResult(makeInfo({ pwLocator: "getByRole('button', { name: 'Submit' }).first()" }));
+    it('uses cdpLocator when provided (cleaner than content script locator)', () => {
+        const result = buildPickResult(
+            makeInfo({ locator: "locator('div').filter({ hasText: /^Submit$/ }).getByRole('button')" }),
+            "getByRole('button', { name: 'Submit' })",
+        );
         expect(result.locator).toBe("page.getByRole('button', { name: 'Submit' })");
+        expect(result.jsExpression).toBe("await page.getByRole('button', { name: 'Submit' }).highlight();");
     });
 
-    it('uses pwLocator when content script locator is CSS fallback', () => {
-        const result = buildPickResult(makeInfo({
-            locator: "locator('div.content')",
-            pwLocator: "getByText('Cross-browser')",
-        }));
-        expect(result.locator).toBe("page.getByText('Cross-browser')");
+    it('falls back to content script locator when cdpLocator is null', () => {
+        const result = buildPickResult(makeInfo(), null);
+        expect(result.locator).toBe("page.getByRole('button', { name: 'Submit' })");
     });
 
     it('derives pw command from role + name', () => {
@@ -113,14 +114,12 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).toBe('highlight "Hello"');
     });
 
-    it('derives pw command from Playwright locator when content script locator is CSS', () => {
+    it('derives pw command from getByText locator', () => {
         const result = buildPickResult(makeInfo({
-            locator: "locator('p.hero')",
-            pwLocator: "getByText('Cross-browser. Playwright')",
+            locator: "getByText('Cross-browser. Playwright')",
             tag: 'p',
             text: 'Cross-browser. Playwright supports all modern rendering engines including Chromium, WebKit, and Firefox.',
         }));
-        // pw command should come from Playwright's locator, not the CSS fallback
         expect(result.pwCommand).toBe('highlight "Cross-browser. Playwright"');
         // getByText locator → toBeVisible (toContainText would be redundant)
         expect(result.assertJs).toBe("await expect(page.getByText('Cross-browser. Playwright')).toBeVisible();");

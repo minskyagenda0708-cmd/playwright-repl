@@ -68,28 +68,25 @@ function parsePwCommand(locator: string, nth: string, role?: string | null): str
 
 /**
  * Derive a .pw keyword command from element info.
- * Tries content script's locator first, then Playwright's jsLocator as fallback.
- * Returns null if no suitable name/text can be extracted.
+ * Returns null when the locator uses chains (.filter, locator()) that
+ * can't be accurately expressed in PW keyword syntax.
  */
-function derivePwCommand(info: ElementPickInfo, jsLocator?: string): string | null {
-    // Prefer nth from content script's locator (globally correct)
-    // Fall back to Playwright's locator nth only when content script has none
-    const contentNth = extractNth(info.locator);
-    const nth = contentNth || extractNth(jsLocator ?? info.locator);
-    const role = tagToRole(info);
+function derivePwCommand(info: ElementPickInfo): string | null {
+    const nth = extractNth(info.locator);
+    const isComplex = /\.filter\(/.test(info.locator) || /^locator\(/.test(info.locator);
 
-    // Try content script's locator first
-    const fromContentScript = parsePwCommand(info.locator, nth, role);
-    if (fromContentScript) return fromContentScript;
-
-    // Fallback: try Playwright's locator (may have better name for long-text elements)
-    if (jsLocator && jsLocator !== info.locator) {
-        const fromPlaywright = parsePwCommand(jsLocator, nth, role);
-        if (fromPlaywright) return fromPlaywright;
+    // For simple getBy* locators, parse the PW command from the locator string
+    if (!isComplex) {
+        const role = tagToRole(info);
+        const fromLocator = parsePwCommand(info.locator, nth, role);
+        if (fromLocator) return fromLocator;
     }
 
-    // Last resort: use element text content
-    if (info.text && info.text.length <= 80) return `highlight "${info.text}"${nth}`;
+    // Fall back to element role + text from element info
+    const role = info.attributes?.role || tagToRole(info);
+    const text = info.text?.trim();
+    if (role && text && text.length <= 80) return `highlight ${role} "${text}"${nth}`;
+    if (text && text.length <= 80) return `highlight "${text}"${nth}`;
 
     return null;
 }
@@ -130,9 +127,8 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     // Extract name from pw command, falling back to JS locator string
     const name = (pwCommand ? extractPwName(pwCommand) : null) ?? extractLocatorName(locator);
     const quotedName = name ? `"${name}"` : null;
-    // Extract role and nth from locator for pw assertions
-    const roleMatch = locator.match(/getByRole\(['"](.+?)['"]/);
-    const role = roleMatch ? roleMatch[1] : null;
+    // Extract role from element attributes (more reliable than regex on chained locators)
+    const role = info.attributes?.role || tagToRole(info);
     const nth = extractNth(locator);
 
     // Checkbox/radio → checked assertion
@@ -196,15 +192,14 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
 
 /**
  * Build a PickResultData from element info gathered by the content script.
- * Prefer content script's locator (simpler, disambiguated with .nth()).
- * Fall back to Playwright's locator only when content script uses CSS fallback.
+ * Uses CDP _generateLocatorString() when available (cleaner locators),
+ * falls back to content script's locator (from data-pw-locator or custom logic).
  */
-export function buildPickResult(info: ElementPickInfo): PickResultData {
-    const isCssFallback = /^locator\(/.test(info.locator);
-    const jsLocator = isCssFallback ? (info.pwLocator ?? info.locator) : info.locator;
+export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | null): PickResultData {
+    const jsLocator = cdpLocator ?? info.locator;
     const locator = `page.${jsLocator}`;
     const jsExpression = `await page.${jsLocator}.highlight();`;
-    const pwCommand = derivePwCommand(info, jsLocator);
+    const pwCommand = derivePwCommand({ ...info, locator: jsLocator });
     const { assertJs, assertPw } = deriveAssertion(info, locator, pwCommand);
 
     return {
@@ -274,7 +269,7 @@ export function pickResultToSerialized(data: PickResultData): SerializedValue {
 }
 
 /**
- * Resolve Playwright's locator for a picked element via swDebugEval.
+ * Resolve Playwright's locator for a picked element via CDP _generateLocatorString().
  * The element must be marked with data-pw-pick-id by the content script.
  */
 export async function resolvePlaywrightLocator(pickId: string): Promise<string | null> {
@@ -288,3 +283,4 @@ export async function resolvePlaywrightLocator(pickId: string): Promise<string |
         return null;
     }
 }
+

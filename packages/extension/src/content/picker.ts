@@ -65,7 +65,7 @@ export function onClick(e: MouseEvent) {
 
     if (!currentElement) return;
     const info = gatherInfo(currentElement);
-    // Mark element so main-world script can find it for Playwright locator generation
+    // Mark element so CDP can find it for _generateLocatorString()
     const pickId = Math.random().toString(36).slice(2);
     currentElement.setAttribute('data-pw-pick-id', pickId);
     cleanup();

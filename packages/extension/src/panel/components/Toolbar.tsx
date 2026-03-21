@@ -292,8 +292,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         const listener = (msg: any) => {
             if (msg.type === 'element-picked-raw') {
                 setIsPicking(false);
-                resolvePlaywrightLocator(msg.pickId).then(async pwLocator => {
-                    const pickResult = buildPickResult({ ...msg.info, pwLocator });
+                resolvePlaywrightLocator(msg.pickId).then(cdpLocator => {
+                    const pickResult = buildPickResult(msg.info, cdpLocator);
                     dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
                 });
             }
