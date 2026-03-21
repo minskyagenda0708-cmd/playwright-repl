@@ -379,6 +379,17 @@ export async function pressKey(page, target, key) {
   return 'Pressed ' + key;
 }
 
+export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  }
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.press(key);
+  return 'Pressed ' + key;
+}
+
 export async function typeText(page, text) {
   await page.keyboard.type(text);
   return 'Typed';

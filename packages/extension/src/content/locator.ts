@@ -232,7 +232,7 @@ export function isHoverRevealed(el: Element): boolean {
  * Parse a JS locator string into PW keyword args.
  * e.g. `getByRole('tab', { name: 'npm', exact: true }).nth(1)` → `tab "npm" --nth 1`
  */
-export function locatorToPwArgs(locator: string): string {
+export function locatorToPwArgs(locator: string, role?: string | null): string {
     const q = (s: string) => `"${s}"`;
 
     // Extract nth modifier
@@ -244,17 +244,24 @@ export function locatorToPwArgs(locator: string): string {
         if (nthMatch) nth = ` --nth ${nthMatch[1]}`;
     }
 
-    // getByRole with name
+    // getByRole with name — already has role
     const roleNameMatch = locator.match(/getByRole\(['"](.+?)['"],\s*\{[^}]*name:\s*['"](.+?)['"]/);
     if (roleNameMatch) return `${roleNameMatch[1]} ${q(roleNameMatch[2])}${nth}`;
 
-    // getByRole without name
+    // getByRole without name — already has role
     const roleMatch = locator.match(/getByRole\(['"](.+?)['"]\)/);
     if (roleMatch) return `${roleMatch[1]}${nth}`;
 
-    // getByTestId / getByLabel / getByText / getByPlaceholder / getByTitle / getByAltText
+    // getByTestId — test ID is not an accessible name, don't add role
+    const testIdMatch = locator.match(/getByTestId\(['"](.+?)['"]\)/);
+    if (testIdMatch) return `${q(testIdMatch[1])}${nth}`;
+
+    // getByLabel / getByText / getByPlaceholder / getByTitle / getByAltText — prepend role if available
     const getByMatch = locator.match(/getBy\w+\(['"](.+?)['"]\)/);
-    if (getByMatch) return `${q(getByMatch[1])}${nth}`;
+    if (getByMatch) {
+        const prefix = role ? `${role} ` : '';
+        return `${prefix}${q(getByMatch[1])}${nth}`;
+    }
 
     // locator('css') fallback
     const locatorMatch = locator.match(/locator\(['"](.+?)['"]\)/);
@@ -386,7 +393,8 @@ export function buildCommands(action: string, el: Element, opts?: {
 }): { pw: string; js: string } | null {
     const { js: jsLocator, pw: pwLocator, ancestor } = generateLocatorPair(el);
     const jsLoc = `page.${jsLocator}`;
-    const pwArgs = locatorToPwArgs(pwLocator);
+    const role = getImplicitRole(el);
+    const pwArgs = locatorToPwArgs(pwLocator, role);
     const q = (s: string) => `"${s}"`;
     const inFlag = ancestor ? ` --in ${ancestor.role} ${q(ancestor.text)}` : '';
 

@@ -606,6 +606,38 @@ describe('locator', () => {
             expect(locatorToPwArgs('somethingWeird'))
                 .toBe('"somethingWeird"');
         });
+
+        // ─── Role prefix for non-getByRole patterns ──────────────────────
+
+        it('prepends role for getByPlaceholder when role provided', () => {
+            expect(locatorToPwArgs("getByPlaceholder('Search...')", 'textbox'))
+                .toBe('textbox "Search..."');
+        });
+
+        it('prepends role for getByLabel when role provided', () => {
+            expect(locatorToPwArgs("getByLabel('Email')", 'textbox'))
+                .toBe('textbox "Email"');
+        });
+
+        it('prepends role for getByText when role provided', () => {
+            expect(locatorToPwArgs("getByText('Submit')", 'button'))
+                .toBe('button "Submit"');
+        });
+
+        it('does not prepend role for getByTestId', () => {
+            expect(locatorToPwArgs("getByTestId('my-btn')", 'button'))
+                .toBe('"my-btn"');
+        });
+
+        it('does not prepend role for getByRole (already has role)', () => {
+            expect(locatorToPwArgs("getByRole('button', { name: 'Submit' })", 'button'))
+                .toBe('button "Submit"');
+        });
+
+        it('prepends role with nth modifier', () => {
+            expect(locatorToPwArgs("getByPlaceholder('Search...').first()", 'textbox'))
+                .toBe('textbox "Search..." --nth 0');
+        });
     });
 
     // ─── isTextField ──────────────────────────────────────────────────────

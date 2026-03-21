@@ -183,3 +183,26 @@ describe("highlight", () => {
     expect(jsExpr).toContain('clearHighlight');
   });
 });
+
+describe("press", () => {
+  it("routes role+name+key to pressKeyByRole", () => {
+    const { jsExpr } = direct('press textbox "What needs to be done?" Enter');
+    expect(jsExpr).toContain('pressKeyByRole');
+    expect(jsExpr).toContain('"textbox"');
+    expect(jsExpr).toContain('"What needs to be done?"');
+    expect(jsExpr).toContain('"Enter"');
+  });
+
+  it("routes global key to pressKey", () => {
+    const { jsExpr } = direct("press Enter");
+    expect(jsExpr).toContain('pressKey');
+    expect(jsExpr).toContain('"Enter"');
+  });
+
+  it("routes text+key to pressKey", () => {
+    const { jsExpr } = direct('press "Email" Tab');
+    expect(jsExpr).toContain('pressKey');
+    expect(jsExpr).toContain('"Email"');
+    expect(jsExpr).toContain('"Tab"');
+  });
+});

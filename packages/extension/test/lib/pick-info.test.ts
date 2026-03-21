@@ -66,6 +66,53 @@ describe('buildPickResult', () => {
         expect(result.assertPw).toBe('verify-element link "Home"');
     });
 
+    it('derives pw command with role for getByPlaceholder on input', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByPlaceholder('What needs to be done?')",
+            tag: 'input',
+            text: '',
+            attributes: {},
+        }));
+        expect(result.pwCommand).toBe('highlight textbox "What needs to be done?"');
+    });
+
+    it('derives pw command with role for getByLabel on textarea', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByLabel('Notes')",
+            tag: 'textarea',
+            text: '',
+            attributes: {},
+        }));
+        expect(result.pwCommand).toBe('highlight textbox "Notes"');
+    });
+
+    it('derives pw command with role for getByText on button', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByText('Submit')",
+            tag: 'button',
+            text: 'Submit',
+        }));
+        expect(result.pwCommand).toBe('highlight button "Submit"');
+    });
+
+    it('does not add role for getByTestId', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByTestId('submit-btn')",
+            tag: 'button',
+            text: 'Submit',
+        }));
+        expect(result.pwCommand).toBe('highlight "submit-btn"');
+    });
+
+    it('does not add role for tags without implicit role', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByText('Hello')",
+            tag: 'p',
+            text: 'Hello',
+        }));
+        expect(result.pwCommand).toBe('highlight "Hello"');
+    });
+
     it('derives pw command from Playwright locator when content script locator is CSS', () => {
         const result = buildPickResult(makeInfo({
             locator: "locator('p.hero')",

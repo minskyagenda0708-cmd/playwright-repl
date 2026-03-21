@@ -13,27 +13,54 @@ function extractNth(locator: string): string {
 }
 
 /**
+ * Derive ARIA role from element tag + input type (for pick results, no DOM access).
+ */
+function tagToRole(info: ElementPickInfo): string | null {
+    const tag = info.tag.toLowerCase();
+    const type = (info.attributes?.type || '').toLowerCase();
+    if (tag === 'input') {
+        if (type === 'checkbox') return 'checkbox';
+        if (type === 'radio') return 'radio';
+        if (type === 'button' || type === 'submit' || type === 'reset') return 'button';
+        if (type === 'hidden') return null;
+        return 'textbox';
+    }
+    if (tag === 'textarea') return 'textbox';
+    if (tag === 'select') return 'combobox';
+    if (tag === 'button') return 'button';
+    if (tag === 'a') return 'link';
+    if (tag === 'img') return 'img';
+    return null;
+}
+
+/**
  * Try to derive a pw highlight command from a locator string.
+ * When role is provided, non-getByRole patterns include it (e.g. `highlight textbox "text"`).
  * Returns null if no getBy* pattern matches.
  */
-function parsePwCommand(locator: string, nth: string): string | null {
+function parsePwCommand(locator: string, nth: string, role?: string | null): string | null {
+    // getByRole — already has role
     const roleNameMatch = locator.match(/getByRole\(['"](.+?)['"],\s*\{[^}]*name:\s*['"](.+?)['"]/);
     if (roleNameMatch) return `highlight ${roleNameMatch[1]} "${roleNameMatch[2]}"${nth}`;
 
     const roleMatch = locator.match(/getByRole\(['"](.+?)['"]\)/);
     if (roleMatch) return `highlight ${roleMatch[1]}${nth}`;
 
+    // getByTestId — test ID is not an accessible name, don't add role
     const testIdMatch = locator.match(/getByTestId\(['"](.+?)['"]\)/);
     if (testIdMatch) return `highlight "${testIdMatch[1]}"${nth}`;
 
+    // getByLabel / getByText / getByPlaceholder — prepend role if available
+    const prefix = role ? `${role} ` : '';
+
     const labelMatch = locator.match(/getByLabel\(['"](.+?)['"]\)/);
-    if (labelMatch) return `highlight "${labelMatch[1]}"${nth}`;
+    if (labelMatch) return `highlight ${prefix}"${labelMatch[1]}"${nth}`;
 
     const textMatch = locator.match(/getByText\(['"](.+?)['"]\)/);
-    if (textMatch) return `highlight "${textMatch[1]}"${nth}`;
+    if (textMatch) return `highlight ${prefix}"${textMatch[1]}"${nth}`;
 
     const placeholderMatch = locator.match(/getByPlaceholder\(['"](.+?)['"]\)/);
-    if (placeholderMatch) return `highlight "${placeholderMatch[1]}"${nth}`;
+    if (placeholderMatch) return `highlight ${prefix}"${placeholderMatch[1]}"${nth}`;
 
     return null;
 }
@@ -48,14 +75,15 @@ function derivePwCommand(info: ElementPickInfo, jsLocator?: string): string | nu
     // Fall back to Playwright's locator nth only when content script has none
     const contentNth = extractNth(info.locator);
     const nth = contentNth || extractNth(jsLocator ?? info.locator);
+    const role = tagToRole(info);
 
     // Try content script's locator first
-    const fromContentScript = parsePwCommand(info.locator, nth);
+    const fromContentScript = parsePwCommand(info.locator, nth, role);
     if (fromContentScript) return fromContentScript;
 
     // Fallback: try Playwright's locator (may have better name for long-text elements)
     if (jsLocator && jsLocator !== info.locator) {
-        const fromPlaywright = parsePwCommand(jsLocator, nth);
+        const fromPlaywright = parsePwCommand(jsLocator, nth, role);
         if (fromPlaywright) return fromPlaywright;
     }
 

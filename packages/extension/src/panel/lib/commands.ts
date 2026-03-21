@@ -132,7 +132,7 @@ import {
   highlightByText, highlightByRole, highlightBySelector, highlightByRef, clearHighlight, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
   evalCode, runCode, takeScreenshot, takeSnapshot,
-  refAction, pressKey, typeText,
+  refAction, pressKey, pressKeyByRole, typeText,
   localStorageGet, localStorageSet, localStorageDelete, localStorageClear, localStorageList,
   sessionStorageGet, sessionStorageSet, sessionStorageDelete, sessionStorageClear, sessionStorageList,
   cookieList, cookieGet, cookieSet, cookieDelete, cookieClear,
@@ -452,6 +452,10 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     }
     if (cmdName === 'select') {
       return { jsExpr: call(selectByRole, role, args._[2], args._.slice(3).join(' ') || '', nth, inRole, inText) };
+    }
+    if (cmdName === 'press') {
+      const key = args._.slice(3).join(' ') || '';
+      return { jsExpr: call(pressKeyByRole, role, args._[2], key, nth, inRole, inText) };
     }
   }
 
