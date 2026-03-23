@@ -66,6 +66,10 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const filePath = editor.document.uri.fsPath;
+      if (!/\.(spec|test)\.(ts|js|mjs)$/.test(filePath)) {
+        vscode.window.showWarningMessage('Not a test file. Open a .spec.ts or .test.ts file first.');
+        return;
+      }
       const fileName = filePath.replace(/.*[\\/]/, '');
 
       // Ensure REPL is open to show results
