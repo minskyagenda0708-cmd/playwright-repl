@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`Bundling ${fileName}...`);
         const script = await bundleTestFile(filePath);
         outputChannel.appendLine(`Running tests in ${fileName}...`);
-        const result = await browserManager!.runCommand(script);
+        const result = await browserManager!.runScript(script);
         outputChannel.appendLine(`\n── ${fileName} ──`);
         outputChannel.appendLine(result.text || '(no output)');
         outputChannel.show();

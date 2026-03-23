@@ -117,4 +117,11 @@ export class BrowserManager {
     }
     return this._bridge.run(raw);
   }
+
+  async runScript(script: string, language: 'pw' | 'javascript' = 'javascript'): Promise<{ text?: string; isError?: boolean }> {
+    if (!this._bridge) {
+      return { text: 'Bridge not started', isError: true };
+    }
+    return this._bridge.runScript(script, language);
+  }
 }
