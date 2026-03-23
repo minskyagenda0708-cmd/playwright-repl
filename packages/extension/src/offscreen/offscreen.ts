@@ -54,12 +54,20 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
     connect(port || 9876);
 });
 
-// Listen for port changes relayed from the SW
+// Listen for port changes and recording/picker events from the SW
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'bridge-port-changed') {
         if (reconnectTimer) clearTimeout(reconnectTimer);
         if (ws) { ws.onclose = null; ws.close(); }
         connect(msg.port as number);
+    }
+
+    // Forward recording/picker events to the bridge client (VS Code)
+    if (msg.type === 'recorded-action' || msg.type === 'recorded-fill-update' ||
+        msg.type === 'element-picked-raw' || msg.type === 'pick-cancelled') {
+        if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ _event: true, ...msg }));
+        }
     }
 });
 

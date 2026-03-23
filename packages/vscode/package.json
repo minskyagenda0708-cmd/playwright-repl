@@ -33,6 +33,14 @@
       {
         "command": "playwright-ide.stopBrowser",
         "title": "Playwright IDE: Stop Browser"
+      },
+      {
+        "command": "playwright-ide.startRecording",
+        "title": "Playwright IDE: Start Recording"
+      },
+      {
+        "command": "playwright-ide.stopRecording",
+        "title": "Playwright IDE: Stop Recording"
       }
     ],
     "configuration": {

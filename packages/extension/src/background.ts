@@ -430,6 +430,17 @@ async function handleBridgeCommand(msg: {
   language?: 'pw' | 'javascript';
   includeSnapshot?: boolean;
 }): Promise<BridgeResult> {
+  // Recording/picker commands — handled before currentPage check
+  const cmd = msg.command.trim();
+  if (cmd === 'record-start') {
+    const r = await startRecording();
+    return { text: r.ok ? `Recording started${r.url ? ': ' + r.url : ''}` : (r.error || 'Failed'), isError: !r.ok };
+  }
+  if (cmd === 'record-stop') {
+    const r = await stopRecording();
+    return { text: r.ok ? 'Recording stopped' : 'Failed', isError: !r.ok };
+  }
+
   if (!currentPage) {
     const tabId = await getActiveTabId();
     if (tabId) await attachToTab(tabId);

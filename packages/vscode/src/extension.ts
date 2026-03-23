@@ -2,10 +2,12 @@ import * as vscode from 'vscode';
 import { BrowserManager } from './browser.js';
 import { PlaywrightRepl } from './repl.js';
 import { TestExplorer } from './test-explorer.js';
+import { Recorder } from './recorder.js';
 
 let browserManager: BrowserManager | undefined;
 let repl: PlaywrightRepl | undefined;
 let testExplorer: TestExplorer | undefined;
+let recorder: Recorder | undefined;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -97,6 +99,35 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (err: unknown) {
         vscode.window.showErrorMessage(`Test run failed: ${(err as Error).message}`);
       }
+    })
+  );
+
+  // ─── Recording ──────────────────────────────────────────────────────────
+  recorder = new Recorder(browserManager, outputChannel);
+  context.subscriptions.push({ dispose: () => recorder?.dispose() });
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('playwright-ide.startRecording', async () => {
+      // Auto-launch browser if needed
+      if (!browserManager?.isRunning()) {
+        const config = vscode.workspace.getConfiguration('playwright-ide');
+        try {
+          await browserManager!.launch({
+            browser: config.get('browser', 'chromium'),
+            bridgePort: config.get('bridgePort', 9876),
+          });
+        } catch (err: unknown) {
+          vscode.window.showErrorMessage(`Failed to launch browser: ${(err as Error).message}`);
+          return;
+        }
+      }
+      await recorder!.start();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('playwright-ide.stopRecording', async () => {
+      await recorder!.stop();
     })
   );
 

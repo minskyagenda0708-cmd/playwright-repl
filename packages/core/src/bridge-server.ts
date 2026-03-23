@@ -7,9 +7,11 @@ export class BridgeServer {
     private pending = new Map<string, (r: EngineResult) => void>();
     private _onConnect?: () => void;
     private _onDisconnect?: () => void;
+    private _onEvent?: (event: Record<string, unknown>) => void;
 
     onConnect(fn: () => void)    { this._onConnect = fn; }
     onDisconnect(fn: () => void) { this._onDisconnect = fn; }
+    onEvent(fn: (event: Record<string, unknown>) => void) { this._onEvent = fn; }
     get connected()              { return this.socket?.readyState === WebSocket.OPEN; }
     get port()                   { return (this.wss.address() as { port: number }).port; }
 
@@ -32,7 +34,13 @@ export class BridgeServer {
             this.socket = ws;
             this._onConnect?.();
             ws.on('message', (data) => {
-                const msg = JSON.parse(String(data)) as { id: string } & EngineResult;
+                const msg = JSON.parse(String(data));
+                // Events from extension (recording, picker) — no request ID
+                if (msg._event) {
+                    this._onEvent?.(msg);
+                    return;
+                }
+                // Normal request/response
                 this.pending.get(msg.id)?.(msg);
                 this.pending.delete(msg.id);
             });

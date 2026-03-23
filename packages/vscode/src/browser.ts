@@ -110,4 +110,10 @@ export class BrowserManager {
     }
     return this._bridge.runScript(script, language);
   }
+
+  onEvent(fn: ((event: Record<string, unknown>) => void) | null) {
+    if (this._bridge) {
+      this._bridge.onEvent(fn || (() => {}));
+    }
+  }
 }
