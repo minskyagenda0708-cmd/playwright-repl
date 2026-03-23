@@ -164,6 +164,13 @@ export class Recorder {
       return;
     }
 
+    // Insert goto with current URL as first action
+    const urlResult = await this._browserManager.runCommand('await page.url()');
+    const url = urlResult.text?.replace(/^['"]|['"]$/g, '') || '';
+    if (url && this._editor) {
+      insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
+    }
+
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright IDE: Stop Recording';
