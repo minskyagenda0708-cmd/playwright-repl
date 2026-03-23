@@ -63,6 +63,9 @@ export function activate(context: vscode.ExtensionContext) {
   // ─── Run Test File ───────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('playwright-ide.runTest', async () => {
+      // Stop recording if active
+      if (recorder?.isRecording) await recorder.stop();
+
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showWarningMessage('No active test file.');
