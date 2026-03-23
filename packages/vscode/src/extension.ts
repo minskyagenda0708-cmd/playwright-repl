@@ -66,15 +66,26 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const filePath = editor.document.uri.fsPath;
-      const terminal = vscode.window.createTerminal({
-        name: 'Playwright Test',
-        cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-      });
-      terminal.show();
-      terminal.sendText(
-        `npx playwright test "${filePath}" --config=playwright-ide.config.ts`,
-        true
-      );
+      const fileName = filePath.replace(/.*[\\/]/, '');
+
+      // Ensure REPL is open to show results
+      if (!repl || repl.disposed) {
+        repl = new PlaywrightRepl(browserManager!);
+        repl.show();
+      }
+
+      try {
+        const { bundleTestFile } = await import('./bundler.js');
+        outputChannel.appendLine(`Bundling ${fileName}...`);
+        const script = await bundleTestFile(filePath);
+        outputChannel.appendLine(`Running tests in ${fileName}...`);
+        const result = await browserManager!.runCommand(script);
+        outputChannel.appendLine(`\n── ${fileName} ──`);
+        outputChannel.appendLine(result.text || '(no output)');
+        outputChannel.show();
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(`Test run failed: ${(err as Error).message}`);
+      }
     })
   );
 

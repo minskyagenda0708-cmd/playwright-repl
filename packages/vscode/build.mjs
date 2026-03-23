@@ -7,7 +7,7 @@ const options = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outfile: 'dist/extension.js',
-  external: ['vscode', '@playwright-repl/core'],
+  external: ['vscode', '@playwright-repl/core', 'esbuild'],
   format: 'cjs',
   platform: 'node',
   target: 'node20',
