@@ -22,6 +22,8 @@ export interface LaunchOptions {
 export class BrowserManager {
   private _bridge: BridgeServer | undefined;
   private _chromeProc: ChildProcess | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _browserContext: any = undefined;
   private _userDataDir: string | undefined;
   private _running = false;
   private _log: vscode.OutputChannel;
@@ -56,38 +58,57 @@ export class BrowserManager {
     this._bridge = bridge;
     this._log.appendLine(`BridgeServer on port ${bridge.port}`);
 
-    // 4. Spawn Chromium directly with extension loaded
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-ide-'));
-    this._userDataDir = userDataDir;
-
-    const chromeArgs = [
-      `--user-data-dir=${userDataDir}`,
+    // 4. Launch Chromium with extension
+    const extArgs = [
       `--disable-extensions-except=${extPath}`,
       `--load-extension=${extPath}`,
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-background-timer-throttling',
       '--disable-infobars',
-      ...(opts.headless ? ['--headless=new'] : []),
-      'https://www.google.com',
     ];
-    this._log.appendLine(`Spawning: ${execPath}`);
-    this._log.appendLine(`Args: ${chromeArgs.join(' ')}`);
 
-    // Clean env: strip Electron/VS Code vars that interfere with Chromium
-    const cleanEnv = Object.fromEntries(
-      Object.entries(process.env).filter(([k]) =>
-        !k.startsWith('ELECTRON_') && !k.startsWith('VSCODE_') && k !== 'ORIGINAL_XDG_CURRENT_DESKTOP'
-      ),
-    );
+    if (opts.headless) {
+      // Headless: use launchPersistentContext (handles headless + extensions properly)
+      this._log.appendLine('Launching headless Chromium...');
+      this._browserContext = await pw.chromium.launchPersistentContext('', {
+        channel: 'chromium',
+        headless: true,
+        args: [...extArgs, 'https://www.google.com'],
+        env: Object.fromEntries(
+          Object.entries(process.env).filter(([k]) =>
+            !k.startsWith('ELECTRON_') && !k.startsWith('VSCODE_') && k !== 'ORIGINAL_XDG_CURRENT_DESKTOP'
+          ),
+        ),
+      });
+      this._log.appendLine('Headless Chromium launched.');
+    } else {
+      // Headed: spawn directly (launchPersistentContext doesn't load extensions from VS Code)
+      const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-ide-'));
+      this._userDataDir = userDataDir;
 
-    this._chromeProc = spawn(execPath, chromeArgs, {
-      detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: cleanEnv,
-    });
-    this._chromeProc.stdout?.on('data', (d: Buffer) => this._log.appendLine(`[chrome] ${d.toString().trim()}`));
-    this._chromeProc.stderr?.on('data', (d: Buffer) => this._log.appendLine(`[chrome] ${d.toString().trim()}`));
-    this._chromeProc.unref();
-    this._log.appendLine('Chromium spawned. Waiting for extension to connect...');
+      const chromeArgs = [
+        `--user-data-dir=${userDataDir}`,
+        ...extArgs,
+        'https://www.google.com',
+      ];
+      this._log.appendLine(`Spawning: ${execPath}`);
+
+      const cleanEnv = Object.fromEntries(
+        Object.entries(process.env).filter(([k]) =>
+          !k.startsWith('ELECTRON_') && !k.startsWith('VSCODE_') && k !== 'ORIGINAL_XDG_CURRENT_DESKTOP'
+        ),
+      );
+
+      this._chromeProc = spawn(execPath, chromeArgs, {
+        detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: cleanEnv,
+      });
+      this._chromeProc.stdout?.on('data', (d: Buffer) => this._log.appendLine(`[chrome] ${d.toString().trim()}`));
+      this._chromeProc.stderr?.on('data', (d: Buffer) => this._log.appendLine(`[chrome] ${d.toString().trim()}`));
+      this._chromeProc.unref();
+      this._log.appendLine('Chromium spawned.');
+    }
+    this._log.appendLine('Waiting for extension to connect...');
 
     // 5. Wait for offscreen document to connect via WebSocket
     await bridge.waitForConnection(30000);
@@ -101,6 +122,10 @@ export class BrowserManager {
     if (this._bridge) {
       await this._bridge.close().catch(() => {});
       this._bridge = undefined;
+    }
+    if (this._browserContext) {
+      await this._browserContext.close().catch(() => {});
+      this._browserContext = undefined;
     }
     if (this._chromeProc) {
       try { this._chromeProc.kill(); } catch { /* ignore */ }
