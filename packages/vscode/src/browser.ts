@@ -14,6 +14,7 @@ declare const __filename: string;
 export interface LaunchOptions {
   browser: string;
   bridgePort: number;
+  headless?: boolean;
 }
 
 // ─── BrowserManager ────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ export class BrowserManager {
       '--no-default-browser-check',
       '--disable-background-timer-throttling',
       '--disable-infobars',
+      ...(opts.headless ? ['--headless=new'] : []),
       'https://www.google.com',
     ];
     this._log.appendLine(`Spawning: ${execPath}`);

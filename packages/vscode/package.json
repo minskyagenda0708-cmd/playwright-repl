@@ -46,6 +46,11 @@
           "type": "number",
           "default": 9876,
           "description": "WebSocket bridge port for extension communication"
+        },
+        "playwright-ide.headless": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run browser in headless mode (no visible window)"
         }
       }
     }

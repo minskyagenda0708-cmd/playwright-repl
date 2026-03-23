@@ -60,11 +60,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage('No active test file.');
         return;
       }
-      if (!browserManager?.isRunning()) {
-        vscode.window.showWarningMessage('Launch browser first.');
-        return;
-      }
-
       const filePath = editor.document.uri.fsPath;
       if (!/\.(spec|test)\.(ts|js|mjs)$/.test(filePath)) {
         vscode.window.showWarningMessage('Not a test file. Open a .spec.ts or .test.ts file first.');
@@ -72,13 +67,19 @@ export function activate(context: vscode.ExtensionContext) {
       }
       const fileName = filePath.replace(/.*[\\/]/, '');
 
-      // Ensure REPL is open to show results
-      if (!repl || repl.disposed) {
-        repl = new PlaywrightRepl(browserManager!);
-        repl.show();
-      }
-
       try {
+        // Auto-launch browser if not running (headless for test execution)
+        if (!browserManager?.isRunning()) {
+          const config = vscode.workspace.getConfiguration('playwright-ide');
+          outputChannel.appendLine('Auto-launching browser for test run...');
+          await browserManager!.launch({
+            browser: config.get('browser', 'chromium'),
+            bridgePort: config.get('bridgePort', 9876),
+            headless: config.get('headless', false),
+          });
+          outputChannel.show();
+        }
+
         const { bundleTestFile } = await import('./bundler.js');
         outputChannel.appendLine(`Bundling ${fileName}...`);
         const script = await bundleTestFile(filePath);
