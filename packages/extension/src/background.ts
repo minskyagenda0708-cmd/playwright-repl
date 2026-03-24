@@ -522,28 +522,3 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;
-
-// ─── Reverse Bridge: __node.invoke() ──────────────────────────────────────────
-// Allows test code running in the service worker to call Node.js APIs (fs, Buffer, etc.)
-// via the offscreen doc → WebSocket → Node.js round-trip.
-const _nodePending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-
-(globalThis as any).__node = {
-  invoke: (module: string, method: string, args: unknown[] = []): Promise<unknown> => {
-    const id = Math.random().toString(36).slice(2);
-    return new Promise((resolve, reject) => {
-      _nodePending.set(id, { resolve, reject });
-      chrome.runtime.sendMessage({ type: 'node-call', id, module, method, args });
-    });
-  },
-};
-
-// Listen for node-result messages from offscreen doc
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'node-result' && _nodePending.has(msg.id)) {
-    const { resolve, reject } = _nodePending.get(msg.id)!;
-    _nodePending.delete(msg.id);
-    if (msg.error) reject(new Error(msg.error));
-    else resolve(msg.result);
-  }
-});

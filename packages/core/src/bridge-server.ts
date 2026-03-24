@@ -40,11 +40,6 @@ export class BridgeServer {
                     this._onEvent?.(msg);
                     return;
                 }
-                // Reverse bridge: browser calls Node.js for fs/Buffer/etc.
-                if (msg._nodeCall) {
-                    this._handleNodeCall(msg, ws);
-                    return;
-                }
                 // Normal request/response
                 this.pending.get(msg.id)?.(msg);
                 this.pending.delete(msg.id);
@@ -114,47 +109,5 @@ export class BridgeServer {
     async close(): Promise<void> {
         this.socket?.close();
         await new Promise<void>(r => this.wss.close(() => r()));
-    }
-
-    // ─── Reverse Bridge: browser → Node.js ────────────────────────────────
-    private async _handleNodeCall(msg: { id: string; module: string; method: string; args: unknown[] }, ws: WebSocket) {
-        try {
-            let result: unknown;
-            const mod = msg.module;
-            const method = msg.method;
-            const args = msg.args || [];
-
-            if (mod === 'fs') {
-                const fs = await import('node:fs');
-                result = (fs as any)[method](...args);
-            } else if (mod === 'path') {
-                const path = await import('node:path');
-                result = (path as any)[method](...args);
-            } else if (mod === 'Buffer') {
-                if (method === 'from') {
-                    const buf = Buffer.from(args[0] as any, args[1] as any);
-                    // Serialize Buffer as { type: 'Buffer', data: base64 }
-                    result = { __type: 'Buffer', data: buf.toString('base64') };
-                } else {
-                    result = (Buffer as any)[method](...args);
-                }
-            } else if (mod === 'process.env') {
-                result = process.env[method];
-            } else {
-                throw new Error(`Unsupported Node.js module: ${mod}`);
-            }
-
-            // Handle Promise results
-            if (result instanceof Promise) result = await result;
-
-            // Serialize Buffer results
-            if (Buffer.isBuffer(result)) {
-                result = { __type: 'Buffer', data: result.toString('base64') };
-            }
-
-            ws.send(JSON.stringify({ _nodeResult: true, id: msg.id, result }));
-        } catch (err: unknown) {
-            ws.send(JSON.stringify({ _nodeResult: true, id: msg.id, error: (err as Error).message }));
-        }
     }
 }

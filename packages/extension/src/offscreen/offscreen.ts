@@ -69,22 +69,6 @@ chrome.runtime.onMessage.addListener((msg) => {
             ws.send(JSON.stringify({ _event: true, ...msg }));
         }
     }
-
-    // Reverse bridge: service worker calls Node.js
-    // Forward node-call to Node.js, wait for result, send back to SW
-    if (msg.type === 'node-call' && ws?.readyState === WebSocket.OPEN) {
-        const id = msg.id as string;
-        const handler = (e: MessageEvent) => {
-            const resp = JSON.parse(e.data as string);
-            if (resp._nodeResult && resp.id === id) {
-                ws?.removeEventListener('message', handler);
-                // Send result back to service worker via chrome.runtime
-                chrome.runtime.sendMessage({ type: 'node-result', id, result: resp.result, error: resp.error });
-            }
-        };
-        ws.addEventListener('message', handler);
-        ws.send(JSON.stringify({ _nodeCall: true, id: msg.id, module: msg.module, method: msg.method, args: msg.args }));
-    }
 });
 
 export {};
