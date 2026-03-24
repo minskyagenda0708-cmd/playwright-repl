@@ -1,6 +1,6 @@
 /**
  * Execute a test file via bridge mode.
- * Detects mode (browser vs compiler) and uses the appropriate path.
+ * All tests run in the browser. Node.js calls (fs, Buffer, etc.) use reverse bridge.
  */
 
 import type { BridgeServer } from '@playwright-repl/core';
@@ -11,26 +11,10 @@ export async function executeTestFile(
   bridge: BridgeServer,
   opts: RunOptions,
 ): Promise<TestResult[]> {
-  // Detect mode
-  const { detectTestMode } = await import('./mode-detect.js');
-  const mode = await detectTestMode(testFilePath);
-
-  let resultText: string;
-
-  if (mode === 'browser') {
-    // Browser mode: bundle with shim, send to bridge (fastest)
-    const { bundleTestFile } = await import('./bundler.js');
-    const script = await bundleTestFile(testFilePath);
-    const result = await bridge.runScript(script, 'javascript');
-    resultText = result.text || '';
-  } else {
-    // Compiler mode: transform page/expect → bridge.run(), execute in Node.js
-    const { compileTestFile, executeCompiledTest } = await import('./compiler.js');
-    const compiled = await compileTestFile(testFilePath);
-    resultText = await executeCompiledTest(compiled, (cmd) => bridge.run(cmd));
-  }
-
-  return parseResults(resultText, testFilePath);
+  const { bundleTestFile } = await import('./bundler.js');
+  const script = await bundleTestFile(testFilePath);
+  const result = await bridge.runScript(script, 'javascript');
+  return parseResults(result.text || '', testFilePath);
 }
 
 function parseResults(output: string, file: string): TestResult[] {

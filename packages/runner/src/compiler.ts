@@ -112,67 +112,40 @@ export async function executeCompiledTest(
 // ─── Source Transform ──────────────────────────────────────────────────────
 
 /**
- * Transform test source: page.* and expect() calls → bridge.run("...").
- * Runs BEFORE esbuild compilation, so esbuild validates the result.
+ * Transform test source: Node.js API calls → __node.invoke().
+ * page.*, expect(), locator — ALL stay untouched (run in browser).
+ * Only fs.*, Buffer.*, path.* get transformed.
  */
 function transformSource(source: string): string {
-  const lines = source.split('\n');
-  const output: string[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
+  return source.split('\n').map(line => {
     const trimmed = line.trim();
-
-    // Skip empty, comments, imports
     if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
-      output.push(line);
-      i++;
-      continue;
+      return line;
     }
+    return transformNodeCalls(line);
+  }).join('\n');
+}
 
-    // Check if this line starts a browser expression (page.* or expect)
-    const isBrowserLine = /^\s*await\s+page\./.test(line) || /^\s*await\s+expect\s*\(/.test(line);
-    const isAssignment = /^\s*(?:const|let|var)\s+\w+\s*=\s*await\s+page\./.test(line);
+function transformNodeCalls(line: string): string {
+  // fs.readFileSync('file', 'utf-8') → await __node.invoke('fs', 'readFileSync', ['file', 'utf-8'])
+  // fs.existsSync('file') → await __node.invoke('fs', 'existsSync', ['file'])
+  line = line.replace(
+    /\bfs\.(\w+)\(([^)]*)\)/g,
+    (_match, method, args) => `await __node.invoke('fs', '${method}', [${args}])`
+  );
 
-    if (isBrowserLine || isAssignment) {
-      const indent = line.match(/^(\s*)/)?.[1] || '';
+  // Buffer.from(data, encoding) → await __node.invoke('Buffer', 'from', [data, encoding])
+  line = line.replace(
+    /\bBuffer\.(\w+)\(([^)]*)\)/g,
+    (_match, method, args) => `await __node.invoke('Buffer', '${method}', [${args}])`
+  );
 
-      // Collect lines until brackets are balanced
-      let expr = '';
-      let depth = 0;
-      let started = false;
-      while (i < lines.length) {
-        const l = lines[i].trim();
-        expr += (expr ? '\n' : '') + lines[i].trim();
-        for (const ch of l) {
-          if (ch === '(' || ch === '[' || ch === '{') { depth++; started = true; }
-          if (ch === ')' || ch === ']' || ch === '}') depth--;
-        }
-        i++;
-        if (started && depth <= 0) break;
-      }
+  // path.resolve(...) → await __node.invoke('path', 'resolve', [...])
+  // path.join(...) → await __node.invoke('path', 'join', [...])
+  line = line.replace(
+    /\bpath\.(\w+)\(([^)]*)\)/g,
+    (_match, method, args) => `await __node.invoke('path', '${method}', [${args}])`
+  );
 
-      // Strip trailing semicolon
-      expr = expr.replace(/;?\s*$/, '');
-
-      if (isAssignment) {
-        const match = expr.match(/^((?:const|let|var)\s+\w+)\s*=\s*(.*)/s);
-        if (match) {
-          const varDecl = match[1];
-          const pageExpr = match[2].replace(/;?\s*$/, '');
-          output.push(`${indent}${varDecl} = JSON.parse((await bridge.run("JSON.stringify(" + ${JSON.stringify(pageExpr)} + ")")).text ?? 'null');`);
-        } else {
-          output.push(`${indent}await bridge.run(${JSON.stringify(expr)});`);
-        }
-      } else {
-        output.push(`${indent}await bridge.run(${JSON.stringify(expr)});`);
-      }
-    } else {
-      output.push(line);
-      i++;
-    }
-  }
-
-  return output.join('\n');
+  return line;
 }
