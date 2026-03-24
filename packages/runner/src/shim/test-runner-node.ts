@@ -166,6 +166,8 @@ async function runSuite(
 
     const start = Date.now();
     try {
+      // Clean up routes from previous tests (our shim reuses the same page)
+      if (fixtures.page?.unrouteAll) await fixtures.page.unrouteAll();
       for (const fn of allBeforeEach) await fn(fixtures);
       await t.fn(fixtures);
       for (const fn of allAfterEach) await fn(fixtures);

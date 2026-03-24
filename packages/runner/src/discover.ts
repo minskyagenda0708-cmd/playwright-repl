@@ -12,9 +12,19 @@ export function discoverTests(testDir: string, filter?: string[]): string[] {
     return [];
   }
 
-  // If filter specifies files directly, use them
+  // If filter specifies files or directories, use them
   if (filter && filter.length > 0) {
-    return filter.map(f => path.resolve(f)).filter(f => fs.existsSync(f));
+    const result: string[] = [];
+    for (const f of filter) {
+      const abs = path.resolve(f);
+      if (!fs.existsSync(abs)) continue;
+      if (fs.statSync(abs).isDirectory()) {
+        walkDir(abs, result);
+      } else {
+        result.push(abs);
+      }
+    }
+    return result.sort();
   }
 
   // Walk directory for .spec.ts / .test.ts files

@@ -17,7 +17,14 @@ type BridgeRun = (command: string) => Promise<{ text?: string; isError?: boolean
 const PROXY_FLAG = Symbol('isProxy');
 const CHAIN_KEY = Symbol('chain');
 
-function makeProxy(chain: string, bridge: BridgeRun): any {
+// Methods that must run on the Node page (CDP) instead of bridge.
+// These either take callback args or return non-serializable objects.
+const NODE_PAGE_METHODS = new Set([
+  'route', 'unroute', 'routeFromHAR', 'unrouteAll',
+  'waitForEvent',
+]);
+
+function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any): any {
   const handler: ProxyHandler<any> = {
     get(_target, prop) {
       // Internal: check if this is a proxy
@@ -47,15 +54,20 @@ function makeProxy(chain: string, bridge: BridgeRun): any {
         return () => chain;
       }
 
+      // Node page methods — delegate to real Playwright page (same tab as bridge).
+      if (nodePage && chain === 'page' && NODE_PAGE_METHODS.has(String(prop))) {
+        return (...args: any[]) => nodePage[String(prop)](...args);
+      }
+
       // Property access → extend chain (returns callable proxy)
-      return makeCallableProxy(`${chain}.${String(prop)}`, bridge);
+      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage);
     },
   };
 
   return new Proxy({}, handler);
 }
 
-function makeCallableProxy(chain: string, bridge: BridgeRun): any {
+function makeCallableProxy(chain: string, bridge: BridgeRun, nodePage?: any): any {
   // A proxy that can be both called as a function AND have properties accessed
   const fn = function() {};
   return new Proxy(fn, {
@@ -83,12 +95,12 @@ function makeCallableProxy(chain: string, bridge: BridgeRun): any {
         return () => chain;
       }
 
-      return makeCallableProxy(`${chain}.${String(prop)}`, bridge);
+      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage);
     },
 
     apply(_target, _thisArg, args) {
       const argsStr = args.map(serializeArg).join(', ');
-      return makeProxy(`${chain}(${argsStr})`, bridge);
+      return makeProxy(`${chain}(${argsStr})`, bridge, nodePage);
     },
   });
 }
@@ -111,10 +123,11 @@ function serializeArg(arg: unknown): string {
 }
 
 /**
- * Create a proxy page that routes all calls through the bridge.
+ * Create a proxy page that routes most calls through the bridge.
+ * Methods in NODE_PAGE_METHODS delegate to the real Node page (CDP) instead.
  */
-export function createPageProxy(bridge: BridgeRun): any {
-  return makeProxy('page', bridge);
+export function createPageProxy(bridge: BridgeRun, nodePage?: any): any {
+  return makeProxy('page', bridge, nodePage);
 }
 
 /**

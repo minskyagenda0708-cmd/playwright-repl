@@ -17,17 +17,19 @@ export async function executeTestFile(
   testFilePath: string,
   bridge: BridgeServer,
   _opts: RunOptions,
+  nodePage?: any,
 ): Promise<TestResult[]> {
   // Compile with esbuild (TS → JS, alias @playwright/test → our shim)
   const compiled = await compile(testFilePath);
 
   // Set up Proxy page + smart expect on globalThis
+  // nodePage (CDP) is used for route/waitForEvent; everything else goes to bridge
   const bridgeRun = async (cmd: string) => {
     const r = await bridge.run(cmd);
     if (r.isError) throw new Error(r.text || 'Bridge error');
     return r;
   };
-  (globalThis as any).__proxyPage = createPageProxy(bridgeRun);
+  (globalThis as any).__proxyPage = createPageProxy(bridgeRun, nodePage);
   (globalThis as any).__proxyExpect = createExpect(bridgeRun);
 
   // Write to temp file and import
