@@ -1,25 +1,162 @@
 /**
  * Execute a test file via bridge mode.
- * Uses the same compiler/bundler approach as the VS Code extension.
+ * Detects if test needs Node.js (compiler mode) or can run in browser.
  */
 
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import type { BridgeServer } from '@playwright-repl/core';
 import type { RunOptions, TestResult } from './types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+
+const NODE_BUILTINS = new Set([
+  'fs', 'path', 'child_process', 'os', 'crypto', 'util',
+  'stream', 'events', 'net', 'http', 'https', 'url',
+  'worker_threads',
+]);
+
+function needsNodeJs(source: string): boolean {
+  for (const mod of NODE_BUILTINS) {
+    if (source.includes(`from '${mod}'`) || source.includes(`from "node:${mod}"`)) return true;
+  }
+  if (/process\.env\b|__dirname\b|__filename\b/.test(source)) return true;
+  return false;
+}
 
 export async function executeTestFile(
   testFilePath: string,
   bridge: BridgeServer,
   opts: RunOptions,
 ): Promise<TestResult[]> {
-  // TODO: detect mode (browser vs compiler) and use the appropriate path
-  // For Phase 1: always use browser mode (bundle + send to bridge)
+  const source = fs.readFileSync(testFilePath, 'utf-8');
 
-  const { bundleTestFile } = await import('./bundler.js');
-  const script = await bundleTestFile(testFilePath);
-  const result = await bridge.runScript(script, 'javascript');
+  if (!needsNodeJs(source)) {
+    // Browser mode: bundle with shim, send to bridge (fastest)
+    const { bundleTestFile } = await import('./bundler.js');
+    const script = await bundleTestFile(testFilePath);
+    const result = await bridge.runScript(script, 'javascript');
+    return parseResults(result.text || '', testFilePath);
+  }
 
-  // Parse result text into TestResult array
-  return parseResults(result.text || '', testFilePath);
+  // Compiler mode: transform page/expect → bridge.run(), run in Node.js
+  console.log('  [compiler mode]');
+  const compiled = await compileForNode(testFilePath);
+  const resultText = await executeInNode(compiled, bridge);
+  return parseResults(resultText, testFilePath);
+}
+
+async function compileForNode(testFilePath: string): Promise<string> {
+  const esbuild = await import('esbuild');
+  const shimPath = path.resolve(path.dirname(__filename), 'shim/test-runner-node.ts');
+  const shimFallback = path.resolve(path.dirname(__filename), 'shim/test-runner-node.js');
+  const shim = fs.existsSync(shimPath) ? shimPath : shimFallback;
+  const testDir = path.dirname(testFilePath);
+  const testFileName = path.basename(testFilePath);
+
+  const plugin = {
+    name: 'compiler',
+    setup(build: any) {
+      build.onResolve({ filter: /^__entry__$/ }, () => ({ path: '__entry__', namespace: 'entry' }));
+      build.onLoad({ filter: /.*/, namespace: 'entry' }, () => ({
+        contents: `
+          import { __runTests } from '@playwright/test';
+          import './${testFileName}';
+          const result = await __runTests();
+          export default result;
+        `,
+        resolveDir: testDir,
+        loader: 'ts',
+      }));
+      // Transform test files
+      build.onLoad({ filter: /\.(spec|test)\.(ts|js|mjs)$/ }, (args: any) => {
+        const src = fs.readFileSync(args.path, 'utf-8');
+        return {
+          contents: transformForBridge(src),
+          loader: args.path.endsWith('.ts') ? 'ts' : 'js',
+          resolveDir: path.dirname(args.path),
+        };
+      });
+    },
+  };
+
+  const result = await esbuild.build({
+    entryPoints: ['__entry__'],
+    bundle: true, write: false, format: 'esm', platform: 'node',
+    plugins: [plugin],
+    alias: { '@playwright/test': shim },
+    external: [...NODE_BUILTINS].flatMap(m => [m, `node:${m}`]),
+  });
+
+  return result.outputFiles[0].text;
+}
+
+function transformForBridge(source: string): string {
+  const lines = source.split('\n');
+  const output: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
+      output.push(line);
+      i++;
+      continue;
+    }
+
+    const isPageCall = /^\s*await\s+page\./.test(line);
+    const isExpectCall = /^\s*await\s+expect\s*\(/.test(line);
+
+    if (isPageCall || isExpectCall) {
+      const indent = line.match(/^(\s*)/)?.[1] || '';
+      // Collect multi-line expression
+      let expr = '';
+      let depth = 0;
+      let started = false;
+      while (i < lines.length) {
+        expr += (expr ? '\n' : '') + lines[i].trim();
+        for (const ch of lines[i]) {
+          if (ch === '(' || ch === '[' || ch === '{') { depth++; started = true; }
+          if (ch === ')' || ch === ']' || ch === '}') depth--;
+        }
+        i++;
+        if (started && depth <= 0) break;
+      }
+      expr = expr.replace(/;?\s*$/, '');
+      output.push(`${indent}await bridge.run(${JSON.stringify(expr)});`);
+    } else {
+      output.push(line);
+      i++;
+    }
+  }
+
+  return output.join('\n');
+}
+
+async function executeInNode(compiled: string, bridge: BridgeServer): Promise<string> {
+  // Set bridge.run as global
+  (globalThis as any).bridge = {
+    run: async (command: string) => {
+      const r = await bridge.run(command);
+      if (r.isError) throw new Error(r.text || 'Bridge command failed');
+      return r;
+    },
+  };
+
+  const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
+
+  try {
+    fs.writeFileSync(tmpFile, compiled);
+    const mod = await import(`file://${tmpFile.replace(/\\/g, '/')}`);
+    return typeof mod.default === 'string' ? mod.default : '(no output)';
+  } finally {
+    delete (globalThis as any).bridge;
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+  }
 }
 
 function parseResults(output: string, file: string): TestResult[] {
