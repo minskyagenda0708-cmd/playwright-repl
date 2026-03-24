@@ -86,6 +86,9 @@ test.describe = (name: string, fn: () => void) => {
   currentSuite = parent;
 };
 (test.describe as any).configure = () => {};
+(test as any).fixme = test.skip; // treat fixme as skip
+(test as any).slow = () => {};   // no-op
+(test as any).info = () => ({ annotations: [] }); // no-op
 
 test.beforeAll = (fn: HookFn) => { currentSuite.beforeAll.push(fn); };
 test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };

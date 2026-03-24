@@ -36,7 +36,7 @@ export function discoverTests(testDir: string, filter?: string[]): string[] {
 function walkDir(dir: string, out: string[]) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    if (entry.name === 'node_modules' || entry.name === 'playwright-tests' || entry.name.startsWith('.')) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       walkDir(full, out);
