@@ -1,6 +1,6 @@
 /**
  * Execute a test file via bridge mode.
- * Uses the same compiler/bundler approach as the VS Code extension.
+ * Detects mode (browser vs compiler) and uses the appropriate path.
  */
 
 import type { BridgeServer } from '@playwright-repl/core';
@@ -11,15 +11,26 @@ export async function executeTestFile(
   bridge: BridgeServer,
   opts: RunOptions,
 ): Promise<TestResult[]> {
-  // TODO: detect mode (browser vs compiler) and use the appropriate path
-  // For Phase 1: always use browser mode (bundle + send to bridge)
+  // Detect mode
+  const { detectTestMode } = await import('./mode-detect.js');
+  const mode = await detectTestMode(testFilePath);
 
-  const { bundleTestFile } = await import('./bundler.js');
-  const script = await bundleTestFile(testFilePath);
-  const result = await bridge.runScript(script, 'javascript');
+  let resultText: string;
 
-  // Parse result text into TestResult array
-  return parseResults(result.text || '', testFilePath);
+  if (mode === 'browser') {
+    // Browser mode: bundle with shim, send to bridge (fastest)
+    const { bundleTestFile } = await import('./bundler.js');
+    const script = await bundleTestFile(testFilePath);
+    const result = await bridge.runScript(script, 'javascript');
+    resultText = result.text || '';
+  } else {
+    // Compiler mode: transform page/expect → bridge.run(), execute in Node.js
+    const { compileTestFile, executeCompiledTest } = await import('./compiler.js');
+    const compiled = await compileTestFile(testFilePath);
+    resultText = await executeCompiledTest(compiled, (cmd) => bridge.run(cmd));
+  }
+
+  return parseResults(resultText, testFilePath);
 }
 
 function parseResults(output: string, file: string): TestResult[] {

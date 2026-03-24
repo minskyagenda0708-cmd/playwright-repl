@@ -85,6 +85,7 @@ test.describe = (name: string, fn: () => void) => {
   fn();
   currentSuite = parent;
 };
+(test.describe as any).configure = () => {}; // no-op — parallel mode not supported yet
 
 test.beforeAll = (fn: HookFn) => { currentSuite.beforeAll.push(fn); };
 test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };
