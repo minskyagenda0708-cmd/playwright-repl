@@ -135,8 +135,8 @@ test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
 // ─── Runner ────────────────────────────────────────────────────────────────
 
-// In compiler mode, page is null — page.* calls are transformed to bridge.run()
-// bridge is provided via globalThis by the execution engine
+// page = Proxy → bridge. expect = smart (proxy → bridge, value → native).
+// Provided via globalThis by the execution engine.
 
 async function runSuite(
   suite: Suite,
@@ -145,7 +145,8 @@ async function runSuite(
   prefix: string,
 ): Promise<TestResult[]> {
   const results: TestResult[] = [];
-  const fixtures = { page: null, context: null, expect: null };
+  const _g = globalThis as any;
+  const fixtures = { page: _g.__proxyPage, context: null, expect: _g.__proxyExpect };
   const allBeforeEach = [...parentBeforeEach, ...suite.beforeEach];
   const allAfterEach = [...suite.afterEach, ...parentAfterEach];
 
@@ -233,9 +234,11 @@ async function __runTests(): Promise<string> {
 // esbuild tree-shakes unexported functions, but globalThis assignments survive.
 (globalThis as any).__runTests = __runTests;
 
-// expect stub — compiler transforms expect() calls to bridge.run()
-function expect(..._args: unknown[]): unknown {
-  throw new Error('expect() should not be called in compiler mode — transformed to bridge.run()');
+// Smart expect: proxy → bridge, value → native assertion
+function expect(target: unknown): unknown {
+  const smartExpect = (globalThis as any).__proxyExpect;
+  if (smartExpect) return smartExpect(target);
+  throw new Error('expect() not available — __proxyExpect not set');
 }
 
 export { test, expect, __runTests };
