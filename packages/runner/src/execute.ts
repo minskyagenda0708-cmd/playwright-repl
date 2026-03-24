@@ -108,26 +108,43 @@ function transformForBridge(source: string): string {
       continue;
     }
 
-    const isPageCall = /^\s*await\s+page\./.test(line);
-    const isExpectCall = /^\s*await\s+expect\s*\(/.test(line);
+    // Detect browser line: any line with page. or expect( or Promise.all with page
+    const isBrowserLine = /\bpage\b[.(]/.test(trimmed) || /\bexpect\s*\(/.test(trimmed);
 
-    if (isPageCall || isExpectCall) {
+    if (isBrowserLine) {
       const indent = line.match(/^(\s*)/)?.[1] || '';
-      // Collect multi-line expression
-      let expr = '';
-      let depth = 0;
-      let started = false;
+      // Collect consecutive browser lines into one block
+      const block: string[] = [];
       while (i < lines.length) {
-        expr += (expr ? '\n' : '') + lines[i].trim();
-        for (const ch of lines[i]) {
-          if (ch === '(' || ch === '[' || ch === '{') { depth++; started = true; }
+        const l = lines[i];
+        const t = l.trim();
+        if (!t) { i++; continue; } // skip blank lines inside block
+        // Keep collecting if line references page, expect, or a variable from previous lines
+        const isRelated = /\bpage\b[.(]/.test(t) || /\bexpect\s*\(/.test(t) ||
+          /^\s*(?:const|let|var)\s+/.test(t) && block.length > 0 ||
+          /^\s*await\s+/.test(t) && block.length > 0 ||
+          /^\s*\]/.test(t) || /^\s*\)/.test(t); // closing brackets
+        if (!isRelated && block.length > 0) break;
+        // Collect multi-line expression (track brackets)
+        let expr = t;
+        let depth = 0;
+        for (const ch of t) {
+          if (ch === '(' || ch === '[' || ch === '{') depth++;
           if (ch === ')' || ch === ']' || ch === '}') depth--;
         }
         i++;
-        if (started && depth <= 0) break;
+        while (depth > 0 && i < lines.length) {
+          expr += '\n' + lines[i].trim();
+          for (const ch of lines[i]) {
+            if (ch === '(' || ch === '[' || ch === '{') depth++;
+            if (ch === ')' || ch === ']' || ch === '}') depth--;
+          }
+          i++;
+        }
+        block.push(expr);
       }
-      expr = expr.replace(/;?\s*$/, '');
-      output.push(`${indent}await bridge.run(${JSON.stringify(expr)});`);
+      const blockCode = block.join('\n').replace(/;?\s*$/, '');
+      output.push(`${indent}await bridge.run(${JSON.stringify(blockCode)});`);
     } else {
       output.push(line);
       i++;
