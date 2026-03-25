@@ -79,8 +79,6 @@ async function ensureServer(): Promise<Server> {
 // Extend test with server + platform fixtures
 const test = base.extend<{
   server: Server;
-  browserName: string;
-  headless: boolean;
   isAndroid: boolean;
   isLinux: boolean;
   isWindows: boolean;
@@ -88,13 +86,12 @@ const test = base.extend<{
   isFrozenWebkit: boolean;
   isElectron: boolean;
   mode: string;
+  isBidi: boolean;
 }>({
   server: async ({}, use) => {
     const srv = await ensureServer();
     await use(srv);
   },
-  browserName: async ({}, use) => { await use('chromium'); },
-  headless: async ({}, use) => { await use(true); },
   isAndroid: async ({}, use) => { await use(false); },
   isLinux: async ({}, use) => { await use(process.platform === 'linux'); },
   isWindows: async ({}, use) => { await use(process.platform === 'win32'); },
@@ -102,6 +99,7 @@ const test = base.extend<{
   isFrozenWebkit: async ({}, use) => { await use(false); },
   isElectron: async ({}, use) => { await use(false); },
   mode: async ({}, use) => { await use('default'); },
+  isBidi: async ({}, use) => { await use(false); },
 });
 
 
