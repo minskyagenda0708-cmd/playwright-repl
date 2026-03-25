@@ -1,10 +1,13 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: '.',
-  testIgnore: ['playwright-tests/**'],  // exclude until pageTest wrapper is fixed
+  testDir: './todomvc',
   timeout: 15000,
+  fullyParallel: true,
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
   ],
 });
