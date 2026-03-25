@@ -2,11 +2,9 @@
 /**
  * pw — drop-in replacement for npx playwright test
  *
- * Spawns Playwright CLI with context reuse patch.
- * Each worker launches its own browser (local CDP, fast).
- * pw-preload.cjs patches newContext to reuse one context/page per worker.
- *
- * Test files stay unchanged.
+ * 1. Spawns Playwright CLI with custom worker via --require preload
+ * 2. Each worker lazily launches its own browser + bridge (reused across test groups)
+ * 3. Worker compiles test → sends to bridge (one call) → results back
  */
 
 import { spawn } from 'node:child_process';
@@ -19,8 +17,6 @@ const require = createRequire(__filename);
 
 const pwCliPath = require.resolve('@playwright/test/cli');
 const preloadPath = path.resolve(path.dirname(__filename), '..', 'src', 'pw-preload.cjs');
-
-// Find extension path
 const extPkgPath = require.resolve('@playwright-repl/extension/package.json');
 const extPath = path.resolve(path.dirname(extPkgPath), 'dist');
 
@@ -35,7 +31,7 @@ const child = spawn(process.execPath, [pwCliPath, ...args], {
   cwd: process.cwd(),
   env: {
     ...process.env,
-    PW_REUSE_CONTEXT: '1',
+    PW_BRIDGE_WORKER: '1',
     PW_EXT_PATH: extPath,
     NODE_OPTIONS: `${existingNodeOptions} --require ${preloadPath}`.trim(),
   },
