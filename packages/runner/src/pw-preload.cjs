@@ -1,8 +1,9 @@
 /**
  * Preloaded via NODE_OPTIONS --require.
  * Patches chromium.launch → launchPersistentContext with extension.
- * Returns context._browser so Playwright fixtures work.
- * Reuses one context/page per worker.
+ * Each worker gets its own bridge on random port (supports parallel).
+ * Sets bridge port via chrome.storage after launch.
+ * Reuses one browser + context + page per worker.
  */
 'use strict';
 
@@ -28,11 +29,17 @@ Module._load = function(request) {
     origLaunch._pwPatched = true;
 
     chromium.launch = async function(options) {
-      // Return cached browser
       if (sharedBrowser) return sharedBrowser;
 
       if (extPath) {
-        // Extension mode: launchPersistentContext + channel:chromium
+        // Start bridge on random port (each worker gets its own)
+        var coreMain = require.resolve('@playwright-repl/core');
+        var coreUrl = 'file:///' + coreMain.replace(/\\/g, '/');
+        var { BridgeServer } = await import(coreUrl);
+        var bridge = new BridgeServer();
+        await bridge.start(0);
+
+        // Launch with extension
         var args = (options && options.args || []).concat([
           '--disable-extensions-except=' + extPath,
           '--load-extension=' + extPath,
@@ -45,11 +52,21 @@ Module._load = function(request) {
           args: args,
         });
 
+        // Set bridge port via service worker
+        var sw = context.serviceWorkers()[0];
+        if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 10000 });
+        await sw.evaluate(function(port) {
+          chrome.storage.local.set({ bridgePort: port });
+        }, bridge.port);
+
+        // Wait for extension to connect
+        await bridge.waitForConnection(10000);
+        console.error('[pw] bridge port ' + bridge.port + ' connected (pid ' + process.pid + ')');
+
         sharedContext = context;
         sharedPage = context.pages()[0] || await context.newPage();
-        console.error('[pw] extension + context reuse (pid ' + process.pid + ')');
 
-        // Return real browser from persistent context
+        // Return real browser with patched newContext
         var browser = context._browser;
         browser.newContext = async function() {
           context.newPage = async function() { return sharedPage; };
