@@ -16,6 +16,14 @@ export interface TestResult {
   skipped: boolean;
   error?: string;
   duration: number;
+  line?: number;   // 1-based line number from reporter output
+}
+
+export interface DiscoveredTest {
+  title: string;     // leaf test name (e.g. "test name")
+  fullName: string;  // full path with describes (e.g. "describe > test name")
+  line: number;      // 1-based line number
+  column: number;
 }
 
 export interface PlaywrightConfig {

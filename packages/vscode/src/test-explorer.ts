@@ -264,34 +264,46 @@ export class TestExplorer {
       const fileUri = vscode.Uri.parse(fileKey);
       try {
         const runTestPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'run-test.js');
-        const { runTestFile, needsNodeMode } = await import(`file://${runTestPath.replace(/\\/g, '/')}`);
+        const { runTestFile, needsNodeMode, listTests } = await import(`file://${runTestPath.replace(/\\/g, '/')}`);
         const bridge = this._browserManager.bridge!;
         const page = this._browserManager.page;
 
+        const isNode = needsNodeMode(fileUri.fsPath);
+
+        // Node mode: use Playwright discovery to get real test names
+        // (resolves template literals, expands parameterized tests)
+        let activeItems = fileItems;
+        if (isNode) {
+          try {
+            const discovered = await listTests(fileUri.fsPath);
+            if (discovered.length > 0) {
+              this._outputChannel.appendLine(`  Discovery: ${discovered.length} tests via --list`);
+              activeItems = this._rebuildFileItems(fileUri, discovered);
+              for (const item of activeItems) run.enqueued(item);
+            }
+          } catch (e: unknown) {
+            this._outputChannel.appendLine(`  Discovery fallback to regex: ${(e as Error).message}`);
+          }
+        }
+
         // Build grep from requested test names
-        const testNames = fileItems.map(i => i.label);
+        const testNames = activeItems.map(i => i.label);
         const grep = testNames.length === 1 ? testNames[0] : undefined;
 
-        const isNode = needsNodeMode(fileUri.fsPath);
         this._outputChannel.appendLine(`Running: ${fileUri.fsPath}${grep ? ` (${grep})` : ''} [${isNode ? 'node' : 'bridge'}]`);
 
         // Bridge mode: mark all started upfront (results come back in batch)
         if (!isNode) {
-          for (const item of fileItems) run.started(item);
+          for (const item of activeItems) run.started(item);
         }
 
         // Stream results: update Test Explorer as each test completes
         const onResult = (r: any) => {
           const icon = r.skipped ? '-' : r.passed ? '✓' : '✗';
           this._outputChannel.appendLine(`  ${icon} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
-          // Find matching item and update immediately
-          const item = fileItems.find(i => {
-            const fullName = this._getFullTestName(i);
-            return fullName === r.name || i.label === r.name
-              || r.name.endsWith(fullName) || r.name.endsWith(i.label);
-          });
+          const item = this._matchItem(activeItems, r);
           if (!item) {
-            this._outputChannel.appendLine(`  [no match] result="${r.name}" items=[${fileItems.map(i => `"${i.label}"`).slice(0, 5).join(', ')}...]`);
+            this._outputChannel.appendLine(`  [no match] result="${r.name}" items=[${activeItems.map(i => `"${i.label}"`).slice(0, 5).join(', ')}...]`);
           }
           if (item) {
             run.started(item);
@@ -309,12 +321,8 @@ export class TestExplorer {
           for (const r of results) {
             this._outputChannel.appendLine(`  ${r.skipped ? '-' : r.passed ? '✓' : '✗'} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
           }
-          for (const item of fileItems) {
-            const fullName = this._getFullTestName(item);
-            const result = results.find((r: any) =>
-              r.name === fullName || r.name === item.label
-              || r.name.endsWith(fullName) || r.name.endsWith(item.label)
-            );
+          for (const item of activeItems) {
+            const result = this._matchResult(results, item);
             if (!result || result.skipped) {
               run.skipped(item);
             } else if (result.passed) {
@@ -327,12 +335,8 @@ export class TestExplorer {
 
         // Node mode: mark any items not matched by streaming as skipped
         if (isNode) {
-          for (const item of fileItems) {
-            const fullName = this._getFullTestName(item);
-            const hasResult = results.some((r: any) =>
-              r.name === fullName || r.name === item.label
-              || r.name.endsWith(fullName) || r.name.endsWith(item.label)
-            );
+          for (const item of activeItems) {
+            const hasResult = results.some((r: any) => this._isMatch(item, r));
             if (!hasResult) {
               run.started(item);
               run.skipped(item);
@@ -482,5 +486,110 @@ export class TestExplorer {
     // Remove the file name (first element after reversal)
     if (parts.length > 1) parts.shift();
     return parts.join(' > ');
+  }
+
+  // ─── Discovery helpers ──────────────────────────────────────────────────────
+
+  /**
+   * Rebuild TestItems for a file from Playwright discovery results.
+   * Replaces regex-parsed items with accurate names from --list.
+   */
+  private _rebuildFileItems(fileUri: vscode.Uri, discovered: any[]): vscode.TestItem[] {
+    // Find the existing file TestItem in the tree
+    let fileItem: vscode.TestItem | undefined;
+    const findFile = (items: vscode.TestItemCollection) => {
+      items.forEach(item => {
+        if (item.id === fileUri.toString()) fileItem = item;
+        else if (item.children.size > 0) findFile(item.children);
+      });
+    };
+    findFile(this._controller.items);
+    if (!fileItem) return [];
+
+    // Clear existing children and rebuild from discovery
+    const oldChildren: string[] = [];
+    fileItem.children.forEach(c => oldChildren.push(c.id));
+    for (const id of oldChildren) fileItem.children.delete(id);
+
+    // Group by describe path to rebuild hierarchy
+    const items: vscode.TestItem[] = [];
+    for (const test of discovered) {
+      const parts = test.fullName.split(' > ');
+      let parent = fileItem;
+
+      // Create describe hierarchy (all parts except last)
+      for (let i = 0; i < parts.length - 1; i++) {
+        const suiteId = `${parent.id}/${parts[i]}`;
+        let suite = parent.children.get(suiteId);
+        if (!suite) {
+          suite = this._controller.createTestItem(suiteId, parts[i], fileUri);
+          suite.range = new vscode.Range(test.line - 1, 0, test.line - 1, 0);
+          parent.children.add(suite);
+        }
+        parent = suite;
+      }
+
+      // Create the leaf test item
+      const testId = `${parent.id}/${test.title}`;
+      const item = this._controller.createTestItem(testId, test.title, fileUri);
+      item.range = new vscode.Range(test.line - 1, 0, test.line - 1, 0);
+      parent.children.add(item);
+      items.push(item);
+    }
+
+    return items;
+  }
+
+  // ─── Matching helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Match a test result to a TestItem. Tries line number first (most reliable),
+   * then falls back to name matching.
+   */
+  private _matchItem(items: vscode.TestItem[], result: any): vscode.TestItem | undefined {
+    // 1. Try exact name match (fast path — works when discovery is accurate)
+    const byName = items.find(i => {
+      const fullName = this._getFullTestName(i);
+      return fullName === result.name || i.label === result.name;
+    });
+    if (byName) return byName;
+
+    // 2. Try line number match (handles name mismatches from template literals)
+    if (result.line) {
+      const byLine = items.find(i =>
+        i.range && i.range.start.line + 1 === result.line
+      );
+      if (byLine) return byLine;
+    }
+
+    // 3. Fuzzy: endsWith (handles describe-prefixed names)
+    return items.find(i => {
+      const fullName = this._getFullTestName(i);
+      return result.name.endsWith(fullName) || result.name.endsWith(i.label);
+    });
+  }
+
+  /** Match a result array against a TestItem (for batch mode). */
+  private _matchResult(results: any[], item: vscode.TestItem): any | undefined {
+    const fullName = this._getFullTestName(item);
+    // 1. Exact name
+    let r = results.find((r: any) => r.name === fullName || r.name === item.label);
+    if (r) return r;
+    // 2. Line number
+    if (item.range) {
+      r = results.find((r: any) => r.line && item.range!.start.line + 1 === r.line);
+      if (r) return r;
+    }
+    // 3. Fuzzy
+    return results.find((r: any) => r.name.endsWith(fullName) || r.name.endsWith(item.label));
+  }
+
+  /** Check if a result matches an item (for has-result checks). */
+  private _isMatch(item: vscode.TestItem, result: any): boolean {
+    const fullName = this._getFullTestName(item);
+    if (fullName === result.name || item.label === result.name) return true;
+    if (result.line && item.range && item.range.start.line + 1 === result.line) return true;
+    if (result.name.endsWith(fullName) || result.name.endsWith(item.label)) return true;
+    return false;
   }
 }

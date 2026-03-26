@@ -13,7 +13,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { BridgeServer } from '@playwright-repl/core';
-import type { TestResult } from './types.js';
+import type { TestResult, DiscoveredTest } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -257,33 +257,97 @@ async function executeNode(
   });
 }
 
+// ─── Test Discovery ──────────────────────────────────────────────────────────
+
+// Discover tests by running `playwright test --list` in a subprocess.
+// Evaluates the file through Playwright's loader — resolves template literals,
+// expands parameterized tests, and returns accurate test names + line numbers.
+//
+// Why subprocess instead of TestServerDispatcher API:
+// The in-process API fails under pnpm because the forked loader worker resolves
+// @playwright/test to a different physical copy than the one that set the
+// currentFileSuite global — same version, two module instances, broken singleton.
+// The CLI boots from a single entry point so resolution is consistent.
+export async function listTests(filePath: string): Promise<DiscoveredTest[]> {
+  const { spawn } = await import('node:child_process');
+  const { createRequire } = await import('node:module');
+
+  const require = createRequire(__filename);
+  const pwCliPath = require.resolve('@playwright/test/cli');
+  const configDir = findConfigDir(path.dirname(filePath));
+  const relPath = path.relative(configDir, filePath).replace(/\\/g, '/');
+  const args = [pwCliPath, 'test', '--list', relPath, '--reporter', 'list'];
+
+  const nodePath = process.env.NVM_SYMLINK
+    ? path.join(process.env.NVM_SYMLINK, 'node')
+    : 'node';
+
+  return new Promise((resolve) => {
+    let buffer = '';
+    const tests: DiscoveredTest[] = [];
+
+    const child = spawn(nodePath, args, {
+      cwd: configDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: true,
+      env: (() => {
+        const env = { ...process.env };
+        delete env.ELECTRON_RUN_AS_NODE;
+        delete env.NODE_OPTIONS;
+        return env;
+      })(),
+    });
+
+    child.stdout?.on('data', (d: Buffer) => { buffer += d.toString(); });
+
+    child.on('close', () => {
+      // Parse lines: "  [project] › file.spec.ts:LINE:COL › [describe ›] test name"
+      for (const line of buffer.split('\n')) {
+        const m = line.match(/›\s+\S+?:(\d+):(\d+)\s+›\s+(.+)/);
+        if (!m) continue;
+        const lineNum = parseInt(m[1]);
+        const col = parseInt(m[2]);
+        const namePath = m[3].trim();
+        const parts = namePath.split(/\s+›\s+/);
+        const title = parts[parts.length - 1];
+        tests.push({ title, fullName: parts.join(' > '), line: lineNum, column: col });
+      }
+      resolve(tests);
+    });
+  });
+}
+
 // Parse Playwright list reporter line:
 //   ✓  1 [chromium] › file.spec.ts:10:1 › describe › test name (1.2s)
 //   ✗  2 [chromium] › file.spec.ts:20:1 › test name (3.4s)
 //   -  3 [chromium] › file.spec.ts:30:1 › test name
 function parseListLine(line: string, filePath: string): TestResult | null {
+  // Extract line number from file location: "file.spec.ts:23:1"
+  const locMatch = line.match(/›\s+\S+?:(\d+):\d+\s+›/);
+  const sourceLine = locMatch ? parseInt(locMatch[1]) : undefined;
+
   // Match passed: ✓ or ok
   const passMatch = line.match(/^\s*[✓✔].*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
   if (passMatch) {
     const dur = passMatch[3] === 's' ? parseFloat(passMatch[2]) * 1000 : parseFloat(passMatch[2]);
-    return { name: passMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur };
+    return { name: passMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur, line: sourceLine };
   }
   // Match passed (plain text): "  ok N [project] › ..."
   const okMatch = line.match(/^\s*ok\s+\d+.*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
   if (okMatch) {
     const dur = okMatch[3] === 's' ? parseFloat(okMatch[2]) * 1000 : parseFloat(okMatch[2]);
-    return { name: okMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur };
+    return { name: okMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur, line: sourceLine };
   }
   // Match failed: ✗ or x
   const failMatch = line.match(/^\s*[✗✘×].*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
   if (failMatch) {
     const dur = failMatch[3] === 's' ? parseFloat(failMatch[2]) * 1000 : parseFloat(failMatch[2]);
-    return { name: failMatch[1].trim(), file: filePath, passed: false, skipped: false, duration: dur };
+    return { name: failMatch[1].trim(), file: filePath, passed: false, skipped: false, duration: dur, line: sourceLine };
   }
   // Match skipped: -
   const skipMatch = line.match(/^\s*-\s+\d+.*?›\s+.*?›\s+(.+)/);
   if (skipMatch) {
-    return { name: skipMatch[1].trim(), file: filePath, passed: true, skipped: true, duration: 0 };
+    return { name: skipMatch[1].trim(), file: filePath, passed: true, skipped: true, duration: 0, line: sourceLine };
   }
   return null;
 }
