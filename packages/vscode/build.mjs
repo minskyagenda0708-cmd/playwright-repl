@@ -6,15 +6,31 @@ const watch = process.argv.includes('--watch');
 
 /** @type {esbuild.BuildOptions} */
 const options = {
-  entryPoints: ['src/extension.ts'],
+  entryPoints: [
+    'src/extension.ts',
+    'src/babelBundle.ts',
+    'src/oopReporter.ts',
+    'src/debugTransform.ts',
+    'src/playwrightFinder.ts',
+    'src/settingsView.script.ts',
+    'src/locatorsView.script.ts',
+  ],
   bundle: true,
-  outfile: 'dist/extension.js',
-  external: ['vscode', '@playwright-repl/core', 'esbuild'],
+  outdir: 'dist',
+  external: [
+    'vscode',
+    // These are loaded dynamically by the extension at runtime
+    './babelBundle',
+    './debugTransform',
+    './oopReporter',
+    './playwrightFinder',
+    './*.script',
+  ],
   format: 'cjs',
   platform: 'node',
-  target: 'node20',
+  target: 'ES2019',
   sourcemap: true,
-  minify: false,
+  minify: !watch,
 };
 
 if (watch) {

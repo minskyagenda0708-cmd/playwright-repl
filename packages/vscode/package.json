@@ -1,72 +1,174 @@
 {
   "name": "playwright-ide",
   "displayName": "Playwright IDE",
-  "description": "Playwright IDE — 35x faster test execution with live REPL",
+  "description": "Playwright IDE — fast test execution with live REPL, trace viewer, and bridge mode",
+  "icon": "images/playwright-logo.png",
   "version": "0.20.0",
   "private": true,
   "publisher": "playwright-repl",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
-    "Testing",
-    "Debuggers"
+    "Testing"
   ],
   "main": "./dist/extension.js",
+  "l10n": "./l10n",
   "activationEvents": [
-    "onStartupFinished"
+    "workspaceContains:**/*playwright*.config.{ts,js,mjs}"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "playwright-ide.launchBrowser",
-        "title": "Playwright IDE: Launch Browser"
+        "category": "Test",
+        "command": "pw.extension.install",
+        "title": "%contributes.command.pw.extension.install%"
       },
       {
-        "command": "playwright-ide.openRepl",
-        "title": "Playwright IDE: Open REPL"
+        "category": "Test",
+        "command": "pw.extension.installBrowsers",
+        "title": "%contributes.command.pw.extension.installBrowsers%"
       },
       {
-        "command": "playwright-ide.runTest",
-        "title": "Playwright IDE: Run Test File"
+        "category": "Test",
+        "command": "pw.extension.command.inspect",
+        "title": "%contributes.command.pw.extension.command.inspect%"
       },
       {
-        "command": "playwright-ide.stopBrowser",
-        "title": "Playwright IDE: Stop Browser"
+        "category": "Test",
+        "command": "pw.extension.command.closeBrowsers",
+        "title": "%contributes.command.pw.extension.command.closeBrowsers%"
       },
       {
-        "command": "playwright-ide.startRecording",
-        "title": "Playwright IDE: Start Recording"
+        "category": "Test",
+        "icon": "$(record)",
+        "command": "pw.extension.command.recordNew",
+        "title": "%contributes.command.pw.extension.command.recordNew%"
       },
       {
-        "command": "playwright-ide.stopRecording",
-        "title": "Playwright IDE: Stop Recording"
+        "category": "Test",
+        "icon": "$(record)",
+        "command": "pw.extension.command.recordAtCursor",
+        "title": "%contributes.command.pw.extension.command.recordAtCursor%"
       },
       {
-        "command": "playwright-ide.pickLocator",
-        "title": "Playwright IDE: Pick Locator"
+        "category": "Test",
+        "icon": "$(gear)",
+        "command": "pw.extension.command.toggleModels",
+        "title": "%contributes.command.pw.extension.command.toggleModels%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.toggle.reuseBrowser",
+        "title": "%contributes.command.pw.extension.toggle.reuseBrowser%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.toggle.showTrace",
+        "title": "%contributes.command.pw.extension.toggle.showTrace%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.toggle.runGlobalSetupOnEachRun",
+        "title": "%contributes.command.pw.extension.toggle.runGlobalSetupOnEachRun%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.toggle.pickLocatorCopyToClipboard",
+        "title": "%contributes.command.pw.extension.toggle.pickLocatorCopyToClipboard%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.command.runGlobalSetup",
+        "title": "%contributes.command.pw.extension.command.runGlobalSetup%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.command.runGlobalTeardown",
+        "title": "%contributes.command.pw.extension.command.runGlobalTeardown%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.command.startDevServer",
+        "title": "%contributes.command.pw.extension.command.startDevServer%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.command.stopDevServer",
+        "title": "%contributes.command.pw.extension.command.stopDevServer%"
+      },
+      {
+        "category": "Test",
+        "command": "pw.extension.command.clearCache",
+        "title": "%contributes.command.pw.extension.command.clearCache%"
       }
     ],
     "configuration": {
-      "title": "Playwright IDE",
+      "title": "Playwright",
       "properties": {
-        "playwright-ide.browser": {
+        "playwright.env": {
+          "type": "object",
+          "default": {},
+          "description": "%configuration.playwright.env%"
+        },
+        "playwright.reuseBrowser": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.playwright.reuseBrowser%"
+        },
+        "playwright.showTrace": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.playwright.showTrace%"
+        },
+        "playwright.runGlobalSetupOnEachRun": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.playwright.runGlobalSetupOnEachRun%"
+        },
+        "playwright.pickLocatorCopyToClipboard": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.playwright.pickLocatorCopyToClipboard%"
+        },
+        "playwright.updateSnapshots": {
           "type": "string",
-          "default": "chromium",
-          "enum": ["chromium", "chrome", "msedge"],
-          "description": "Browser to launch (chromium = Playwright's bundled Chromium)"
+          "enum": ["all", "changed", "missing", "none"],
+          "default": "missing",
+          "description": "%configuration.playwright.updateSnapshots%"
         },
-"playwright-ide.headless": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run browser in headless mode (no visible window)"
-        },
-        "playwright-ide.watchMode": {
-          "type": "boolean",
-          "default": false,
-          "description": "Auto-run tests on save (also available via Test Explorer's continuous run icon)"
+        "playwright.updateSourceMethod": {
+          "type": "string",
+          "enum": ["overwrite", "patch", "3way"],
+          "default": "3way",
+          "description": "%configuration.playwright.updateSourceMethod%"
         }
       }
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "playwrightContainer",
+          "title": "Playwright",
+          "icon": "images/playwright-logo.png"
+        }
+      ]
+    },
+    "views": {
+      "test": [
+        {
+          "type": "webview",
+          "id": "pw.extension.settingsView",
+          "name": "%views.test.pw.extension.settingsView%"
+        }
+      ],
+      "playwrightContainer": [
+        {
+          "type": "webview",
+          "id": "pw.extension.locatorsView",
+          "name": "%views.test.pw.extension.locatorsView%"
+        }
+      ]
     }
   },
   "scripts": {
@@ -74,11 +176,26 @@
     "watch": "node build.mjs --watch"
   },
   "dependencies": {
+    "@babel/core": "^7.23.2",
+    "@babel/helper-plugin-utils": "^7.22.5",
+    "@babel/plugin-proposal-decorators": "^7.24.7",
+    "@babel/preset-typescript": "^7.23.2",
+    "@babel/traverse": "^7.23.2",
     "@playwright-repl/core": "workspace:*",
-    "@playwright-repl/runner": "workspace:*"
+    "@playwright-repl/runner": "workspace:*",
+    "stack-utils": "^2.0.6",
+    "which": "^4.0.0",
+    "ws": "^8.17.1"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
+    "@types/babel__core": "^7.20.3",
+    "@types/babel__helper-plugin-utils": "^7.10.2",
+    "@types/babel__traverse": "^7.20.3",
+    "@types/node": "^18.11.9",
+    "@types/stack-utils": "^2.0.1",
+    "@types/vscode": "1.93.0",
+    "@types/which": "^3.0.3",
+    "@types/ws": "^8.5.3",
     "esbuild": "^0.25.0"
   }
 }
