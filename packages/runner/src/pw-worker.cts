@@ -9,11 +9,14 @@
  * Bridge state (browser + bridge server) is lazily created and reused
  * across all bridge test groups within the same worker process.
  */
-'use strict';
+
+import fs = require('fs');
+import path = require('path');
+import { pathToFileURL } from 'url';
 
 // ─── Node API detection ───
 
-const NODE_API_PATTERNS = [
+const NODE_API_PATTERNS: RegExp[] = [
   // Node built-in modules
   /\brequire\s*\(\s*['"]fs['"]\)/,
   /\brequire\s*\(\s*['"]path['"]\)/,
@@ -44,16 +47,14 @@ const NODE_API_PATTERNS = [
   /\.\$\$eval\s*\(/,
 ];
 
-function needsNode(filePath) {
-  const fs = require('fs');
-  const path = require('path');
-  const checked = new Set();
+function needsNode(filePath: string): boolean {
+  const checked = new Set<string>();
 
-  function check(file) {
+  function check(file: string): boolean {
     if (checked.has(file)) return false;
     checked.add(file);
 
-    let source;
+    let source: string;
     try { source = fs.readFileSync(file, 'utf-8'); }
     catch { return false; }
 
@@ -61,9 +62,8 @@ function needsNode(filePath) {
       if (pattern.test(source)) return true;
     }
 
-    // Check local imports (./foo, ../foo)
     const importRe = /(?:import|from)\s+['"](\.[^'"]+)['"]/g;
-    let m;
+    let m: RegExpExecArray | null;
     while ((m = importRe.exec(source)) !== null) {
       const dir = path.dirname(file);
       const candidates = [
@@ -83,13 +83,12 @@ function needsNode(filePath) {
 
 // ─── Bridge state (shared across test groups in one worker) ───
 
-let _bridge = null;
-let _context = null;
+let _bridge: any = null;
+let _context: any = null;
 
-async function ensureBridge() {
+async function ensureBridge(): Promise<void> {
   if (_bridge) return;
 
-  const { pathToFileURL } = require('url');
   const coreMain = require.resolve('@playwright-repl/core');
   const { BridgeServer } = await import(pathToFileURL(coreMain).href);
 
@@ -110,15 +109,15 @@ async function ensureBridge() {
 
   let sw = _context.serviceWorkers()[0];
   if (!sw) sw = await _context.waitForEvent('serviceworker', { timeout: 10000 });
-  await sw.evaluate(function(port) {
-    chrome.storage.local.set({ bridgePort: port });
+  await sw.evaluate(function (port: number) {
+    (globalThis as any).chrome.storage.local.set({ bridgePort: port });
   }, _bridge.port);
 
   await _bridge.waitForConnection(10000);
   console.error('[pw-worker] bridge ready, port ' + _bridge.port + ' (pid ' + process.pid + ')');
 }
 
-async function closeBridge() {
+async function closeBridge(): Promise<void> {
   if (_context) await _context.close().catch(() => {});
   if (_bridge) await _bridge.close().catch(() => {});
   _context = null;
@@ -127,12 +126,12 @@ async function closeBridge() {
 
 // ─── Test name resolution ───
 
-async function resolveTestNames(worker, runPayload) {
+async function resolveTestNames(worker: any, runPayload: any): Promise<Map<string, string> | null> {
   await worker._loadIfNeeded();
 
   const cacheKeys = Object.keys(require.cache);
-  const testLoaderPath = cacheKeys.find(k => k.includes('common') && k.endsWith('testLoader.js'));
-  const suiteUtilsPath = cacheKeys.find(k => k.includes('common') && k.endsWith('suiteUtils.js'));
+  const testLoaderPath = cacheKeys.find((k: string) => k.includes('common') && k.endsWith('testLoader.js'));
+  const suiteUtilsPath = cacheKeys.find((k: string) => k.includes('common') && k.endsWith('suiteUtils.js'));
   if (!testLoaderPath || !suiteUtilsPath) return null;
 
   const { loadTestFile } = require(testLoaderPath);
@@ -143,7 +142,7 @@ async function resolveTestNames(worker, runPayload) {
   if (worker._params.repeatEachIndex)
     applyRepeatEachIndex(worker._project, suite, worker._params.repeatEachIndex);
 
-  const idToTitle = new Map();
+  const idToTitle = new Map<string, string>();
   for (const test of suite.allTests()) {
     const fullName = test.titlePath().slice(1).join(' > ');
     idToTitle.set(test.id, fullName);
@@ -151,20 +150,21 @@ async function resolveTestNames(worker, runPayload) {
   return idToTitle;
 }
 
-function buildGrep(testNames) {
+function buildGrep(testNames: string[]): string | null {
   if (!testNames || testNames.length === 0) return null;
-  const escaped = testNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escaped = testNames.map((n: string) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return '^(' + escaped.join('|') + ')$';
 }
 
 // ─── Bridge execution ───
 
-async function runOnBridge(worker, compiled, runPayload, idToTitle) {
+interface TestResultEntry { status: string; duration: number; errors: { message: string }[]; }
+
+async function runOnBridge(worker: any, compiled: string, runPayload: any, idToTitle: Map<string, string> | null): Promise<void> {
   const entries = runPayload.entries;
 
-  // Build grep to run only requested tests
-  const requestedNames = idToTitle
-    ? entries.map(e => idToTitle.get(e.testId)).filter(Boolean)
+  const requestedNames: string[] = idToTitle
+    ? entries.map((e: any) => idToTitle.get(e.testId)).filter(Boolean)
     : [];
   const grepPattern = buildGrep(requestedNames);
 
@@ -177,24 +177,24 @@ async function runOnBridge(worker, compiled, runPayload, idToTitle) {
 
   const r = await _bridge.runScript(script, 'javascript');
 
-  const resultText = r.isError ? '' : (r.text || '');
+  const resultText: string = r.isError ? '' : (r.text || '');
   const lines = resultText.split('\n');
 
   for (const entry of entries) {
-    const testId = entry.testId;
+    const testId: string = entry.testId;
     const testName = idToTitle ? idToTitle.get(testId) : null;
 
     worker.dispatchEvent('testBegin', {
-      testId: testId,
+      testId,
       startWallTime: Date.now(),
     });
 
-    const testResult = testName
+    const testResult: TestResultEntry = testName
       ? findResultByName(lines, testName)
       : findResultByIndex(lines, entries.indexOf(entry));
 
     worker.dispatchEvent('testEnd', {
-      testId: testId,
+      testId,
       duration: testResult.duration,
       status: testResult.status,
       errors: testResult.errors,
@@ -212,7 +212,7 @@ async function runOnBridge(worker, compiled, runPayload, idToTitle) {
   console.error('[pw-worker] bridge done (pid ' + process.pid + ')');
 }
 
-function findResultByName(lines, testName) {
+function findResultByName(lines: string[], testName: string): TestResultEntry {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const passMatch = line.match(/^\s*[✓✔]\s+(.+?)\s+\(\d+ms\)$/);
@@ -234,7 +234,7 @@ function findResultByName(lines, testName) {
   return { status: 'failed', duration: 0, errors: [{ message: 'Test result not found' }] };
 }
 
-function findResultByIndex(lines, idx) {
+function findResultByIndex(lines: string[], idx: number): TestResultEntry {
   let currentIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -263,10 +263,8 @@ function findResultByIndex(lines, idx) {
 
 // ─── Compile ───
 
-async function compile(testFilePath) {
+async function compile(testFilePath: string): Promise<string> {
   const esbuild = require('esbuild');
-  const path = require('path');
-  const fs = require('fs');
 
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
@@ -277,7 +275,7 @@ async function compile(testFilePath) {
 
   const plugin = {
     name: 'pw-bridge',
-    setup(build) {
+    setup(build: any) {
       build.onResolve({ filter: /^__entry__$/ }, () => ({ path: '__entry__', namespace: 'entry' }));
       build.onLoad({ filter: /.*/, namespace: 'entry' }, () => ({
         contents: 'import "./' + testFileName + '";',
@@ -302,19 +300,19 @@ async function compile(testFilePath) {
 
 // ─── Patch real WorkerMain ───
 
-function patchWorker(worker, params) {
+function patchWorker(worker: any, _params: unknown): void {
   const origRunTestGroup = worker.runTestGroup.bind(worker);
   const origGracefullyClose = worker.gracefullyClose.bind(worker);
 
-  worker.runTestGroup = async function(runPayload) {
+  worker.runTestGroup = async function (runPayload: any) {
     if (needsNode(runPayload.file)) {
       console.error('[pw-worker] node mode: ' + runPayload.file);
       return origRunTestGroup(runPayload);
     }
 
     const idToTitle = await resolveTestNames(worker, runPayload);
-    const names = idToTitle
-      ? runPayload.entries.map(e => idToTitle.get(e.testId)).filter(Boolean)
+    const names: string[] = idToTitle
+      ? runPayload.entries.map((e: any) => idToTitle.get(e.testId)).filter(Boolean)
       : [];
     console.error('[pw-worker] bridge mode: ' + runPayload.file +
       (names.length ? ' (' + names.join(', ') + ')' : ''));
@@ -324,7 +322,7 @@ function patchWorker(worker, params) {
     return runOnBridge(worker, compiled, runPayload, idToTitle);
   };
 
-  worker.gracefullyClose = async function() {
+  worker.gracefullyClose = async function () {
     await closeBridge();
     return origGracefullyClose();
   };

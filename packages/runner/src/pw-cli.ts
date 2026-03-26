@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const require = createRequire(__filename);
 
 const pwCliPath = require.resolve('@playwright/test/cli');
-const preloadPath = path.resolve(path.dirname(__filename), '..', 'src', 'pw-preload.cjs');
+const preloadPath = path.resolve(path.dirname(__filename), 'pw-preload.cjs');
 const extPkgPath = require.resolve('@playwright-repl/extension/package.json');
 const extPath = path.resolve(path.dirname(extPkgPath), 'dist');
 
