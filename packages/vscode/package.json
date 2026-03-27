@@ -88,33 +88,33 @@
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.launchBrowser",
-        "title": "Playwright REPL: Launch Browser"
+        "title": "Launch Browser"
       },
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.stopBrowser",
-        "title": "Playwright REPL: Stop Browser"
+        "title": "Stop Browser"
       },
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.openRepl",
-        "title": "Playwright REPL: Open REPL"
+        "title": "Open REPL"
       },
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.startRecording",
         "icon": "$(record)",
-        "title": "Playwright REPL: Start Recording"
+        "title": "Start Recording"
       },
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.stopRecording",
-        "title": "Playwright REPL: Stop Recording"
+        "title": "Stop Recording"
       },
       {
         "category": "Playwright REPL",
         "command": "playwright-repl.pickLocator",
-        "title": "Playwright REPL: Pick Locator"
+        "title": "Pick Locator"
       }
     ],
     "configuration": {
