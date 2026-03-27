@@ -1,4 +1,4 @@
-# Playwright IDE — VS Code Extension
+# Playwright REPL — VS Code Extension
 
 Interactive Playwright REPL inside VS Code, powered by bridge mode for fast execution.
 
@@ -32,10 +32,10 @@ node build.mjs --watch
 
 ## Commands
 
-- **Playwright IDE: Launch Browser** — spawns Chromium with extension, starts bridge
-- **Playwright IDE: Open REPL** — opens the interactive terminal
-- **Playwright IDE: Run Test File** — runs current file with Playwright Test
-- **Playwright IDE: Stop Browser** — closes browser and bridge
+- **Playwright REPL: Launch Browser** — spawns Chromium with extension, starts bridge
+- **Playwright REPL: Open REPL** — opens the interactive terminal
+- **Playwright REPL: Run Test File** — runs current file with Playwright Test
+- **Playwright REPL: Stop Browser** — closes browser and bridge
 
 ## Settings
 

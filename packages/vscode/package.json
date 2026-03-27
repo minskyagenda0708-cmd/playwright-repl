@@ -1,7 +1,7 @@
 {
   "name": "playwright-ide",
-  "displayName": "Playwright IDE",
-  "description": "Playwright IDE — fast test execution with live REPL, trace viewer, and bridge mode",
+  "displayName": "Playwright REPL",
+  "description": "Playwright REPL — fast test execution with live REPL, trace viewer, and bridge mode",
   "icon": "images/playwright-logo.png",
   "version": "0.20.0",
   "private": true,
@@ -86,39 +86,39 @@
         "title": "%contributes.command.playwright-ide.clearCache%"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.launchBrowser",
-        "title": "Playwright IDE: Launch Browser"
+        "title": "Playwright REPL: Launch Browser"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.stopBrowser",
-        "title": "Playwright IDE: Stop Browser"
+        "title": "Playwright REPL: Stop Browser"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.openRepl",
-        "title": "Playwright IDE: Open REPL"
+        "title": "Playwright REPL: Open REPL"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.startRecording",
         "icon": "$(record)",
-        "title": "Playwright IDE: Start Recording"
+        "title": "Playwright REPL: Start Recording"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.stopRecording",
-        "title": "Playwright IDE: Stop Recording"
+        "title": "Playwright REPL: Stop Recording"
       },
       {
-        "category": "Playwright IDE",
+        "category": "Playwright REPL",
         "command": "playwright-ide.pickLocator",
-        "title": "Playwright IDE: Pick Locator"
+        "title": "Playwright REPL: Pick Locator"
       }
     ],
     "configuration": {
-      "title": "Playwright IDE",
+      "title": "Playwright REPL",
       "properties": {
         "playwright-ide.env": {
           "type": "object",
@@ -168,7 +168,7 @@
       "panel": [
         {
           "id": "playwrightIdeContainer",
-          "title": "Playwright IDE",
+          "title": "Playwright REPL",
           "icon": "images/playwright-logo.png"
         }
       ]

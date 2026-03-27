@@ -92,7 +92,7 @@ export class Extension implements RunHooks {
   private _watchFilesBatch?: vscodeTypes.TestItem[];
   private _watchItemsBatch?: vscodeTypes.TestItem[];
 
-  // Playwright IDE: bridge-based features
+  // Playwright REPL: bridge-based features
   private _browserManager?: BrowserManager;
   private _recorder?: Recorder;
   private _picker?: Picker;
@@ -155,7 +155,7 @@ export class Extension implements RunHooks {
       testPausedHandler: this._onTestPaused.bind(this),
       logger: this._logger,
     });
-    this._testController = vscode.tests.createTestController('playwright-ide', 'Playwright IDE');
+    this._testController = vscode.tests.createTestController('playwright-ide', 'Playwright REPL');
     this._testController.resolveHandler = item => this._resolveChildren(item);
     this._testController.refreshHandler = () => this._rebuildModelsImmediately(true);
     const supportsContinuousRun = true;
@@ -205,7 +205,7 @@ export class Extension implements RunHooks {
 
   private async _ensureBrowserManager() {
     if (!this._browserManager) {
-      const outputChannel = this._vscode.window.createOutputChannel('Playwright IDE');
+      const outputChannel = this._vscode.window.createOutputChannel('Playwright REPL');
       this._browserManager = new BrowserManager(outputChannel);
     }
     if (this._browserManager.isRunning())
@@ -344,7 +344,7 @@ export class Extension implements RunHooks {
       this._treeItemObserver,
       registerTerminalLinkProvider(this._vscode),
 
-      // ─── Playwright IDE: bridge-based commands ────────────────────────────
+      // ─── Playwright REPL: bridge-based commands ────────────────────────────
       vscode.commands.registerCommand('playwright-ide.launchBrowser', async () => {
         try {
           await this._ensureBrowserManager();

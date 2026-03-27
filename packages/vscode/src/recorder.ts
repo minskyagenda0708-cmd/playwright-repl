@@ -123,7 +123,7 @@ export class Recorder {
     // Status bar item — always visible, toggles between Record / Stop
     this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this._statusBarItem.text = '$(circle-filled) Record';
-    this._statusBarItem.tooltip = 'Playwright IDE: Start Recording';
+    this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
     this._statusBarItem.command = 'playwright-ide.startRecording';
     this._statusBarItem.show();
   }
@@ -160,7 +160,7 @@ export class Recorder {
     // Register event listener BEFORE starting recording to avoid race condition
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
-    this._statusBarItem.tooltip = 'Playwright IDE: Stop Recording';
+    this._statusBarItem.tooltip = 'Playwright REPL: Stop Recording';
     this._statusBarItem.command = 'playwright-ide.stopRecording';
     this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 
@@ -208,7 +208,7 @@ export class Recorder {
     await this._browserManager.runCommand('record-stop');
     this._recording = false;
     this._statusBarItem.text = '$(circle-filled) Record';
-    this._statusBarItem.tooltip = 'Playwright IDE: Start Recording';
+    this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
     this._statusBarItem.command = 'playwright-ide.startRecording';
     this._statusBarItem.backgroundColor = undefined;
     this._browserManager.onEvent(null);

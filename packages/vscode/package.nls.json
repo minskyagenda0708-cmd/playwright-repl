@@ -24,5 +24,5 @@
   "configuration.playwright-ide.updateSnapshots": "Update snapshots",
   "configuration.playwright-ide.updateSourceMethod": "Update source method",
   "views.test.playwright-ide.locatorsView": "Locators",
-  "views.test.playwright-ide.settingsView": "Playwright IDE"
+  "views.test.playwright-ide.settingsView": "Playwright REPL"
 }

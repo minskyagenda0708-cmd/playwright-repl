@@ -51,7 +51,7 @@ export class PlaywrightRepl {
   }
 
   private _onOpen() {
-    this._writeEmitter.fire(`${GREEN}Playwright IDE REPL${RESET}\r\n`);
+    this._writeEmitter.fire(`${GREEN}Playwright REPL${RESET}\r\n`);
     this._writeEmitter.fire(`${DIM}Type Playwright commands. Use ↑↓ for history.${RESET}\r\n`);
     this._prompt();
   }
@@ -186,7 +186,7 @@ export class PlaywrightRepl {
     }
 
     if (!this._browserManager?.isRunning()) {
-      this._writeEmitter.fire(`${RED}Browser not running. Use Ctrl+Shift+P → "Playwright IDE: Launch Browser" first.${RESET}\r\n`);
+      this._writeEmitter.fire(`${RED}Browser not running. Use Ctrl+Shift+P → "Playwright REPL: Launch Browser" first.${RESET}\r\n`);
       this._processing = false;
       return;
     }
