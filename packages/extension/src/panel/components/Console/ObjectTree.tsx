@@ -12,6 +12,7 @@ interface Props {
     expandDepth?: number;
     noQuote?: boolean;
     getProperties?: (objectId: string) => Promise<unknown>;
+    extraChildren?: React.ReactNode;
 }
 
 export function inlineSummary(data: SerializedValue): string {
@@ -70,7 +71,7 @@ function mergeMapSetProps(original: Record<string, SerializedValue>, fetched: Re
     return merged;
 }
 
-export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, getProperties }: Props) {
+export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, getProperties, extraChildren }: Props) {
     const [open, setOpen] = useState(depth < expandDepth);
     const [childProps, setChildProps] = useState<Record<string, SerializedValue> | null>(null);
     const [loading, setLoading] = useState(false);
@@ -155,7 +156,10 @@ export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, g
     const propsToShow = childProps
         ? (isMapOrSet ? mergeMapSetProps(data.props, childProps) : childProps)
         : data.props;
-    const keys = Object.keys(propsToShow);
+    // Skip keys rendered by extraChildren (e.g. aria in PickResult)
+    const keys = extraChildren
+        ? Object.keys(propsToShow).filter(k => !(propsToShow[k].__type === 'string' && (propsToShow[k] as any).v === '' ))
+        : Object.keys(propsToShow);
     const header = isArray ? `Array(${data.len})` : data.cls;
 
     if (keys.length === 0 && !objectId && !loading) {
@@ -192,6 +196,7 @@ export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, g
                             );
                         })
                     }
+                    {extraChildren}
                 </div>
             )}
         </span>

@@ -141,29 +141,13 @@ describe('PickResult via ObjectTree', () => {
         await expect.element(screen.getByText('verify-value "Email" "alice@test.com"')).toBeInTheDocument();
     });
 
-    // ─── Element details ──────────────────────────────────────────────────
-
-    it('renders element section header', async () => {
-        const screen = await renderPick();
-        await expect.element(screen.getByText('element')).toBeInTheDocument();
-    });
-
-    it('expands element details on toggle click', async () => {
-        const screen = await renderPick();
-        expandSection(screen.container, 'element');
-        await expect.element(screen.getByText('<button>Submit</button>')).toBeInTheDocument();
-        await expect.element(screen.getByText('button', { exact: true })).toBeInTheDocument();
-    });
-
     // ─── Sections order ──────────────────────────────────────────────────
 
-    it('renders sections in order: locator, assert, element', async () => {
+    it('renders sections in order: locator, assert', async () => {
         const screen = await renderPick();
         const text = screen.container.textContent ?? '';
         const locatorIdx = text.indexOf('locator');
         const assertIdx = text.indexOf('assert');
-        const elementIdx = text.indexOf('element');
         expect(locatorIdx).toBeLessThan(assertIdx);
-        expect(assertIdx).toBeLessThan(elementIdx);
     });
 });

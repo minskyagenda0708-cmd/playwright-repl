@@ -245,24 +245,9 @@ export function pickResultToSerialized(data: PickResultData): SerializedValue {
         props.assert = { __type: 'object', cls: '', props: assertProps };
     }
 
-    // element: { tag, text, visible, enabled, ... }
-    if (data.details) {
-        const d = data.details;
-        const ep: Record<string, SerializedValue> = {};
-        if (d.html) ep.dom = { __type: 'string', v: d.html };
-        ep.tag = { __type: 'string', v: d.tag };
-        if (d.text) ep.text = { __type: 'string', v: d.text.length > 80 ? d.text.slice(0, 80) + '…' : d.text };
-        ep.visible = { __type: 'boolean', v: d.visible };
-        ep.enabled = { __type: 'boolean', v: d.enabled };
-        if (d.value !== undefined) ep.value = { __type: 'string', v: d.value };
-        if (d.checked !== undefined) ep.checked = { __type: 'boolean', v: d.checked };
-        if (d.count > 1) ep.matches = { __type: 'number', v: d.count };
-        if (d.box) {
-            ep.size = { __type: 'string', v: `${Math.round(d.box.width)} × ${Math.round(d.box.height)}` };
-            ep.position = { __type: 'string', v: `(${Math.round(d.box.x)}, ${Math.round(d.box.y)})` };
-        }
-        for (const [k, v] of Object.entries(d.attributes)) ep[k] = { __type: 'string', v };
-        props.element = { __type: 'object', cls: '', props: ep };
+    // aria: placeholder so key appears in collapsed summary; actual rendering via extraChildren
+    if (data.ariaSnapshot) {
+        props.aria = { __type: 'string', v: '' };
     }
 
     return { __type: 'object', cls: 'PickResult', props };

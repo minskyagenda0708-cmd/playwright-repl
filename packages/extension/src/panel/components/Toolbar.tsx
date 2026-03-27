@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
-import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
+import { swTerminateExecution, swDebugResume, swDebugEval } from '@/lib/sw-debugger';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
@@ -292,8 +292,16 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         const listener = (msg: any) => {
             if (msg.type === 'element-picked-raw') {
                 setIsPicking(false);
-                resolvePlaywrightLocator(msg.pickId).then(cdpLocator => {
+                resolvePlaywrightLocator(msg.pickId).then(async cdpLocator => {
                     const pickResult = buildPickResult(msg.info, cdpLocator);
+                    // Fetch aria snapshot for the picked element
+                    try {
+                        const jsLocator = cdpLocator ?? msg.info.locator;
+                        const expr = `await page.${jsLocator}.ariaSnapshot()`;
+                        const result = await swDebugEval(expr) as { result?: { type?: string; value?: string } };
+                        if (result?.result?.type === 'string' && result.result.value)
+                            pickResult.ariaSnapshot = result.result.value;
+                    } catch { /* aria snapshot is optional */ }
                     dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
                 });
             }

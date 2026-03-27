@@ -14,6 +14,7 @@ export type PickResultData = {
     jsExpression: string;      // "await page.getByRole('button', { name: 'Submit' }).highlight()"
     assertJs?: string;         // "await expect(page.getByRole('button', { name: 'Submit' })).toContainText('Submit')"
     assertPw?: string;         // 'verify-text "Submit"'
+    ariaSnapshot?: string;     // YAML aria snapshot of the picked element
     details?: {
         tag: string;
         text: string;
