@@ -17,11 +17,15 @@ export class PlaywrightRepl {
   private _buffer = '';
   private _history: string[] = [];
   private _historyIndex = -1;
-  private _browserManager: BrowserManager;
+  private _browserManager: BrowserManager | undefined;
   private _processing = false;
   disposed = false;
 
-  constructor(browserManager: BrowserManager) {
+  constructor(browserManager?: BrowserManager) {
+    this._browserManager = browserManager;
+  }
+
+  setBrowserManager(browserManager: BrowserManager) {
     this._browserManager = browserManager;
   }
 
@@ -177,6 +181,12 @@ export class PlaywrightRepl {
     this._processing = true;
 
     if (this._handleLocal(command)) {
+      this._processing = false;
+      return;
+    }
+
+    if (!this._browserManager?.isRunning()) {
+      this._writeEmitter.fire(`${RED}Browser not running. Use Ctrl+Shift+P → "Playwright IDE: Launch Browser" first.${RESET}\r\n`);
       this._processing = false;
       return;
     }

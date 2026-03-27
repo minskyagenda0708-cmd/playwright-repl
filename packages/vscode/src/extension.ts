@@ -96,6 +96,7 @@ export class Extension implements RunHooks {
   private _browserManager?: BrowserManager;
   private _recorder?: Recorder;
   private _picker?: Picker;
+  private _repl?: PlaywrightRepl;
 
   private _modelRebuild?: { result: Promise<void>; token: vscodeTypes.CancellationTokenSource; needsAnother: boolean; };
 
@@ -191,6 +192,8 @@ export class Extension implements RunHooks {
     const vscode = this._vscode;
     this._settingsView = new SettingsView(vscode, this._settingsModel, this._models, this._reusedBrowser, this._context.extensionUri);
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
+    this._repl = new PlaywrightRepl();
+    this._repl.show();
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
     this._disposables = [
       this._debugHighlight,
@@ -315,6 +318,9 @@ export class Extension implements RunHooks {
             browser: 'chromium',
             headless: !showBrowser,
           });
+          // Wire browser manager to REPL
+          if (this._repl)
+            this._repl.setBrowserManager(this._browserManager);
         } catch (e: unknown) {
           vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }
@@ -323,13 +329,12 @@ export class Extension implements RunHooks {
         this._browserManager?.stop();
       }),
       vscode.commands.registerCommand('playwright-ide.openRepl', () => {
-        if (!this._browserManager?.isRunning()) {
-          vscode.window.showWarningMessage('Launch browser first.');
-          return;
+        if (!this._repl || this._repl.disposed) {
+          this._repl = new PlaywrightRepl(this._browserManager);
+          if (this._browserManager)
+            this._repl.setBrowserManager(this._browserManager);
         }
-        const repl = new PlaywrightRepl(this._browserManager);
-        const terminal = vscode.window.createTerminal({ name: 'Playwright REPL', pty: repl });
-        terminal.show();
+        this._repl.show();
       }),
       vscode.commands.registerCommand('playwright-ide.startRecording', async () => {
         if (!this._browserManager?.isRunning()) {
