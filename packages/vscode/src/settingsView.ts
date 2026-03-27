@@ -55,7 +55,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
     this._disposables = [
       reusedBrowser.onRunningTestsChanged(() => this._updateActions()),
       reusedBrowser.onPageCountChanged(() => this._updateActions()),
-      vscode.window.registerWebviewViewProvider('playwright-ide.settingsView', this),
+      vscode.window.registerWebviewViewProvider('playwright-repl.settingsView', this),
     ];
     this._models.onUpdated(() => {
       this._updateModels();
@@ -76,7 +76,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
       if (data.method === 'execute') {
         void this._vscode.commands.executeCommand(data.params.command);
       } else if (data.method === 'toggle') {
-        void this._vscode.commands.executeCommand(`playwright-ide.toggle.${data.params.setting}`);
+        void this._vscode.commands.executeCommand(`playwright-repl.toggle.${data.params.setting}`);
       } else if (data.method === 'set') {
         void this._settingsModel.setting(data.params.setting)!.set(data.params.value);
       } else if (data.method === 'setProjectEnabled') {
@@ -303,7 +303,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
 
 export const pickElementAction = (vscode: vscodeTypes.VSCode) => {
   return {
-    command: 'playwright-ide.pickLocator',
+    command: 'playwright-repl.pickLocator',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M18 42h-7.5c-3 0-4.5-1.5-4.5-4.5v-27C6 7.5 7.5 6 10.5 6h27C42 6 42 10.404 42 10.5V18h-3V9H9v30h9v3Zm27-15-9 6 9 9-3 3-9-9-6 9-6-24 24 6Z"/></svg>`,
     text: vscode.l10n.t('Pick locator'),
   };
@@ -311,7 +311,7 @@ export const pickElementAction = (vscode: vscodeTypes.VSCode) => {
 
 export const recordNewAction = (vscode: vscodeTypes.VSCode, reusedBrowser: ReusedBrowser) => {
   return {
-    command: 'playwright-ide.startRecording',
+    command: 'playwright-repl.startRecording',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M22.65 34h3v-8.3H34v-3h-8.35V14h-3v8.7H14v3h8.65ZM24 44q-4.1 0-7.75-1.575-3.65-1.575-6.375-4.3-2.725-2.725-4.3-6.375Q4 28.1 4 23.95q0-4.1 1.575-7.75 1.575-3.65 4.3-6.35 2.725-2.7 6.375-4.275Q19.9 4 24.05 4q4.1 0 7.75 1.575 3.65 1.575 6.35 4.275 2.7 2.7 4.275 6.35Q44 19.85 44 24q0 4.1-1.575 7.75-1.575 3.65-4.275 6.375t-6.35 4.3Q28.15 44 24 44Zm.05-3q7.05 0 12-4.975T41 23.95q0-7.05-4.95-12T24 7q-7.05 0-12.025 4.95Q7 16.9 7 24q0 7.05 4.975 12.025Q16.95 41 24.05 41ZM24 24Z"/></svg>`,
     text: vscode.l10n.t('Record'),
     disabled: false,
@@ -320,7 +320,7 @@ export const recordNewAction = (vscode: vscodeTypes.VSCode, reusedBrowser: Reuse
 
 export const stopRecordingAction = (vscode: vscodeTypes.VSCode) => {
   return {
-    command: 'playwright-ide.stopRecording',
+    command: 'playwright-repl.stopRecording',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M12 36h24V12H12Zm-2 4q-1.65 0-2.825-1.175T6 36V12q0-1.65 1.175-2.825T10 8h28q1.65 0 2.825 1.175T42 12v24q0 1.65-1.175 2.825T38 40Z"/></svg>`,
     text: vscode.l10n.t('Stop recording'),
     disabled: false,
@@ -337,7 +337,7 @@ export const revealTestOutputAction = (vscode: vscodeTypes.VSCode) => {
 
 export const closeBrowsersAction = (vscode: vscodeTypes.VSCode, reusedBrowser: ReusedBrowser) => {
   return {
-    command: 'playwright-ide.closeBrowsers',
+    command: 'playwright-repl.closeBrowsers',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path xmlns="http://www.w3.org/2000/svg" d="m12.45 37.65-2.1-2.1L21.9 24 10.35 12.45l2.1-2.1L24 21.9l11.55-11.55 2.1 2.1L26.1 24l11.55 11.55-2.1 2.1L24 26.1Z"/></svg>`,
     text: vscode.l10n.t('Close all browsers'),
     disabled: !reusedBrowser.canClose(),
@@ -346,7 +346,7 @@ export const closeBrowsersAction = (vscode: vscodeTypes.VSCode, reusedBrowser: R
 
 export const runGlobalSetupAction = (vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, models: TestModelCollection) => {
   return {
-    command: 'playwright-ide.runGlobalSetup',
+    command: 'playwright-repl.runGlobalSetup',
     svg: ``,
     text: vscode.l10n.t('Run global setup'),
     disabled: settingsModel.runGlobalSetupOnEachRun.get() || !models.selectedModel() || !models.selectedModel()!.canRunGlobalHooks('setup'),
@@ -355,7 +355,7 @@ export const runGlobalSetupAction = (vscode: vscodeTypes.VSCode, settingsModel: 
 
 export const runGlobalTeardownAction = (vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, models: TestModelCollection) => {
   return {
-    command: 'playwright-ide.runGlobalTeardown',
+    command: 'playwright-repl.runGlobalTeardown',
     svg: ``,
     text: vscode.l10n.t('Run global teardown'),
     disabled: settingsModel.runGlobalSetupOnEachRun.get() || !models.selectedModel() || !models.selectedModel()!.canRunGlobalHooks('teardown'),
@@ -364,7 +364,7 @@ export const runGlobalTeardownAction = (vscode: vscodeTypes.VSCode, settingsMode
 
 export const clearCacheAction = (vscode: vscodeTypes.VSCode, models: TestModelCollection) => {
   return {
-    command: 'playwright-ide.clearCache',
+    command: 'playwright-repl.clearCache',
     svg: ``,
     text: vscode.l10n.t('Clear cache'),
     disabled: !models.selectedModel(),

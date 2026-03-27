@@ -38,9 +38,9 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     this._settingsModel = settingsModel;
     this._reusedBrowser = reusedBrowser;
     this._disposables = [
-      vscode.window.registerWebviewViewProvider('playwright-ide.locatorsView', this),
+      vscode.window.registerWebviewViewProvider('playwright-repl.locatorsView', this),
       this._reusedBrowser.onInspectRequested(async ({ locator, ariaSnapshot, backendVersion }) => {
-        await vscode.commands.executeCommand('playwright-ide.locatorsView.focus');
+        await vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
         this._backendVersion = backendVersion;
         this._locator = { locator: locator || '' };
         this._ariaSnapshot = { yaml: ariaSnapshot || '' };
@@ -57,7 +57,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     this._locator = { locator };
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
     this._updateValues();
-    void this._vscode.commands.executeCommand('playwright-ide.locatorsView.focus');
+    void this._vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
   }
 
   public resolveWebviewView(webviewView: vscodeTypes.WebviewView, context: vscodeTypes.WebviewViewResolveContext, token: vscodeTypes.CancellationToken) {
@@ -91,7 +91,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
           this._updateValues();
         });
       } else if (data.method === 'toggle') {
-        void this._vscode.commands.executeCommand(`playwright-ide.toggle.${data.params.setting}`);
+        void this._vscode.commands.executeCommand(`playwright-repl.toggle.${data.params.setting}`);
       }
     }));
 

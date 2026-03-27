@@ -33,7 +33,7 @@ export type WorkspaceSettings = {
   configs?: ConfigSettings[];
 };
 
-export const workspaceStateKey = 'playwright-ide.workspace-settings';
+export const workspaceStateKey = 'playwright-repl.workspace-settings';
 
 export class SettingsModel extends DisposableBase {
   private _vscode: vscodeTypes.VSCode;
@@ -78,10 +78,10 @@ export class SettingsModel extends DisposableBase {
   }
 
   private _modernize() {
-    const workspaceSettings = this._vscode.workspace.getConfiguration('playwright-ide').get('workspaceSettings') as any;
+    const workspaceSettings = this._vscode.workspace.getConfiguration('playwright-repl').get('workspaceSettings') as any;
     if (workspaceSettings?.configs && !this._context.workspaceState.get(workspaceStateKey)) {
       void this._context.workspaceState.update(workspaceStateKey, { configs: workspaceSettings.configs });
-      void this._vscode.workspace.getConfiguration('playwright-ide').update('workspaceSettings', undefined);
+      void this._vscode.workspace.getConfiguration('playwright-repl').update('workspaceSettings', undefined);
     }
   }
 
@@ -144,19 +144,19 @@ class PersistentSetting<T> extends SettingBase<T> {
         if (event.affectsConfiguration(settingFQN))
           this._onChange.fire(this.get()!);
       }),
-      vscode.commands.registerCommand(`playwright-ide.toggle.${settingName}`, async () => {
+      vscode.commands.registerCommand(`playwright-repl.toggle.${settingName}`, async () => {
         await this.set(!this.get() as T);
       }),
     ];
   }
 
   get(): T | undefined {
-    const configuration = this._vscode.workspace.getConfiguration('playwright-ide');
+    const configuration = this._vscode.workspace.getConfiguration('playwright-repl');
     return configuration.get(this.settingName) as T | undefined;
   }
 
   async set(value: T) {
-    const configuration = this._vscode.workspace.getConfiguration('playwright-ide');
+    const configuration = this._vscode.workspace.getConfiguration('playwright-repl');
     const existsInWorkspace = configuration.inspect(this.settingName)?.workspaceValue !== undefined;
     if (existsInWorkspace)
       await configuration.update(this.settingName, value, false);

@@ -41,8 +41,8 @@ node build.mjs --watch
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `playwright-ide.browser` | `chromium` | Browser to launch (`chromium`, `chrome`, `msedge`) |
-| `playwright-ide.bridgePort` | `9876` | WebSocket bridge port |
+| `playwright-repl.browser` | `chromium` | Browser to launch (`chromium`, `chrome`, `msedge`) |
+| `playwright-repl.bridgePort` | `9876` | WebSocket bridge port |
 
 ## Key Files
 

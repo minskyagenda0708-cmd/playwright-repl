@@ -155,7 +155,7 @@ export class Extension implements RunHooks {
       testPausedHandler: this._onTestPaused.bind(this),
       logger: this._logger,
     });
-    this._testController = vscode.tests.createTestController('playwright-ide', 'Playwright REPL');
+    this._testController = vscode.tests.createTestController('playwright-repl', 'Playwright REPL');
     this._testController.resolveHandler = item => this._resolveChildren(item);
     this._testController.refreshHandler = () => this._rebuildModelsImmediately(true);
     const supportsContinuousRun = true;
@@ -164,7 +164,7 @@ export class Extension implements RunHooks {
     this._testTree = new TestTree(vscode, this._models, this._testController);
     this._debugHighlight.onErrorInDebugger(e => this._errorInDebugger(e.error, e.location));
     this._workspaceObserver = new WorkspaceObserver(this._vscode, changes => this._workspaceChanged(changes) , this._isUnderTest);
-    this._diagnostics = this._vscode.languages.createDiagnosticCollection('playwright-ide.testErrors.diagnostic');
+    this._diagnostics = this._vscode.languages.createDiagnosticCollection('playwright-repl.testErrors.diagnostic');
     this._treeItemObserver = new TreeItemObserver(this._vscode, this._logger);
   }
 
@@ -243,10 +243,10 @@ export class Extension implements RunHooks {
       vscode.window.onDidChangeVisibleTextEditors(() => {
         void this._updateVisibleEditorItems();
       }),
-      vscode.commands.registerCommand('playwright-ide.install', async () => {
+      vscode.commands.registerCommand('playwright-repl.install', async () => {
         await installPlaywright(this._vscode);
       }),
-      vscode.commands.registerCommand('playwright-ide.installBrowsers', async () => {
+      vscode.commands.registerCommand('playwright-repl.installBrowsers', async () => {
         if (!this._models.hasEnabledModels()) {
           await vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
           return;
@@ -255,17 +255,17 @@ export class Extension implements RunHooks {
         for (const model of versions.values())
           await installBrowsers(this._vscode, model);
       }),
-      vscode.commands.registerCommand('playwright-ide.inspect', async () => {
+      vscode.commands.registerCommand('playwright-repl.inspect', async () => {
         if (!this._models.hasEnabledModels()) {
           await vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
           return;
         }
         await this._reusedBrowser.inspect(this._models);
       }),
-      vscode.commands.registerCommand('playwright-ide.closeBrowsers', () => {
+      vscode.commands.registerCommand('playwright-repl.closeBrowsers', () => {
         this._reusedBrowser.closeAllBrowsers();
       }),
-      vscode.commands.registerCommand('playwright-ide.recordNew', async () => {
+      vscode.commands.registerCommand('playwright-repl.recordNew', async () => {
         const model = this._models.selectedModel();
         if (!model)
           return vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
@@ -287,7 +287,7 @@ export class Extension implements RunHooks {
           await this._settingsModel.showBrowser.set(showBrowser);
         }
       }),
-      vscode.commands.registerCommand('playwright-ide.recordAtCursor', async () => {
+      vscode.commands.registerCommand('playwright-repl.recordAtCursor', async () => {
         const model = this._models.selectedModel();
         if (!model)
           return vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
@@ -295,26 +295,26 @@ export class Extension implements RunHooks {
         const project = openTestCase ? ancestorProject(openTestCase) : model.enabledProjects()[0]?.project;
         await this._reusedBrowser.record(model, project);
       }),
-      vscode.commands.registerCommand('playwright-ide.toggleModels', async () => {
+      vscode.commands.registerCommand('playwright-repl.toggleModels', async () => {
         this._settingsView.toggleModels();
       }),
-      vscode.commands.registerCommand('playwright-ide.runGlobalSetup', async () => {
+      vscode.commands.registerCommand('playwright-repl.runGlobalSetup', async () => {
         await this._queueGlobalHooks('setup');
         this._settingsView.updateActions();
       }),
-      vscode.commands.registerCommand('playwright-ide.runGlobalTeardown', async () => {
+      vscode.commands.registerCommand('playwright-repl.runGlobalTeardown', async () => {
         await this._queueGlobalHooks('teardown');
         this._settingsView.updateActions();
       }),
-      vscode.commands.registerCommand('playwright-ide.startDevServer', async () => {
+      vscode.commands.registerCommand('playwright-repl.startDevServer', async () => {
         await this._models.selectedModel()?.startDevServer();
         this._settingsView.updateActions();
       }),
-      vscode.commands.registerCommand('playwright-ide.stopDevServer', async () => {
+      vscode.commands.registerCommand('playwright-repl.stopDevServer', async () => {
         await this._models.selectedModel()?.stopDevServer();
         this._settingsView.updateActions();
       }),
-      vscode.commands.registerCommand('playwright-ide.clearCache', async () => {
+      vscode.commands.registerCommand('playwright-repl.clearCache', async () => {
         await this._models.selectedModel()?.clearCache();
       }),
       vscode.workspace.onDidChangeTextDocument(() => {
@@ -345,17 +345,17 @@ export class Extension implements RunHooks {
       registerTerminalLinkProvider(this._vscode),
 
       // ─── Playwright REPL: bridge-based commands ────────────────────────────
-      vscode.commands.registerCommand('playwright-ide.launchBrowser', async () => {
+      vscode.commands.registerCommand('playwright-repl.launchBrowser', async () => {
         try {
           await this._ensureBrowserManager();
         } catch (e: unknown) {
           vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }
       }),
-      vscode.commands.registerCommand('playwright-ide.stopBrowser', () => {
+      vscode.commands.registerCommand('playwright-repl.stopBrowser', () => {
         this._browserManager?.stop();
       }),
-      vscode.commands.registerCommand('playwright-ide.openRepl', () => {
+      vscode.commands.registerCommand('playwright-repl.openRepl', () => {
         if (!this._repl || this._repl.disposed) {
           this._repl = new PlaywrightRepl(this._browserManager);
           if (this._browserManager)
@@ -363,7 +363,7 @@ export class Extension implements RunHooks {
         }
         this._repl.show();
       }),
-      vscode.commands.registerCommand('playwright-ide.startRecording', async () => {
+      vscode.commands.registerCommand('playwright-repl.startRecording', async () => {
         if (!this._browserManager?.isRunning()) {
           vscode.window.showWarningMessage('Launch browser first.');
           return;
@@ -373,11 +373,11 @@ export class Extension implements RunHooks {
         await this._recorder.start();
         this._settingsView.setRecording(true);
       }),
-      vscode.commands.registerCommand('playwright-ide.stopRecording', () => {
+      vscode.commands.registerCommand('playwright-repl.stopRecording', () => {
         this._recorder?.stop();
         this._settingsView.setRecording(false);
       }),
-      vscode.commands.registerCommand('playwright-ide.pickLocator', async () => {
+      vscode.commands.registerCommand('playwright-repl.pickLocator', async () => {
         try {
           if (!this._browserManager?.isRunning()) {
             vscode.window.showWarningMessage('Launch browser first.');
@@ -505,7 +505,7 @@ export class Extension implements RunHooks {
   }
 
   private _envProvider(configFile: string) {
-    const config = this._vscode.workspace.getConfiguration('playwright-ide').get('env', {});
+    const config = this._vscode.workspace.getConfiguration('playwright-repl').get('env', {});
     const env = Object.fromEntries(Object.entries(config).map(entry => {
       return typeof entry[1] === 'string' ? entry : [entry[0], JSON.stringify(entry[1])];
     })) as NodeJS.ProcessEnv;

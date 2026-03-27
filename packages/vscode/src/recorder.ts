@@ -124,7 +124,7 @@ export class Recorder {
     this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this._statusBarItem.text = '$(circle-filled) Record';
     this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
-    this._statusBarItem.command = 'playwright-ide.startRecording';
+    this._statusBarItem.command = 'playwright-repl.startRecording';
     this._statusBarItem.show();
   }
 
@@ -161,7 +161,7 @@ export class Recorder {
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright REPL: Stop Recording';
-    this._statusBarItem.command = 'playwright-ide.stopRecording';
+    this._statusBarItem.command = 'playwright-repl.stopRecording';
     this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 
     this._browserManager.onEvent((event) => {
@@ -183,7 +183,7 @@ export class Recorder {
     if (result.isError) {
       this._recording = false;
       this._statusBarItem.text = '$(circle-filled) Record';
-      this._statusBarItem.command = 'playwright-ide.startRecording';
+      this._statusBarItem.command = 'playwright-repl.startRecording';
       this._statusBarItem.backgroundColor = undefined;
       this._browserManager.onEvent(null);
       vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
@@ -209,7 +209,7 @@ export class Recorder {
     this._recording = false;
     this._statusBarItem.text = '$(circle-filled) Record';
     this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
-    this._statusBarItem.command = 'playwright-ide.startRecording';
+    this._statusBarItem.command = 'playwright-repl.startRecording';
     this._statusBarItem.backgroundColor = undefined;
     this._browserManager.onEvent(null);
     this._outputChannel.appendLine('Recording stopped.');

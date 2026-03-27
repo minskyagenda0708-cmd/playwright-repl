@@ -1,5 +1,5 @@
 {
-  "name": "playwright-ide",
+  "name": "playwright-repl",
   "displayName": "Playwright REPL",
   "description": "Playwright REPL — fast test execution with live REPL, trace viewer, and bridge mode",
   "icon": "images/playwright-logo.png",
@@ -21,143 +21,143 @@
     "commands": [
       {
         "category": "Test",
-        "command": "playwright-ide.install",
-        "title": "%contributes.command.playwright-ide.install%"
+        "command": "playwright-repl.install",
+        "title": "%contributes.command.playwright-repl.install%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.installBrowsers",
-        "title": "%contributes.command.playwright-ide.installBrowsers%"
+        "command": "playwright-repl.installBrowsers",
+        "title": "%contributes.command.playwright-repl.installBrowsers%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.closeBrowsers",
-        "title": "%contributes.command.playwright-ide.closeBrowsers%"
+        "command": "playwright-repl.closeBrowsers",
+        "title": "%contributes.command.playwright-repl.closeBrowsers%"
       },
       {
         "category": "Test",
         "icon": "$(gear)",
-        "command": "playwright-ide.toggleModels",
-        "title": "%contributes.command.playwright-ide.toggleModels%"
+        "command": "playwright-repl.toggleModels",
+        "title": "%contributes.command.playwright-repl.toggleModels%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.toggle.reuseBrowser",
-        "title": "%contributes.command.playwright-ide.toggle.reuseBrowser%"
+        "command": "playwright-repl.toggle.reuseBrowser",
+        "title": "%contributes.command.playwright-repl.toggle.reuseBrowser%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.toggle.showTrace",
-        "title": "%contributes.command.playwright-ide.toggle.showTrace%"
+        "command": "playwright-repl.toggle.showTrace",
+        "title": "%contributes.command.playwright-repl.toggle.showTrace%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.toggle.runGlobalSetupOnEachRun",
-        "title": "%contributes.command.playwright-ide.toggle.runGlobalSetupOnEachRun%"
+        "command": "playwright-repl.toggle.runGlobalSetupOnEachRun",
+        "title": "%contributes.command.playwright-repl.toggle.runGlobalSetupOnEachRun%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.toggle.pickLocatorCopyToClipboard",
-        "title": "%contributes.command.playwright-ide.toggle.pickLocatorCopyToClipboard%"
+        "command": "playwright-repl.toggle.pickLocatorCopyToClipboard",
+        "title": "%contributes.command.playwright-repl.toggle.pickLocatorCopyToClipboard%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.runGlobalSetup",
-        "title": "%contributes.command.playwright-ide.runGlobalSetup%"
+        "command": "playwright-repl.runGlobalSetup",
+        "title": "%contributes.command.playwright-repl.runGlobalSetup%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.runGlobalTeardown",
-        "title": "%contributes.command.playwright-ide.runGlobalTeardown%"
+        "command": "playwright-repl.runGlobalTeardown",
+        "title": "%contributes.command.playwright-repl.runGlobalTeardown%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.startDevServer",
-        "title": "%contributes.command.playwright-ide.startDevServer%"
+        "command": "playwright-repl.startDevServer",
+        "title": "%contributes.command.playwright-repl.startDevServer%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.stopDevServer",
-        "title": "%contributes.command.playwright-ide.stopDevServer%"
+        "command": "playwright-repl.stopDevServer",
+        "title": "%contributes.command.playwright-repl.stopDevServer%"
       },
       {
         "category": "Test",
-        "command": "playwright-ide.clearCache",
-        "title": "%contributes.command.playwright-ide.clearCache%"
+        "command": "playwright-repl.clearCache",
+        "title": "%contributes.command.playwright-repl.clearCache%"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.launchBrowser",
+        "command": "playwright-repl.launchBrowser",
         "title": "Playwright REPL: Launch Browser"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.stopBrowser",
+        "command": "playwright-repl.stopBrowser",
         "title": "Playwright REPL: Stop Browser"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.openRepl",
+        "command": "playwright-repl.openRepl",
         "title": "Playwright REPL: Open REPL"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.startRecording",
+        "command": "playwright-repl.startRecording",
         "icon": "$(record)",
         "title": "Playwright REPL: Start Recording"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.stopRecording",
+        "command": "playwright-repl.stopRecording",
         "title": "Playwright REPL: Stop Recording"
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-ide.pickLocator",
+        "command": "playwright-repl.pickLocator",
         "title": "Playwright REPL: Pick Locator"
       }
     ],
     "configuration": {
       "title": "Playwright REPL",
       "properties": {
-        "playwright-ide.env": {
+        "playwright-repl.env": {
           "type": "object",
           "default": {},
-          "description": "%configuration.playwright-ide.env%"
+          "description": "%configuration.playwright-repl.env%"
         },
-        "playwright-ide.reuseBrowser": {
+        "playwright-repl.reuseBrowser": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright-ide.reuseBrowser%"
+          "description": "%configuration.playwright-repl.reuseBrowser%"
         },
-        "playwright-ide.showTrace": {
+        "playwright-repl.showTrace": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright-ide.showTrace%"
+          "description": "%configuration.playwright-repl.showTrace%"
         },
-        "playwright-ide.runGlobalSetupOnEachRun": {
+        "playwright-repl.runGlobalSetupOnEachRun": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright-ide.runGlobalSetupOnEachRun%"
+          "description": "%configuration.playwright-repl.runGlobalSetupOnEachRun%"
         },
-        "playwright-ide.pickLocatorCopyToClipboard": {
+        "playwright-repl.pickLocatorCopyToClipboard": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright-ide.pickLocatorCopyToClipboard%"
+          "description": "%configuration.playwright-repl.pickLocatorCopyToClipboard%"
         },
-        "playwright-ide.updateSnapshots": {
+        "playwright-repl.updateSnapshots": {
           "type": "string",
           "enum": ["all", "changed", "missing", "none"],
           "default": "missing",
-          "description": "%configuration.playwright-ide.updateSnapshots%"
+          "description": "%configuration.playwright-repl.updateSnapshots%"
         },
-        "playwright-ide.updateSourceMethod": {
+        "playwright-repl.updateSourceMethod": {
           "type": "string",
           "enum": ["overwrite", "patch", "3way"],
           "default": "3way",
-          "description": "%configuration.playwright-ide.updateSourceMethod%"
+          "description": "%configuration.playwright-repl.updateSourceMethod%"
         },
-        "playwright-ide.headless": {
+        "playwright-repl.headless": {
           "type": "boolean",
           "default": false,
           "description": "Run browser in headless mode (no visible window)"
@@ -167,7 +167,7 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "playwrightIdeContainer",
+          "id": "playwrightReplContainer",
           "title": "Playwright REPL",
           "icon": "images/playwright-logo.png"
         }
@@ -177,15 +177,15 @@
       "test": [
         {
           "type": "webview",
-          "id": "playwright-ide.settingsView",
-          "name": "%views.test.playwright-ide.settingsView%"
+          "id": "playwright-repl.settingsView",
+          "name": "%views.test.playwright-repl.settingsView%"
         }
       ],
-      "playwrightIdeContainer": [
+      "playwrightReplContainer": [
         {
           "type": "webview",
-          "id": "playwright-ide.locatorsView",
-          "name": "%views.test.playwright-ide.locatorsView%"
+          "id": "playwright-repl.locatorsView",
+          "name": "%views.test.playwright-repl.locatorsView%"
         }
       ]
     }
