@@ -158,7 +158,7 @@ export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, g
         : data.props;
     // Skip keys rendered by extraChildren (e.g. aria in PickResult)
     const keys = extraChildren
-        ? Object.keys(propsToShow).filter(k => !(propsToShow[k].__type === 'string' && (propsToShow[k] as any).v === '' ))
+        ? Object.keys(propsToShow).filter(k => !(propsToShow[k].__type === 'string' && (propsToShow[k] as { v?: string }).v === '' ))
         : Object.keys(propsToShow);
     const header = isArray ? `Array(${data.len})` : data.cls;
 
