@@ -31,25 +31,8 @@
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.inspect",
-        "title": "%contributes.command.pw.extension.command.inspect%"
-      },
-      {
-        "category": "Test",
         "command": "pw.extension.command.closeBrowsers",
         "title": "%contributes.command.pw.extension.command.closeBrowsers%"
-      },
-      {
-        "category": "Test",
-        "icon": "$(record)",
-        "command": "pw.extension.command.recordNew",
-        "title": "%contributes.command.pw.extension.command.recordNew%"
-      },
-      {
-        "category": "Test",
-        "icon": "$(record)",
-        "command": "pw.extension.command.recordAtCursor",
-        "title": "%contributes.command.pw.extension.command.recordAtCursor%"
       },
       {
         "category": "Test",
@@ -101,6 +84,37 @@
         "category": "Test",
         "command": "pw.extension.command.clearCache",
         "title": "%contributes.command.pw.extension.command.clearCache%"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.launchBrowser",
+        "title": "Playwright IDE: Launch Browser"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.stopBrowser",
+        "title": "Playwright IDE: Stop Browser"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.openRepl",
+        "title": "Playwright IDE: Open REPL"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.startRecording",
+        "icon": "$(record)",
+        "title": "Playwright IDE: Start Recording"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.stopRecording",
+        "title": "Playwright IDE: Stop Recording"
+      },
+      {
+        "category": "Playwright IDE",
+        "command": "playwright-ide.pickLocator",
+        "title": "Playwright IDE: Pick Locator"
       }
     ],
     "configuration": {

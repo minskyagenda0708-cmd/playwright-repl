@@ -130,7 +130,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
 
 function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri, webview: vscodeTypes.Webview) {
   const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'common.css'));
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'locatorsView.script.js'));
+  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'locatorsView.script.js'));
   const nonce = getNonce();
 
   return html`

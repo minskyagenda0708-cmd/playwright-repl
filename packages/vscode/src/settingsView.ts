@@ -43,6 +43,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
   private _settingsModel: SettingsModel;
   private _reusedBrowser: ReusedBrowser;
   private _models: TestModelCollection;
+  private _isRecording = false;
 
   constructor(vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, models: TestModelCollection, reusedBrowser: ReusedBrowser, extensionUri: vscodeTypes.Uri) {
     super();
@@ -111,6 +112,11 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
       this._updateActions();
   }
 
+  setRecording(recording: boolean) {
+    this._isRecording = recording;
+    this._updateActions();
+  }
+
   private _updateSettings() {
     void this._view!.webview.postMessage({ method: 'settings', params: { settings: this._settingsModel.json() } });
   }
@@ -118,8 +124,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
   private _updateActions() {
     const actions = [
       pickElementAction(this._vscode),
-      recordNewAction(this._vscode, this._reusedBrowser),
-      recordAtCursorAction(this._vscode, this._reusedBrowser),
+      this._isRecording ? stopRecordingAction(this._vscode) : recordNewAction(this._vscode, this._reusedBrowser),
       revealTestOutputAction(this._vscode),
       closeBrowsersAction(this._vscode, this._reusedBrowser),
       {
@@ -202,7 +207,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
 
 function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri, webview: vscodeTypes.Webview) {
   const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'common.css'));
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'settingsView.script.js'));
+  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'settingsView.script.js'));
   const nonce = getNonce();
 
   return html`<!DOCTYPE html>
@@ -298,7 +303,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
 
 export const pickElementAction = (vscode: vscodeTypes.VSCode) => {
   return {
-    command: 'pw.extension.command.inspect',
+    command: 'playwright-ide.pickLocator',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M18 42h-7.5c-3 0-4.5-1.5-4.5-4.5v-27C6 7.5 7.5 6 10.5 6h27C42 6 42 10.404 42 10.5V18h-3V9H9v30h9v3Zm27-15-9 6 9 9-3 3-9-9-6 9-6-24 24 6Z"/></svg>`,
     text: vscode.l10n.t('Pick locator'),
   };
@@ -306,19 +311,19 @@ export const pickElementAction = (vscode: vscodeTypes.VSCode) => {
 
 export const recordNewAction = (vscode: vscodeTypes.VSCode, reusedBrowser: ReusedBrowser) => {
   return {
-    command: 'pw.extension.command.recordNew',
+    command: 'playwright-ide.startRecording',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M22.65 34h3v-8.3H34v-3h-8.35V14h-3v8.7H14v3h8.65ZM24 44q-4.1 0-7.75-1.575-3.65-1.575-6.375-4.3-2.725-2.725-4.3-6.375Q4 28.1 4 23.95q0-4.1 1.575-7.75 1.575-3.65 4.3-6.35 2.725-2.7 6.375-4.275Q19.9 4 24.05 4q4.1 0 7.75 1.575 3.65 1.575 6.35 4.275 2.7 2.7 4.275 6.35Q44 19.85 44 24q0 4.1-1.575 7.75-1.575 3.65-4.275 6.375t-6.35 4.3Q28.15 44 24 44Zm.05-3q7.05 0 12-4.975T41 23.95q0-7.05-4.95-12T24 7q-7.05 0-12.025 4.95Q7 16.9 7 24q0 7.05 4.975 12.025Q16.95 41 24.05 41ZM24 24Z"/></svg>`,
-    text: vscode.l10n.t('Record new'),
-    disabled: !reusedBrowser.canRecordNew(),
+    text: vscode.l10n.t('Record'),
+    disabled: false,
   };
 };
 
-export const recordAtCursorAction = (vscode: vscodeTypes.VSCode, reusedBrowser: ReusedBrowser) => {
+export const stopRecordingAction = (vscode: vscodeTypes.VSCode) => {
   return {
-    command: 'pw.extension.command.recordAtCursor',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M9 39h2.2l22.15-22.15-2.2-2.2L9 36.8Zm30.7-24.3-6.4-6.4 2.1-2.1q.85-.85 2.1-.85t2.1.85l2.2 2.2q.85.85.85 2.1t-.85 2.1Zm-2.1 2.1L12.4 42H6v-6.4l25.2-25.2Zm-5.35-1.05-1.1-1.1 2.2 2.2Z"/></svg>`,
-    text: vscode.l10n.t('Record at cursor'),
-    disabled: !reusedBrowser.canRecordAtCursor(),
+    command: 'playwright-ide.stopRecording',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M12 36h24V12H12Zm-2 4q-1.65 0-2.825-1.175T6 36V12q0-1.65 1.175-2.825T10 8h28q1.65 0 2.825 1.175T42 12v24q0 1.65-1.175 2.825T38 40Z"/></svg>`,
+    text: vscode.l10n.t('Stop recording'),
+    disabled: false,
   };
 };
 

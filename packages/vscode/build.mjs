@@ -25,6 +25,8 @@ const options = {
     './oopReporter',
     './playwrightFinder',
     './*.script',
+    // ESM modules that use import.meta.url — can't be bundled into CJS
+    '@playwright-repl/core',
   ],
   format: 'cjs',
   platform: 'node',
