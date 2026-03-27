@@ -156,6 +156,11 @@
           "enum": ["overwrite", "patch", "3way"],
           "default": "3way",
           "description": "%configuration.playwright.updateSourceMethod%"
+        },
+        "playwright-ide.headless": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run browser in headless mode (no visible window)"
         }
       }
     },

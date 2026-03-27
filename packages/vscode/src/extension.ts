@@ -304,16 +304,20 @@ export class Extension implements RunHooks {
 
       // ─── Playwright IDE: bridge-based commands ────────────────────────────
       vscode.commands.registerCommand('playwright-ide.launchBrowser', async () => {
-        if (!this._browserManager) {
-          const outputChannel = vscode.window.createOutputChannel('Playwright IDE');
-          this._browserManager = new BrowserManager(outputChannel);
+        try {
+          if (!this._browserManager) {
+            const outputChannel = vscode.window.createOutputChannel('Playwright IDE');
+            this._browserManager = new BrowserManager(outputChannel);
+          }
+          if (this._browserManager.isRunning()) return;
+          const showBrowser = this._settingsModel.showBrowser.get();
+          await this._browserManager.launch({
+            browser: 'chromium',
+            headless: !showBrowser,
+          });
+        } catch (e: unknown) {
+          vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }
-        if (this._browserManager.isRunning()) return;
-        const config = vscode.workspace.getConfiguration('playwright-ide');
-        await this._browserManager.launch({
-          browser: config.get('browser', 'chromium'),
-          headless: config.get('headless', false),
-        });
       }),
       vscode.commands.registerCommand('playwright-ide.stopBrowser', () => {
         this._browserManager?.stop();
@@ -333,7 +337,7 @@ export class Extension implements RunHooks {
           return;
         }
         if (!this._recorder)
-          this._recorder = new Recorder(this._browserManager);
+          this._recorder = new Recorder(this._browserManager, this._logger);
         await this._recorder.start();
         this._settingsView.setRecording(true);
       }),
@@ -342,13 +346,23 @@ export class Extension implements RunHooks {
         this._settingsView.setRecording(false);
       }),
       vscode.commands.registerCommand('playwright-ide.pickLocator', async () => {
-        if (!this._browserManager?.isRunning()) {
-          vscode.window.showWarningMessage('Launch browser first.');
-          return;
+        try {
+          if (!this._browserManager?.isRunning()) {
+            vscode.window.showWarningMessage('Launch browser first.');
+            return;
+          }
+          if (!this._picker) {
+            this._picker = new Picker(this._browserManager, this._logger);
+            this._picker.setLocatorsView(this._locatorsView);
+          }
+          if (this._picker.isPicking)
+            await this._picker.stop();
+          else
+            await this._picker.start();
+        } catch (e: unknown) {
+          this._logger.error('Pick locator error:', (e as Error).message);
+          vscode.window.showErrorMessage(`Pick locator failed: ${(e as Error).message}`);
         }
-        if (!this._picker)
-          this._picker = new Picker(this._browserManager);
-        await this._picker.toggle();
       }),
     ];
 

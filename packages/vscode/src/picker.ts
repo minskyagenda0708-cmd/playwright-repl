@@ -10,41 +10,32 @@
 
 import * as vscode from 'vscode';
 import type { BrowserManager } from './browser.js';
+import type { LocatorsView } from './locatorsView';
 
 export class Picker {
   private _browserManager: BrowserManager;
   private _outputChannel: vscode.OutputChannel;
+  private _locatorsView: LocatorsView | undefined;
   private _picking = false;
-  private _statusBarItem: vscode.StatusBarItem;
 
   constructor(browserManager: BrowserManager, outputChannel: vscode.OutputChannel) {
     this._browserManager = browserManager;
     this._outputChannel = outputChannel;
-
-    // Status bar button
-    this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
-    this._statusBarItem.text = '$(target) Pick';
-    this._statusBarItem.tooltip = 'Playwright IDE: Pick Locator';
-    this._statusBarItem.command = 'playwright-ide.pickLocator';
-    this._statusBarItem.show();
   }
 
   get isPicking() { return this._picking; }
 
+  setLocatorsView(view: LocatorsView) {
+    this._locatorsView = view;
+  }
+
   dispose() {
-    this._statusBarItem.dispose();
   }
 
   async start() {
     if (this._picking) return;
     if (!this._browserManager.isRunning()) {
       vscode.window.showWarningMessage('Launch browser first.');
-      return;
-    }
-
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      vscode.window.showWarningMessage('Open a file first.');
       return;
     }
 
@@ -56,14 +47,7 @@ export class Picker {
     }
 
     this._picking = true;
-    this._statusBarItem.text = '$(target) Picking...';
-    this._statusBarItem.tooltip = 'Click an element in the browser';
-    this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     this._outputChannel.appendLine('Pick mode started. Click an element in the browser.');
-
-    // Remember which editor and position to insert into
-    const targetEditor = editor;
-    const targetPosition = editor.selection.active;
 
     // Listen for pick events
     this._browserManager.onEvent(async (event) => {
@@ -73,7 +57,24 @@ export class Picker {
         const info = event.info as { locator?: string };
         const locator = info?.locator;
         if (locator) {
-          await this._insertLocator(targetEditor, targetPosition, `page.${locator}`);
+          const fullLocator = `page.${locator}`;
+          this._outputChannel.appendLine(`Picked: ${fullLocator}`);
+
+          // Get aria snapshot for the picked element
+          let ariaSnapshot = '';
+          try {
+            const ariaResult = await this._browserManager.runCommand(`await ${fullLocator}.ariaSnapshot()`);
+            if (!ariaResult.isError && ariaResult.text)
+              ariaSnapshot = ariaResult.text;
+          } catch {}
+
+          // Copy to clipboard if setting is enabled
+          const copyOnPick = vscode.workspace.getConfiguration('playwright').get('pickLocatorCopyToClipboard', false);
+          if (copyOnPick)
+            await vscode.env.clipboard.writeText(fullLocator);
+
+          if (this._locatorsView)
+            this._locatorsView.showLocator(fullLocator, ariaSnapshot);
         }
         this._stop();
       }
@@ -92,23 +93,8 @@ export class Picker {
 
   private _stop() {
     this._picking = false;
-    this._statusBarItem.text = '$(target) Pick';
-    this._statusBarItem.tooltip = 'Playwright IDE: Pick Locator';
-    this._statusBarItem.command = 'playwright-ide.pickLocator';
-    this._statusBarItem.backgroundColor = undefined;
     this._browserManager.onEvent(null);
     this._outputChannel.appendLine('Pick mode ended.');
   }
 
-  private async _insertLocator(editor: vscode.TextEditor, position: vscode.Position, locator: string) {
-    // Bring editor back to focus first
-    await vscode.window.showTextDocument(editor.document, editor.viewColumn);
-    await editor.edit(editBuilder => {
-      editBuilder.insert(position, locator);
-    });
-    // Move cursor to end of inserted text
-    const newPos = new vscode.Position(position.line, position.character + locator.length);
-    editor.selection = new vscode.Selection(newPos, newPos);
-    this._outputChannel.appendLine(`Picked: ${locator}`);
-  }
 }

@@ -157,28 +157,13 @@ export class Recorder {
       lastInsertLength = 0;
     }
 
-    // Start recording via bridge
-    const result = await this._browserManager.runCommand('record-start');
-    if (result.isError) {
-      vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
-      return;
-    }
-
-    // Insert goto with current URL as first action
-    const urlResult = await this._browserManager.runCommand('await page.url()');
-    const url = urlResult.text?.replace(/^['"]|['"]$/g, '') || '';
-    if (url && this._editor) {
-      insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
-    }
-
+    // Register event listener BEFORE starting recording to avoid race condition
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright IDE: Stop Recording';
     this._statusBarItem.command = 'playwright-ide.stopRecording';
     this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
-    this._outputChannel.appendLine('Recording started.');
 
-    // Listen for recording events from bridge
     this._browserManager.onEvent((event) => {
       if (!this._recording || !this._editor) return;
 
@@ -192,6 +177,29 @@ export class Recorder {
         replaceLastInsert(this._editor!, action.js, this._indentation);
       }
     });
+
+    // Start recording via bridge — returns URL of current page
+    const result = await this._browserManager.runCommand('record-start');
+    if (result.isError) {
+      this._recording = false;
+      this._statusBarItem.text = '$(circle-filled) Record';
+      this._statusBarItem.command = 'playwright-ide.startRecording';
+      this._statusBarItem.backgroundColor = undefined;
+      this._browserManager.onEvent(null);
+      vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
+      return;
+    }
+
+    // Insert goto only when starting a new test (template was inserted or cursor is at first line)
+    if (!ctx || !ctx.inside) {
+      const urlMatch = result.text?.match(/Recording started:\s*(.+)/);
+      const url = urlMatch?.[1]?.trim() || '';
+      if (url && this._editor) {
+        insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
+      }
+    }
+
+    this._outputChannel.appendLine('Recording started.');
   }
 
   async stop() {
