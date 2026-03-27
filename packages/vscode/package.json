@@ -1,5 +1,5 @@
 {
-  "name": "playwright-repl",
+  "name": "@playwright-repl/vscode",
   "displayName": "Playwright REPL",
   "description": "Playwright REPL — fast test execution with live REPL, trace viewer, and bridge mode",
   "icon": "images/playwright-logo.png",
