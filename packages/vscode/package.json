@@ -21,69 +21,69 @@
     "commands": [
       {
         "category": "Test",
-        "command": "pw.extension.install",
-        "title": "%contributes.command.pw.extension.install%"
+        "command": "playwright-ide.install",
+        "title": "%contributes.command.playwright-ide.install%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.installBrowsers",
-        "title": "%contributes.command.pw.extension.installBrowsers%"
+        "command": "playwright-ide.installBrowsers",
+        "title": "%contributes.command.playwright-ide.installBrowsers%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.closeBrowsers",
-        "title": "%contributes.command.pw.extension.command.closeBrowsers%"
+        "command": "playwright-ide.closeBrowsers",
+        "title": "%contributes.command.playwright-ide.closeBrowsers%"
       },
       {
         "category": "Test",
         "icon": "$(gear)",
-        "command": "pw.extension.command.toggleModels",
-        "title": "%contributes.command.pw.extension.command.toggleModels%"
+        "command": "playwright-ide.toggleModels",
+        "title": "%contributes.command.playwright-ide.toggleModels%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.toggle.reuseBrowser",
-        "title": "%contributes.command.pw.extension.toggle.reuseBrowser%"
+        "command": "playwright-ide.toggle.reuseBrowser",
+        "title": "%contributes.command.playwright-ide.toggle.reuseBrowser%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.toggle.showTrace",
-        "title": "%contributes.command.pw.extension.toggle.showTrace%"
+        "command": "playwright-ide.toggle.showTrace",
+        "title": "%contributes.command.playwright-ide.toggle.showTrace%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.toggle.runGlobalSetupOnEachRun",
-        "title": "%contributes.command.pw.extension.toggle.runGlobalSetupOnEachRun%"
+        "command": "playwright-ide.toggle.runGlobalSetupOnEachRun",
+        "title": "%contributes.command.playwright-ide.toggle.runGlobalSetupOnEachRun%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.toggle.pickLocatorCopyToClipboard",
-        "title": "%contributes.command.pw.extension.toggle.pickLocatorCopyToClipboard%"
+        "command": "playwright-ide.toggle.pickLocatorCopyToClipboard",
+        "title": "%contributes.command.playwright-ide.toggle.pickLocatorCopyToClipboard%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.runGlobalSetup",
-        "title": "%contributes.command.pw.extension.command.runGlobalSetup%"
+        "command": "playwright-ide.runGlobalSetup",
+        "title": "%contributes.command.playwright-ide.runGlobalSetup%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.runGlobalTeardown",
-        "title": "%contributes.command.pw.extension.command.runGlobalTeardown%"
+        "command": "playwright-ide.runGlobalTeardown",
+        "title": "%contributes.command.playwright-ide.runGlobalTeardown%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.startDevServer",
-        "title": "%contributes.command.pw.extension.command.startDevServer%"
+        "command": "playwright-ide.startDevServer",
+        "title": "%contributes.command.playwright-ide.startDevServer%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.stopDevServer",
-        "title": "%contributes.command.pw.extension.command.stopDevServer%"
+        "command": "playwright-ide.stopDevServer",
+        "title": "%contributes.command.playwright-ide.stopDevServer%"
       },
       {
         "category": "Test",
-        "command": "pw.extension.command.clearCache",
-        "title": "%contributes.command.pw.extension.command.clearCache%"
+        "command": "playwright-ide.clearCache",
+        "title": "%contributes.command.playwright-ide.clearCache%"
       },
       {
         "category": "Playwright IDE",
@@ -118,44 +118,44 @@
       }
     ],
     "configuration": {
-      "title": "Playwright",
+      "title": "Playwright IDE",
       "properties": {
-        "playwright.env": {
+        "playwright-ide.env": {
           "type": "object",
           "default": {},
-          "description": "%configuration.playwright.env%"
+          "description": "%configuration.playwright-ide.env%"
         },
-        "playwright.reuseBrowser": {
+        "playwright-ide.reuseBrowser": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright.reuseBrowser%"
+          "description": "%configuration.playwright-ide.reuseBrowser%"
         },
-        "playwright.showTrace": {
+        "playwright-ide.showTrace": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright.showTrace%"
+          "description": "%configuration.playwright-ide.showTrace%"
         },
-        "playwright.runGlobalSetupOnEachRun": {
+        "playwright-ide.runGlobalSetupOnEachRun": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright.runGlobalSetupOnEachRun%"
+          "description": "%configuration.playwright-ide.runGlobalSetupOnEachRun%"
         },
-        "playwright.pickLocatorCopyToClipboard": {
+        "playwright-ide.pickLocatorCopyToClipboard": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.playwright.pickLocatorCopyToClipboard%"
+          "description": "%configuration.playwright-ide.pickLocatorCopyToClipboard%"
         },
-        "playwright.updateSnapshots": {
+        "playwright-ide.updateSnapshots": {
           "type": "string",
           "enum": ["all", "changed", "missing", "none"],
           "default": "missing",
-          "description": "%configuration.playwright.updateSnapshots%"
+          "description": "%configuration.playwright-ide.updateSnapshots%"
         },
-        "playwright.updateSourceMethod": {
+        "playwright-ide.updateSourceMethod": {
           "type": "string",
           "enum": ["overwrite", "patch", "3way"],
           "default": "3way",
-          "description": "%configuration.playwright.updateSourceMethod%"
+          "description": "%configuration.playwright-ide.updateSourceMethod%"
         },
         "playwright-ide.headless": {
           "type": "boolean",
@@ -167,8 +167,8 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "playwrightContainer",
-          "title": "Playwright",
+          "id": "playwrightIdeContainer",
+          "title": "Playwright IDE",
           "icon": "images/playwright-logo.png"
         }
       ]
@@ -177,15 +177,15 @@
       "test": [
         {
           "type": "webview",
-          "id": "pw.extension.settingsView",
-          "name": "%views.test.pw.extension.settingsView%"
+          "id": "playwright-ide.settingsView",
+          "name": "%views.test.playwright-ide.settingsView%"
         }
       ],
-      "playwrightContainer": [
+      "playwrightIdeContainer": [
         {
           "type": "webview",
-          "id": "pw.extension.locatorsView",
-          "name": "%views.test.pw.extension.locatorsView%"
+          "id": "playwright-ide.locatorsView",
+          "name": "%views.test.playwright-ide.locatorsView%"
         }
       ]
     }

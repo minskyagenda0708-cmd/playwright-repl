@@ -59,7 +59,7 @@ function setAllProjectsEnabled(enabled: boolean) {
 }
 selectAllButton.addEventListener('click', () => setAllProjectsEnabled(true));
 unselectAllButton.addEventListener('click', () => setAllProjectsEnabled(false));
-toggleModels.addEventListener('click', () => (vscode.postMessage({ method: 'execute', params: { command: 'pw.extension.command.toggleModels' } })));
+toggleModels.addEventListener('click', () => (vscode.postMessage({ method: 'execute', params: { command: 'playwright-ide.toggleModels' } })));
 
 for (const input of Array.from(document.querySelectorAll('input[type=checkbox]'))) {
   input.addEventListener('change', event => {

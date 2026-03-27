@@ -55,7 +55,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
     this._disposables = [
       reusedBrowser.onRunningTestsChanged(() => this._updateActions()),
       reusedBrowser.onPageCountChanged(() => this._updateActions()),
-      vscode.window.registerWebviewViewProvider('pw.extension.settingsView', this),
+      vscode.window.registerWebviewViewProvider('playwright-ide.settingsView', this),
     ];
     this._models.onUpdated(() => {
       this._updateModels();
@@ -76,7 +76,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
       if (data.method === 'execute') {
         void this._vscode.commands.executeCommand(data.params.command);
       } else if (data.method === 'toggle') {
-        void this._vscode.commands.executeCommand(`pw.extension.toggle.${data.params.setting}`);
+        void this._vscode.commands.executeCommand(`playwright-ide.toggle.${data.params.setting}`);
       } else if (data.method === 'set') {
         void this._settingsModel.setting(data.params.setting)!.set(data.params.value);
       } else if (data.method === 'setProjectEnabled') {
@@ -337,7 +337,7 @@ export const revealTestOutputAction = (vscode: vscodeTypes.VSCode) => {
 
 export const closeBrowsersAction = (vscode: vscodeTypes.VSCode, reusedBrowser: ReusedBrowser) => {
   return {
-    command: 'pw.extension.command.closeBrowsers',
+    command: 'playwright-ide.closeBrowsers',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path xmlns="http://www.w3.org/2000/svg" d="m12.45 37.65-2.1-2.1L21.9 24 10.35 12.45l2.1-2.1L24 21.9l11.55-11.55 2.1 2.1L26.1 24l11.55 11.55-2.1 2.1L24 26.1Z"/></svg>`,
     text: vscode.l10n.t('Close all browsers'),
     disabled: !reusedBrowser.canClose(),
@@ -346,7 +346,7 @@ export const closeBrowsersAction = (vscode: vscodeTypes.VSCode, reusedBrowser: R
 
 export const runGlobalSetupAction = (vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, models: TestModelCollection) => {
   return {
-    command: 'pw.extension.command.runGlobalSetup',
+    command: 'playwright-ide.runGlobalSetup',
     svg: ``,
     text: vscode.l10n.t('Run global setup'),
     disabled: settingsModel.runGlobalSetupOnEachRun.get() || !models.selectedModel() || !models.selectedModel()!.canRunGlobalHooks('setup'),
@@ -355,7 +355,7 @@ export const runGlobalSetupAction = (vscode: vscodeTypes.VSCode, settingsModel: 
 
 export const runGlobalTeardownAction = (vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, models: TestModelCollection) => {
   return {
-    command: 'pw.extension.command.runGlobalTeardown',
+    command: 'playwright-ide.runGlobalTeardown',
     svg: ``,
     text: vscode.l10n.t('Run global teardown'),
     disabled: settingsModel.runGlobalSetupOnEachRun.get() || !models.selectedModel() || !models.selectedModel()!.canRunGlobalHooks('teardown'),
@@ -364,7 +364,7 @@ export const runGlobalTeardownAction = (vscode: vscodeTypes.VSCode, settingsMode
 
 export const clearCacheAction = (vscode: vscodeTypes.VSCode, models: TestModelCollection) => {
   return {
-    command: 'pw.extension.command.clearCache',
+    command: 'playwright-ide.clearCache',
     svg: ``,
     text: vscode.l10n.t('Clear cache'),
     disabled: !models.selectedModel(),

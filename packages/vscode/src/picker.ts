@@ -69,7 +69,7 @@ export class Picker {
           } catch {}
 
           // Copy to clipboard if setting is enabled
-          const copyOnPick = vscode.workspace.getConfiguration('playwright').get('pickLocatorCopyToClipboard', false);
+          const copyOnPick = vscode.workspace.getConfiguration('playwright-ide').get('pickLocatorCopyToClipboard', false);
           if (copyOnPick)
             await vscode.env.clipboard.writeText(fullLocator);
 
