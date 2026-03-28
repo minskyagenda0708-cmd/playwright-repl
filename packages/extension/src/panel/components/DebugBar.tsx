@@ -8,32 +8,32 @@ interface DebugBarProps {
 
 function DebugBar({ dispatch }: DebugBarProps) {
     function handleContinue() {
-        swDebugResume().catch(() => {});
+        swDebugResume().catch(e => console.warn('[debug] resume failed:', e));
     }
 
     function handleStepOver() {
-        swDebugStepOver().catch(() => {});
+        swDebugStepOver().catch(e => console.warn('[debug] step-over failed:', e));
     }
 
     function handleStepInto() {
-        swDebugStepInto().catch(() => {});
+        swDebugStepInto().catch(e => console.warn('[debug] step-into failed:', e));
     }
 
     function handleStepOut() {
-        swDebugStepOut().catch(() => {});
+        swDebugStepOut().catch(e => console.warn('[debug] step-out failed:', e));
     }
 
     function handleRestart() {
         // Stop current execution, then re-run in debug mode
-        swTerminateExecution().catch(() => {});
-        swDebugResume().catch(() => {});
+        swTerminateExecution().catch(e => console.warn('[debug] terminate failed:', e));
+        swDebugResume().catch(e => console.warn('[debug] resume failed:', e));
         dispatch({ type: 'RUN_STOP' });
         // Re-start is handled by the user clicking Debug again
     }
 
     function handleStop() {
-        swTerminateExecution().catch(() => {});
-        swDebugResume().catch(() => {});
+        swTerminateExecution().catch(e => console.warn('[debug] terminate failed:', e));
+        swDebugResume().catch(e => console.warn('[debug] resume failed:', e));
         dispatch({ type: 'RUN_STOP' });
     }
 

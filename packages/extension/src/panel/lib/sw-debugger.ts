@@ -87,7 +87,7 @@ export function swTrackBreakpoint(breakpointId: string) {
 
 export async function swRemoveAllBreakpoints(): Promise<void> {
     const ids = activeBreakpointIds.splice(0);
-    for (const id of ids) await swRemoveBreakpoint(id).catch(() => {});
+    for (const id of ids) await swRemoveBreakpoint(id).catch(e => console.debug('[debug] remove breakpoint:', e));
 }
 
 export async function swRemoveBreakpoint(breakpointId: string): Promise<void> {

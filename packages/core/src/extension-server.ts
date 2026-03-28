@@ -92,7 +92,9 @@ export class CommandServer {
         const { url } = JSON.parse(body);
         console.log(`[select-tab] ${url || 'no-url'}`);
         if (url && url !== this._lastActiveUrl) {
-          await withTimeout(this._engine.selectPageByUrl(url), 5000).catch(() => {});
+          await withTimeout(this._engine.selectPageByUrl(url), 5000).catch(e => {
+            console.warn(`[select-tab] failed to select page: ${e instanceof Error ? e.message : String(e)}`);
+          });
           this._lastActiveUrl = url;
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -113,7 +115,9 @@ export class CommandServer {
 
         // Auto-select the tab matching the panel's active tab (only when it changes).
         if (activeTabUrl && activeTabUrl !== this._lastActiveUrl) {
-          await withTimeout(this._engine.selectPageByUrl(activeTabUrl), 5000).catch(() => {});
+          await withTimeout(this._engine.selectPageByUrl(activeTabUrl), 5000).catch(e => {
+            console.warn(`[server] tab select failed: ${e instanceof Error ? e.message : String(e)}`);
+          });
           this._lastActiveUrl = activeTabUrl;
         }
 

@@ -163,10 +163,15 @@ export class Engine {
         console.log('Connecting to existing Chrome on port ' + cdpPort + ' (use --spawn to launch Chrome automatically)');
       }
 
-      // 3. Wait for Chrome CDP to be ready (no timeout — waits until available).
+      // 3. Wait for Chrome CDP to be ready (30s timeout).
       console.log('Waiting for Chrome CDP...');
       const cdpUrl = `http://localhost:${cdpPort}`;
+      const cdpTimeout = 30_000;
+      const cdpStart = Date.now();
       while (true) {
+        if (Date.now() - cdpStart > cdpTimeout) {
+          throw new Error(`Timeout: Chrome CDP not available at ${cdpUrl} after ${cdpTimeout / 1000}s`);
+        }
         try {
           const res = await fetch(`${cdpUrl}/json/version`);
           if (res.ok) break;
@@ -380,7 +385,9 @@ export class Engine {
   private _scheduleReconnect(): void {
     if (this._isReconnecting) return;
     this._isReconnecting = true;
-    this._doReconnect().catch(() => {});
+    this._doReconnect().catch((e) => {
+      console.warn('Reconnection failed:', e instanceof Error ? e.message : String(e));
+    });
   }
 
   private async _doReconnect(): Promise<void> {
@@ -392,13 +399,27 @@ export class Engine {
 
     console.log('Browser context closed. Waiting for Chrome to reconnect...');
 
+    let attempt = 0;
     while (!this._connected) {
+      attempt++;
       await new Promise(r => setTimeout(r, 1500));
+
+      // Check if engine was closed during reconnect
+      if (!this._reconnectInfo) {
+        console.log('Reconnection cancelled (engine closed).');
+        break;
+      }
 
       try {
         const res = await fetch(`${cdpUrl}/json/version`);
-        if (!res.ok) continue;
-      } catch { continue; }
+        if (!res.ok) {
+          console.warn(`Reconnect attempt ${attempt}: CDP responded with status ${res.status}`);
+          continue;
+        }
+      } catch (e) {
+        console.warn(`Reconnect attempt ${attempt}: CDP not available (${e instanceof Error ? e.message : String(e)})`);
+        continue;
+      }
 
       // CDP is responding — reconnect
       try {
@@ -411,8 +432,10 @@ export class Engine {
 
         (config as any).browser.cdpEndpoint = cdpUrl;
         await this._connectToCdp(deps, config, clientInfo);
-        console.log('Reconnected to Chrome CDP.');
-      } catch { /* retry next iteration */ }
+        console.log(`Reconnected to Chrome CDP after ${attempt} attempt(s).`);
+      } catch (e) {
+        console.warn(`Reconnect attempt ${attempt}: connection failed (${e instanceof Error ? e.message : String(e)})`);
+      }
     }
 
     this._isReconnecting = false;

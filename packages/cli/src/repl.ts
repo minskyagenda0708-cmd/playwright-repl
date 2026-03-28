@@ -232,7 +232,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   }
 
   if (line === '.exit' || line === '.quit') {
-    ctx.conn.close();
+    await ctx.conn.close();
     process.exit(0);
   }
 
@@ -430,11 +430,11 @@ export async function runReplayMode(ctx: ReplContext, replayFile: string, step: 
     }
     ctx.session.endReplay();
     console.log(`\n${c.green}✓${c.reset} Replay complete`);
-    ctx.conn.close();
+    await ctx.conn.close();
     process.exit(0);
   } catch (err: unknown) {
     console.error(`${c.red}Error:${c.reset} ${(err as Error).message}`);
-    ctx.conn.close();
+    await ctx.conn.close();
     process.exit(1);
   }
 }
@@ -452,7 +452,7 @@ export async function runMultiReplayMode(ctx: ReplContext, targets: string[], st
   const files = resolveReplayFiles(targets);
   if (files.length === 0) {
     console.error(`${c.red}Error:${c.reset} No .pw files found`);
-    ctx.conn.close();
+    await ctx.conn.close();
     process.exit(1);
   }
 
@@ -542,7 +542,7 @@ export async function runMultiReplayMode(ctx: ReplContext, targets: string[], st
   fs.writeFileSync(logFile, logLines.join('\n') + '\n', 'utf-8');
   console.log(`${c.dim}Log: ${logFile}${c.reset}`);
 
-  ctx.conn.close();
+  await ctx.conn.close();
   process.exit(failCount > 0 ? 1 : 0);
 }
 
@@ -584,20 +584,20 @@ export function startCommandLoop(ctx: ReplContext): void {
       await new Promise(r => setTimeout(r, 50));
     }
     ctx.log(`\n${c.dim}Closing browser...${c.reset}`);
-    ctx.conn.close();
+    await ctx.conn.close();
     process.exit(0);
   });
 
   let lastSigint = 0;
   ctx.rl!.on('SIGINT', () => {
     if (ctx.opts?.extension) {
-      ctx.conn.close();
-      process.exit(0);
+      ctx.conn.close().finally(() => process.exit(0));
+      return;
     }
     const now = Date.now();
     if (now - lastSigint < 500) {
-      ctx.conn.close();
-      process.exit(0);
+      ctx.conn.close().finally(() => process.exit(0));
+      return;
     }
     lastSigint = now;
     ctx.log(`\n${c.dim}(Ctrl+C again to exit, or type .exit)${c.reset}`);

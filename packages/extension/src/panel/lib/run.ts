@@ -169,7 +169,7 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
                 dispatch({ type: 'SET_SCOPE_DATA', scopes});
             } else {
                 // Already at last line, stepped past — finish
-                swDebugResume().catch(() => {});
+                swDebugResume().catch(e => console.debug('[debug] auto-resume:', e));
             }
         });
 
@@ -202,8 +202,8 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
         dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(e?.message ?? String(e)), type: 'error' } });
     } finally {
         onDebugPaused(null);
-        await swDebuggerDisable().catch(() => {});
-        await swRemoveAllBreakpoints().catch(() => {})
+        await swDebuggerDisable().catch(e => console.debug('[debug] disable:', e));
+        await swRemoveAllBreakpoints().catch(e => console.debug('[debug] cleanup breakpoints:', e));
     }
 }
 

@@ -19,7 +19,7 @@ function DevToolsConsole() {
       attachToTab(tabId).then(res => {
         if (res.ok && res.url)
           dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
-      }).catch(() => {});
+      }).catch(e => console.warn('[pw-repl] auto-attach failed:', e));
     }
   }, []);
 

@@ -24,22 +24,22 @@ async function ensureOffscreen() {
     justification: 'Maintains WebSocket connection to CLI/MCP bridge server',
   });
 }
-ensureOffscreen().catch(() => {});
+ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
 
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(e => console.debug('[pw-repl] setPanelBehavior:', e));
 
 let cachedSettings: Partial<PwReplSettings> = { openAs: 'sidepanel' };
-loadSettings().then(s => cachedSettings = s).catch(() => {});
+loadSettings().then(s => cachedSettings = s).catch(e => console.warn('[pw-repl] settings load failed:', e));
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.openAs) {
     cachedSettings.openAs = changes.openAs.newValue;
   }
   if (area === 'local' && changes.bridgePort) {
-    chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => { /* panel may not be open */ });
   }
 });
 
@@ -108,7 +108,7 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
     } catch {
       // Attach failed (stale frames, etc.) — detach all stale sessions and retry.
       // The _doDetach fix in playwright-crx handles broken pages gracefully.
-      await app.detachAll().catch(() => {});
+      await app.detachAll().catch(e => console.debug('[pw-repl] detachAll before retry:', e));
       currentPage = await app.attach(tabId);
     }
 
@@ -162,7 +162,7 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
 
 async function stopRecording(): Promise<{ ok: boolean }> {
   if (recordingTabId) {
-    await chrome.tabs.sendMessage(recordingTabId, { type: 'record-stop' }).catch(() => {});
+    await chrome.tabs.sendMessage(recordingTabId, { type: 'record-stop' }).catch(e => console.debug('[pw-repl] record-stop:', e));
     recordingTabId = null;
   }
   return { ok: true };
@@ -171,7 +171,7 @@ async function stopRecording(): Promise<{ ok: boolean }> {
 // Re-inject recorder after navigation (page reload / SPA navigation)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === recordingTabId && changeInfo.status === 'complete') {
-    chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] }).catch(() => {});
+    chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] }).catch(e => console.debug('[pw-repl] recorder re-inject:', e));
   }
 });
 
@@ -201,7 +201,7 @@ async function startPicking(): Promise<{ ok: boolean; error?: string }> {
 
 async function stopPicking(): Promise<{ ok: boolean }> {
   const tabId = await getActiveTabId();
-  if (tabId) await chrome.tabs.sendMessage(tabId, { type: 'pick-stop' }).catch(() => {});
+  if (tabId) await chrome.tabs.sendMessage(tabId, { type: 'pick-stop' }).catch(e => console.debug('[pw-repl] pick-stop:', e));
   return { ok: true };
 }
 
@@ -445,7 +445,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'attach')        { attachToTab(msg.tabId).then(sendResponse); return true; }
   if (msg.type === 'detach')        {
     if (activeTabId !== null && crxApp) {
-      crxApp.detach(activeTabId).catch(() => {});
+      crxApp.detach(activeTabId).catch(e => console.debug('[pw-repl] detach:', e));
       currentPage = null;
       activeTabId = null;
     }

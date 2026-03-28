@@ -25,7 +25,7 @@ function makeCtx(overrides = {}) {
   return {
     conn: {
       connected: true,
-      close: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
       start: vi.fn().mockResolvedValue(undefined),
       run: vi.fn().mockResolvedValue({ text: '### Result\nOK' }),
     },
@@ -247,9 +247,9 @@ describe('startCommandLoop', () => {
     expect(ctx.log).toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
 
-    // Second SIGINT within 500ms
+    // Second SIGINT within 500ms — close().finally(() => exit(0)) is async
     rl.emit('SIGINT');
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalledWith(0));
 
     exitSpy.mockRestore();
   });

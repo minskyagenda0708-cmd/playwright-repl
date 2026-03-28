@@ -85,7 +85,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     async function handleTabChange(tabId: number) {
         const tab = availableTabs.find(t => t.id === tabId);
         setSelectedTabId(tabId); // show in dropdown immediately
-        chrome.tabs.update(tabId, { active: true }).catch(() => {});
+        chrome.tabs.update(tabId, { active: true }).catch(e => console.debug('[pw-repl] tab activate:', e));
         if (tab && isInternalUrl(tab.url)) {
             dispatch({ type: 'DETACH' });
             return;
@@ -184,8 +184,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     function handleStop() {
         cancelRunRef.current = true;
         if (isStepDebugging) {
-            swTerminateExecution().catch(() => {});
-            swDebugResume().catch(() => {}); // unpause so termination takes effect
+            swTerminateExecution().catch(e => console.warn('[debug] terminate failed:', e));
+            swDebugResume().catch(e => console.warn('[debug] resume failed:', e)); // unpause so termination takes effect
         }
         dispatch({ type: 'RUN_STOP' });
     }
@@ -249,7 +249,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     useEffect(() => {
         if (isRunning && isRecording) {
             setIsRecording(false);
-            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
+            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(e => console.debug('[pw-repl] record-stop:', e));
         }
     }, [isRunning]);
 
@@ -258,7 +258,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         if (isRecording) {
             setIsRecording(false);
-            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
+            chrome.runtime.sendMessage({ type: 'record-stop' }).catch(e => console.debug('[pw-repl] record-stop:', e));
             return;
         }
 
@@ -318,7 +318,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         if (isPicking) {
             setIsPicking(false);
-            await chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
+            await chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(e => console.debug('[pw-repl] pick-stop:', e));
             return;
         }
 
@@ -339,7 +339,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     function handleDetach() {
         dispatch({ type: 'DETACH' });
         // Let background know we're detaching (for cleanup)
-        chrome.runtime.sendMessage({ type: 'detach' }).catch(() => { });
+        chrome.runtime.sendMessage({ type: 'detach' }).catch(e => console.debug('[pw-repl] detach:', e));
     }
 
     // ─── Theme toggle ───

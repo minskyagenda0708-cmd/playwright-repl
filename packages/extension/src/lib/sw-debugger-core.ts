@@ -28,7 +28,7 @@ function querySwTarget(): Promise<string | null> {
 
 async function findSwTarget(): Promise<string | null> {
     // Wake the SW and wait for it to confirm it's alive before polling
-    await chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});
+    await chrome.runtime.sendMessage({ type: 'ping' }).catch(() => { /* SW may not be ready yet */ });
     // Poll until it appears as a debuggable target (up to ~1s)
     for (let i = 0; i < 10; i++) {
         const id = await querySwTarget();
