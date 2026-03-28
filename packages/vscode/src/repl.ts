@@ -270,6 +270,27 @@ export class PlaywrightRepl {
       return;
     }
 
+    // Intercept 'page' — show useful page info instead of raw object
+    if (command.trim() === 'page') {
+      try {
+        const result = await this._browserManager.runCommand('await JSON.stringify({ url: page.url(), title: await page.title(), viewport: await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.clientHeight, dpr: window.devicePixelRatio })) })');
+        if (result.text && !result.isError) {
+          const info = JSON.parse(result.text);
+          this._write(`URL:      ${info.url}`);
+          this._write(`Title:    ${info.title}`);
+          const vp = info.viewport ? `${info.viewport.width}x${info.viewport.height}` : 'auto';
+          const dpr = info.viewport?.dpr && info.viewport.dpr !== 1 ? ` @${info.viewport.dpr}x` : '';
+          this._write(`Viewport: ${vp}${dpr}`);
+        } else {
+          this._writeEmitter.fire(`${RED}${result.text || 'Could not get page info'}${RESET}\r\n`);
+        }
+      } catch (e: unknown) {
+        this._writeEmitter.fire(`${RED}Error: ${(e as Error).message}${RESET}\r\n`);
+      }
+      this._processing = false;
+      return;
+    }
+
     this._commandCount++;
     const start = Date.now();
     try {

@@ -88,6 +88,31 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
       return;
     }
 
+    // Intercept 'page' — show useful page info instead of raw object
+    if (command.trim() === 'page') {
+      this._setProcessing(true);
+      try {
+        const result = await this._browserManager.runCommand('await JSON.stringify({ url: page.url(), title: await page.title(), viewport: await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.clientHeight, dpr: window.devicePixelRatio })) })');
+        if (result.text && !result.isError) {
+          const info = JSON.parse(result.text);
+          const vp = info.viewport ? `${info.viewport.width}x${info.viewport.height}` : 'auto';
+          const dpr = info.viewport?.dpr && info.viewport.dpr !== 1 ? ` @${info.viewport.dpr}x` : '';
+          this._appendOutput(
+            `URL:      ${info.url}\n` +
+            `Title:    ${info.title}\n` +
+            `Viewport: ${vp}${dpr}`,
+            'output',
+          );
+        } else {
+          this._appendOutput(result.text || 'Could not get page info', 'error');
+        }
+      } catch (e: unknown) {
+        this._appendOutput(`Error: ${(e as Error).message}`, 'error');
+      }
+      this._setProcessing(false);
+      return;
+    }
+
     this._setProcessing(true);
     this._commandCount++;
     const start = Date.now();
