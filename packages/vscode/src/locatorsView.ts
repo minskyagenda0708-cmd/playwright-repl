@@ -30,6 +30,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
   private _settingsModel: SettingsModel;
   private _reusedBrowser: ReusedBrowser;
+  private _browserManager: import('./browser').BrowserManager | undefined;
   private _backendVersion = 0;
 
   constructor(vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, reusedBrowser: ReusedBrowser, extensionUri: vscodeTypes.Uri) {
@@ -53,13 +54,22 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     ];
   }
 
+  setBrowserManager(browserManager: import('./browser').BrowserManager) {
+    this._browserManager = browserManager;
+  }
+
   /** Allow external callers (e.g. our bridge picker) to show a locator. */
-  public showLocator(locator: string, ariaSnapshot?: string, assertion?: string) {
+  public async showLocator(locator: string, ariaSnapshot?: string, assertion?: string) {
     this._locator = { locator };
     this._assertion = assertion || '';
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
+    this._highlighted = false;
+    // Focus first so the webview is resolved before we send the update
+    await this._vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
+    // Small delay to let the webview initialize on first open
+    if (!this._view)
+      await new Promise(r => setTimeout(r, 200));
     this._updateValues();
-    void this._vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
   }
 
   public resolveWebviewView(webviewView: vscodeTypes.WebviewView, context: vscodeTypes.WebviewViewResolveContext, token: vscodeTypes.CancellationToken) {
@@ -92,8 +102,14 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
           this._ariaSnapshot.error = e.message;
           this._updateValues();
         });
+      } else if (data.method === 'assertionChanged') {
+        this._assertion = data.params.assertion;
       } else if (data.method === 'toggle') {
         void this._vscode.commands.executeCommand(`playwright-repl.toggle.${data.params.setting}`);
+      } else if (data.method === 'highlight') {
+        this._highlight();
+      } else if (data.method === 'verify') {
+        this._verify();
       }
     }));
 
@@ -109,13 +125,44 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     this._updateSettings();
   }
 
+  private _highlighted = false;
+
+  private async _highlight() {
+    if (!this._browserManager?.isRunning() || !this._locator.locator) return;
+    try {
+      if (this._highlighted) {
+        await this._browserManager.runCommand('highlight --clear');
+        this._highlighted = false;
+      } else {
+        await this._browserManager.runCommand(`await ${this._locator.locator}.highlight()`);
+        this._highlighted = true;
+      }
+      void this._view?.webview.postMessage({ method: 'highlightState', params: { active: this._highlighted } });
+    } catch {}
+  }
+
+  private async _verify() {
+    if (!this._browserManager?.isRunning() || !this._assertion) return;
+    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: true } });
+    try {
+      const result = await this._browserManager.runCommand(this._assertion);
+      const passed = !result.isError;
+      void this._view?.webview.postMessage({
+        method: 'verifyResult',
+        params: { passed, error: passed ? null : result.text }
+      });
+    } catch (e: unknown) {
+      void this._view?.webview.postMessage({
+        method: 'verifyResult',
+        params: { passed: false, error: (e as Error).message }
+      });
+    }
+    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: false } });
+  }
+
   private _updateActions() {
     const actions = [
       pickElementAction(this._vscode),
-      {
-        ...pickElementAction(this._vscode),
-        location: 'actions-2',
-      }
     ];
     if (this._view)
       void this._view.webview.postMessage({ method: 'actions', params: { actions } });
@@ -149,7 +196,57 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+      <style>
+        .inline-btn {
+          cursor: pointer;
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+          border: none;
+          padding: 2px 10px;
+          border-radius: 2px;
+          font-size: 13px;
+          margin-left: 6px;
+        }
+        .inline-btn:hover {
+          background: var(--vscode-button-secondaryHoverBackground);
+        }
+        .inline-btn.active {
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+        }
+        .switch-label {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          margin-left: 4px;
+          font-size: 12px;
+          cursor: pointer;
+          flex: none;
+        }
+        .icon-btn {
+          cursor: pointer;
+          background: none;
+          border: none;
+          padding: 2px;
+          display: flex;
+          align-items: center;
+          border-radius: 3px;
+        }
+        .icon-btn:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+        }
+        .icon-btn svg {
+          width: 16px;
+          height: 16px;
+          fill: var(--vscode-editor-foreground);
+        }
+        .separator {
+          color: var(--vscode-panelInput-border, var(--vscode-panel-border));
+          margin: 0 4px;
+          flex: none;
+        }
+      </style>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link href="${style}" rel="stylesheet">
       <title>Playwright</title>
@@ -157,12 +254,12 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
     <body class="locators-view">
       <div class="section">
         <div class="hbox">
-          <div class="actions" id="actions"></div>
+          <button id="pickBtn" title="Pick locator" class="icon-btn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M18 42h-7.5c-3 0-4.5-1.5-4.5-4.5v-27C6 7.5 7.5 6 10.5 6h27C42 6 42 10.404 42 10.5V18h-3V9H9v30h9v3Zm27-15-9 6 9 9-3 3-9-9-6 9-6-24 24 6Z"/></svg></button>
           <label id="locatorLabel">${vscode.l10n.t('Locator')}</label>
-          <div class="hbox" id="locatorSpacer"></div>
-          <label id="copyToClipboardLabel" title="${vscode.l10n.t('Automatically copy picked locator to clipboard')}">
-            <input id="copyToClipboardCheckbox" type="checkbox">
-            ${vscode.l10n.t('Copy on pick')}
+          <span class="separator">|</span>
+          <label class="switch-label" title="Toggle highlight in browser">
+            Highlight
+            <input id="highlightSwitch" type="checkbox">
           </label>
         </div>
         <input id="locator" placeholder="${vscode.l10n.t('Locator')}" aria-labelledby="locatorLabel">
@@ -172,14 +269,18 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         <div class="hbox">
           <label>Assert</label>
         </div>
-        <input id="assertion" placeholder="Pick an element to see assertion" readonly aria-label="Assertion">
+        <input id="assertion" placeholder="Pick an element to see assertion" aria-label="Assertion">
+        <div class="hbox" style="margin-top:4px;align-items:center;">
+          <button id="verifyBtn" title="Run assertion" class="inline-btn" style="margin-left:0;">Verify</button>
+          <span id="verifyResult" style="font-size:13px;margin-left:6px;display:none;"></span>
+        </div>
       </div>
       <div id="ariaSection" class="section">
         <div class="hbox">
           <div class="actions" id="actions-2"></div>
           <label id="locatorLabel">Aria</label>
         </div>
-        <textarea id="ariaSnapshot" placeholder="Aria" rows="10" aria-labelledby="ariaSnapshotLabel"></textarea>
+        <textarea id="ariaSnapshot" placeholder="Aria" rows="10" readonly aria-labelledby="ariaSnapshotLabel"></textarea>
         <p id="ariaSnapshotError" class="error"></p>
       </div>
     </body>

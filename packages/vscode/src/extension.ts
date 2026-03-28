@@ -221,6 +221,8 @@ export class Extension implements RunHooks {
       this._repl.setBrowserManager(this._browserManager);
     if (this._replView)
       this._replView.setBrowserManager(this._browserManager);
+    if (this._locatorsView)
+      this._locatorsView.setBrowserManager(this._browserManager);
   }
 
   reusedBrowserForTest(): ReusedBrowser {
