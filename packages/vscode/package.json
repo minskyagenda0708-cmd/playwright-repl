@@ -167,7 +167,12 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "playwrightReplContainer",
+          "id": "replContainer",
+          "title": "REPL",
+          "icon": "images/playwright-logo.png"
+        },
+        {
+          "id": "locatorContainer",
           "title": "Locator",
           "icon": "images/playwright-logo.png"
         }
@@ -181,7 +186,14 @@
           "name": "%views.test.playwright-repl.settingsView%"
         }
       ],
-      "playwrightReplContainer": [
+      "replContainer": [
+        {
+          "type": "webview",
+          "id": "playwright-repl.replView",
+          "name": "REPL"
+        }
+      ],
+      "locatorContainer": [
         {
           "type": "webview",
           "id": "playwright-repl.locatorsView",

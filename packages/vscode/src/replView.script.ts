@@ -1,0 +1,84 @@
+/**
+ * REPL webview script — handles input, output rendering, and command history.
+ */
+
+import { vscode } from './common';
+
+const output = document.getElementById('output')!;
+const input = document.getElementById('command-input') as HTMLInputElement;
+
+let history: string[] = [];
+let historyIndex = -1;
+let savedInput = '';
+
+// ─── Input handling ───────────────────────────────────────────────────────
+
+input.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Enter') {
+    const command = input.value.trim();
+    if (!command) return;
+    appendLine(command, 'command');
+    vscode.postMessage({ method: 'execute', params: { command } });
+    history.unshift(command);
+    if (history.length > 100) history.pop();
+    historyIndex = -1;
+    savedInput = '';
+    input.value = '';
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (historyIndex < history.length - 1) {
+      if (historyIndex === -1) savedInput = input.value;
+      historyIndex++;
+      input.value = history[historyIndex]!;
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (historyIndex > 0) {
+      historyIndex--;
+      input.value = history[historyIndex]!;
+    } else if (historyIndex === 0) {
+      historyIndex = -1;
+      input.value = savedInput;
+    }
+  }
+});
+
+// ─── Messages from extension ──────────────────────────────────────────────
+
+window.addEventListener('message', event => {
+  const { method, params } = event.data;
+
+  if (method === 'output') {
+    appendLine(params.text, params.type);
+  } else if (method === 'image') {
+    const img = document.createElement('img');
+    img.src = params.dataUri;
+    img.style.maxWidth = '100%';
+    img.style.margin = '4px 0';
+    output.appendChild(img);
+    output.scrollTop = output.scrollHeight;
+  } else if (method === 'clear') {
+    output.textContent = '';
+  } else if (method === 'processing') {
+    input.disabled = params.processing;
+    if (!params.processing) input.focus();
+  } else if (method === 'history') {
+    history = params.history;
+  }
+});
+
+// ─── Output rendering ─────────────────────────────────────────────────────
+
+function appendLine(text: string, type: 'command' | 'output' | 'error' | 'info') {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const el = document.createElement('div');
+    el.className = `line line-${type}`;
+    el.textContent = line;
+    output.appendChild(el);
+  }
+  output.scrollTop = output.scrollHeight;
+}
+
+// Request history on load
+vscode.postMessage({ method: 'getHistory' });

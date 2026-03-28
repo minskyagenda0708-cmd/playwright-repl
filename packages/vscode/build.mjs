@@ -14,6 +14,7 @@ const options = {
     'src/playwrightFinder.ts',
     'src/settingsView.script.ts',
     'src/locatorsView.script.ts',
+    'src/replView.script.ts',
   ],
   bundle: true,
   outdir: 'dist',

@@ -39,6 +39,7 @@ import { Recorder } from './recorder';
 import { Picker } from './picker';
 import { createRequire } from 'node:module';
 import { PlaywrightRepl } from './repl';
+import { ReplView } from './replView';
 
 const stackUtils = new StackUtils({
   cwd: '/ensure_absolute_paths'
@@ -95,6 +96,7 @@ export class Extension implements RunHooks {
 
   // Playwright REPL: bridge-based features
   private _browserManager?: BrowserManager;
+  private _replView!: ReplView;
   private _recorder?: Recorder;
   private _picker?: Picker;
   private _repl?: PlaywrightRepl;
@@ -217,6 +219,8 @@ export class Extension implements RunHooks {
     });
     if (this._repl)
       this._repl.setBrowserManager(this._browserManager);
+    if (this._replView)
+      this._replView.setBrowserManager(this._browserManager);
   }
 
   reusedBrowserForTest(): ReusedBrowser {
@@ -232,6 +236,7 @@ export class Extension implements RunHooks {
     const vscode = this._vscode;
     this._settingsView = new SettingsView(vscode, this._settingsModel, this._models, this._reusedBrowser, this._context.extensionUri);
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
+    this._replView = new ReplView(vscode, this._context.extensionUri);
     this._repl = new PlaywrightRepl();
     this._repl.show();
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
@@ -336,6 +341,7 @@ export class Extension implements RunHooks {
       this._treeItemObserver.onTreeItemSelected(item => this._treeItemSelected(item)),
       this._settingsView,
       this._locatorsView,
+      this._replView,
       this._testController,
       this._runProfile,
       this._debugProfile,
