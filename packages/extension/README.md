@@ -19,6 +19,7 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 | ⚙️ **Preferences** | Default language mode (`.pw` or JS), bridge port, and open mode — configurable in Options |
 | 🌗 **Light / Dark Mode** | Toggle between light and dark themes from the toolbar, persisted across sessions |
 | 🪟 **Side Panel & Popup** | Opens as a Chrome side panel by default; switch to a standalone popup window in Options |
+| 🔧 **DevTools REPL** | Console-only REPL tab in Chrome DevTools — always available alongside Elements/Network for quick debugging |
 | ⚡ **Fast** | Commands execute directly via CDP in the service worker — no Node.js roundtrip, near-instant response |
 
 ## Setup

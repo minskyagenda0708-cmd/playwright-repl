@@ -67,7 +67,16 @@ export class BrowserManager {
       ),
     );
 
-    this._browserContext = await pw.chromium.launchPersistentContext('', {
+    // Create user data dir with DevTools prefs (dock to bottom)
+    const os = await import('node:os');
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-'));
+    const defaultDir = path.join(userDataDir, 'Default');
+    fs.mkdirSync(defaultDir, { recursive: true });
+    fs.writeFileSync(path.join(defaultDir, 'Preferences'), JSON.stringify({
+      devtools: { preferences: { currentDockState: '"bottom"' } },
+    }));
+
+    this._browserContext = await pw.chromium.launchPersistentContext(userDataDir, {
       channel: 'chromium',
       headless,
       args: [
@@ -77,6 +86,7 @@ export class BrowserManager {
         '--no-default-browser-check',
         '--disable-background-timer-throttling',
         '--disable-infobars',
+        '--auto-open-devtools-for-tabs',
         '--remote-debugging-port=9222',
       ],
       env: cleanEnv,

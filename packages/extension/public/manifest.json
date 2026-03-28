@@ -29,6 +29,7 @@
       "128": "icons/dramaturg_icon_128.png"
     }
   },
+  "devtools_page": "devtools/devtools.html",
   "side_panel": {
     "default_path": "panel/panel.html"
   },
