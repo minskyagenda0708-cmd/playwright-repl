@@ -125,6 +125,7 @@ export class SettingsView extends DisposableBase implements vscodeTypes.WebviewV
     const actions = [
       pickElementAction(this._vscode),
       this._isRecording ? stopRecordingAction(this._vscode) : recordNewAction(this._vscode, this._reusedBrowser),
+      assertBuilderAction(this._vscode),
       revealTestOutputAction(this._vscode),
       closeBrowsersAction(this._vscode, this._reusedBrowser),
       {
@@ -306,6 +307,14 @@ export const pickElementAction = (vscode: vscodeTypes.VSCode) => {
     command: 'playwright-repl.pickLocator',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M18 42h-7.5c-3 0-4.5-1.5-4.5-4.5v-27C6 7.5 7.5 6 10.5 6h27C42 6 42 10.404 42 10.5V18h-3V9H9v30h9v3Zm27-15-9 6 9 9-3 3-9-9-6 9-6-24 24 6Z"/></svg>`,
     text: vscode.l10n.t('Pick locator'),
+  };
+};
+
+export const assertBuilderAction = (vscode: vscodeTypes.VSCode) => {
+  return {
+    command: 'playwright-repl.assertBuilder',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M21.05 33.1 35.2 18.95l-2.3-2.25-11.85 11.85-6-6-2.25 2.25ZM24 44q-4.1 0-7.75-1.575-3.65-1.575-6.375-4.3-2.725-2.725-4.3-6.375Q4 28.1 4 24q0-4.15 1.575-7.8 1.575-3.65 4.3-6.35 2.725-2.7 6.375-4.275Q19.9 4 24 4q4.15 0 7.8 1.575 3.65 1.575 6.35 4.275 2.7 2.7 4.275 6.35Q44 19.85 44 24q0 4.1-1.575 7.75-1.575 3.65-4.275 6.375t-6.35 4.3Q28.15 44 24 44Z"/></svg>`,
+    text: vscode.l10n.t('Assert'),
   };
 };
 

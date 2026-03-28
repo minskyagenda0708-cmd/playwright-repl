@@ -15,6 +15,7 @@ const options = {
     'src/settingsView.script.ts',
     'src/locatorsView.script.ts',
     'src/replView.script.ts',
+    'src/assertView.script.ts',
   ],
   bundle: true,
   outdir: 'dist',

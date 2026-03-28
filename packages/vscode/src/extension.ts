@@ -40,6 +40,7 @@ import { Picker } from './picker';
 import { createRequire } from 'node:module';
 import { PlaywrightRepl } from './repl';
 import { ReplView } from './replView';
+import { AssertView } from './assertView';
 
 const stackUtils = new StackUtils({
   cwd: '/ensure_absolute_paths'
@@ -97,6 +98,7 @@ export class Extension implements RunHooks {
   // Playwright REPL: bridge-based features
   private _browserManager?: BrowserManager;
   private _replView!: ReplView;
+  private _assertView!: AssertView;
   private _recorder?: Recorder;
   private _picker?: Picker;
   private _repl?: PlaywrightRepl;
@@ -223,6 +225,16 @@ export class Extension implements RunHooks {
       this._replView.setBrowserManager(this._browserManager);
     if (this._locatorsView)
       this._locatorsView.setBrowserManager(this._browserManager);
+    if (this._assertView)
+      this._assertView.setBrowserManager(this._browserManager);
+  }
+
+  private _ensurePicker() {
+    if (this._picker || !this._browserManager) return;
+    this._picker = new Picker(this._browserManager, this._logger);
+    this._picker.setLocatorsView(this._locatorsView);
+    this._picker.setAssertView(this._assertView);
+    this._assertView.setPicker(this._picker);
   }
 
   reusedBrowserForTest(): ReusedBrowser {
@@ -239,6 +251,7 @@ export class Extension implements RunHooks {
     this._settingsView = new SettingsView(vscode, this._settingsModel, this._models, this._reusedBrowser, this._context.extensionUri);
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
     this._replView = new ReplView(vscode, this._context.extensionUri);
+    this._assertView = new AssertView(vscode, this._context.extensionUri);
     this._repl = new PlaywrightRepl();
     this._repl.show();
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
@@ -344,6 +357,7 @@ export class Extension implements RunHooks {
       this._settingsView,
       this._locatorsView,
       this._replView,
+      this._assertView,
       this._testController,
       this._runProfile,
       this._debugProfile,
@@ -392,17 +406,31 @@ export class Extension implements RunHooks {
             vscode.window.showWarningMessage('Launch browser first.');
             return;
           }
-          if (!this._picker) {
-            this._picker = new Picker(this._browserManager, this._logger);
-            this._picker.setLocatorsView(this._locatorsView);
-          }
-          if (this._picker.isPicking)
-            await this._picker.stop();
+          this._ensurePicker();
+          if (this._picker!.isPicking)
+            await this._picker!.stop();
           else
-            await this._picker.start();
+            await this._picker!.start();
         } catch (e: unknown) {
           this._logger.error('Pick locator error:', (e as Error).message);
           vscode.window.showErrorMessage(`Pick locator failed: ${(e as Error).message}`);
+        }
+      }),
+
+      vscode.commands.registerCommand('playwright-repl.assertBuilder', async () => {
+        try {
+          await this._ensureBrowserManager();
+          if (!this._browserManager?.isRunning()) {
+            vscode.window.showWarningMessage('Could not launch browser.');
+            return;
+          }
+          this._ensurePicker();
+          // Focus Assert panel and start pick (sends result to Assert view)
+          await this._vscode.commands.executeCommand('playwright-repl.assertView.focus');
+          if (!this._picker!.isPicking)
+            await this._picker!.startForAssert();
+        } catch (e: unknown) {
+          this._logger.error('Assert builder error:', (e as Error).message);
         }
       }),
     ];

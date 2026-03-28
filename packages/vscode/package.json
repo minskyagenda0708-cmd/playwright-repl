@@ -115,6 +115,11 @@
         "category": "Playwright REPL",
         "command": "playwright-repl.pickLocator",
         "title": "Pick Locator"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.assertBuilder",
+        "title": "Assert Builder"
       }
     ],
     "configuration": {
@@ -175,6 +180,11 @@
           "id": "locatorContainer",
           "title": "Locator",
           "icon": "images/playwright-logo.png"
+        },
+        {
+          "id": "assertContainer",
+          "title": "Assert",
+          "icon": "images/playwright-logo.png"
         }
       ]
     },
@@ -198,6 +208,13 @@
           "type": "webview",
           "id": "playwright-repl.locatorsView",
           "name": "%views.test.playwright-repl.locatorsView%"
+        }
+      ],
+      "assertContainer": [
+        {
+          "type": "webview",
+          "id": "playwright-repl.assertView",
+          "name": "Assert"
         }
       ]
     }

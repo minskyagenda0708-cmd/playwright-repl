@@ -26,7 +26,6 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _view: vscodeTypes.WebviewView | undefined;
   private _extensionUri: vscodeTypes.Uri;
   private _locator: { locator: string, error?: string } = { locator: '' };
-  private _assertion: string = '';
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
   private _settingsModel: SettingsModel;
   private _reusedBrowser: ReusedBrowser;
@@ -59,9 +58,8 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   }
 
   /** Allow external callers (e.g. our bridge picker) to show a locator. */
-  public async showLocator(locator: string, ariaSnapshot?: string, assertion?: string) {
+  public async showLocator(locator: string, ariaSnapshot?: string) {
     this._locator = { locator };
-    this._assertion = assertion || '';
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
     this._highlighted = false;
     // Focus first so the webview is resolved before we send the update
@@ -102,14 +100,10 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
           this._ariaSnapshot.error = e.message;
           this._updateValues();
         });
-      } else if (data.method === 'assertionChanged') {
-        this._assertion = data.params.assertion;
       } else if (data.method === 'toggle') {
         void this._vscode.commands.executeCommand(`playwright-repl.toggle.${data.params.setting}`);
       } else if (data.method === 'highlight') {
         this._highlight();
-      } else if (data.method === 'verify') {
-        this._verify();
       }
     }));
 
@@ -141,25 +135,6 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     } catch {}
   }
 
-  private async _verify() {
-    if (!this._browserManager?.isRunning() || !this._assertion) return;
-    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: true } });
-    try {
-      const result = await this._browserManager.runCommand(this._assertion);
-      const passed = !result.isError;
-      void this._view?.webview.postMessage({
-        method: 'verifyResult',
-        params: { passed, error: passed ? null : result.text }
-      });
-    } catch (e: unknown) {
-      void this._view?.webview.postMessage({
-        method: 'verifyResult',
-        params: { passed: false, error: (e as Error).message }
-      });
-    }
-    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: false } });
-  }
-
   private _updateActions() {
     const actions = [
       pickElementAction(this._vscode),
@@ -173,7 +148,6 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
       method: 'update',
       params: {
         locator: this._locator,
-        assertion: this._assertion,
         ariaSnapshot: this._ariaSnapshot,
         hideAria: this._backendVersion && this._backendVersion < 1.50
       }
@@ -264,16 +238,6 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         </div>
         <input id="locator" placeholder="${vscode.l10n.t('Locator')}" aria-labelledby="locatorLabel">
         <p id="locatorError" class="error"></p>
-      </div>
-      <div id="assertionSection" class="section">
-        <div class="hbox">
-          <label>Assert</label>
-        </div>
-        <input id="assertion" placeholder="Pick an element to see assertion" aria-label="Assertion">
-        <div class="hbox" style="margin-top:4px;align-items:center;">
-          <button id="verifyBtn" title="Run assertion" class="inline-btn" style="margin-left:0;">Verify</button>
-          <span id="verifyResult" style="font-size:13px;margin-left:6px;display:none;"></span>
-        </div>
       </div>
       <div id="ariaSection" class="section">
         <div class="hbox">

@@ -1,0 +1,129 @@
+/**
+ * Assert Builder webview script.
+ */
+
+import { vscode } from './common';
+
+const pickBtn = document.getElementById('pickBtn') as HTMLButtonElement;
+const locatorInput = document.getElementById('locator') as HTMLInputElement;
+const assertType = document.getElementById('assertType') as HTMLSelectElement;
+const negateCheckbox = document.getElementById('negateCheckbox') as HTMLInputElement;
+const argInput = document.getElementById('argInput') as HTMLInputElement;
+const assertionInput = document.getElementById('assertion') as HTMLInputElement;
+const verifyBtn = document.getElementById('verifyBtn') as HTMLButtonElement;
+const verifyResult = document.getElementById('verifyResult')!;
+
+let types: { value: string; label: string; needsArg: boolean; argType?: string }[] = [];
+let currentLocator = '';
+
+// ─── Event handlers ───────────────────────────────────────────────────────
+
+pickBtn.addEventListener('click', () => {
+  vscode.postMessage({ method: 'pick' });
+});
+
+function rebuild() {
+  const typeDef = types.find(t => t.value === assertType.value);
+  argInput.style.display = typeDef?.needsArg ? 'block' : 'none';
+  argInput.placeholder = typeDef?.argType === 'pair' ? 'attribute, value' :
+    typeDef?.argType === 'number' ? 'Count' : 'Expected value';
+  vscode.postMessage({ method: 'rebuild', params: { type: assertType.value, arg: argInput.value, negate: negateCheckbox.checked } });
+}
+
+assertType.addEventListener('change', rebuild);
+argInput.addEventListener('input', rebuild);
+negateCheckbox.addEventListener('change', rebuild);
+
+locatorInput.addEventListener('input', () => {
+  currentLocator = locatorInput.value;
+  vscode.postMessage({ method: 'locatorChanged', params: { locator: locatorInput.value } });
+  rebuild();
+});
+
+verifyBtn.addEventListener('click', () => {
+  vscode.postMessage({ method: 'verify', params: { assertion: assertionInput.value } });
+});
+
+// ─── Messages from extension ──────────────────────────────────────────────
+
+window.addEventListener('message', event => {
+  const { method, params } = event.data;
+
+  if (method === 'init') {
+    populateTypes(params.types);
+  } else if (method === 'update') {
+    currentLocator = params.locator;
+    locatorInput.value = params.locator;
+    assertionInput.value = params.assertion;
+    if (params.types) populateTypes(params.types);
+    // Detect current type from assertion
+    detectType(params.assertion);
+    verifyResult.style.display = 'none';
+  } else if (method === 'assertionUpdated') {
+    assertionInput.value = params.assertion;
+    verifyResult.style.display = 'none';
+  } else if (method === 'verifyProcessing') {
+    verifyBtn.disabled = params.processing;
+    verifyBtn.textContent = params.processing ? 'Verifying...' : 'Verify';
+    if (params.processing) {
+      verifyResult.style.display = 'inline';
+      verifyResult.textContent = '...';
+      verifyResult.style.color = 'var(--vscode-descriptionForeground)';
+    }
+  } else if (method === 'verifyResult') {
+    verifyResult.style.display = 'inline';
+    if (params.passed) {
+      verifyResult.textContent = '✓ Passed';
+      verifyResult.style.color = 'var(--vscode-terminal-ansiGreen)';
+      verifyResult.title = '';
+    } else {
+      const full = (params.error || 'Assertion failed').replace(/^### \w[\w ]*\n/gm, '').trim();
+      const expectedMatch = full.match(/Expected\s*(?:string)?:\s*(.+)/);
+      const receivedMatch = full.match(/Received\s*(?:string)?:\s*(.+)/);
+      const timeoutMatch = full.match(/Timed out (\d+)ms/);
+      let short: string;
+      if (expectedMatch && receivedMatch) {
+        short = `expected: ${expectedMatch[1].trim()}, received: ${receivedMatch[1].trim()}`;
+      } else if (timeoutMatch) {
+        short = `Timed out (${timeoutMatch[1]}ms)`;
+      } else {
+        const msgMatch = full.match(/Error:\s*(.+?)(?:\n|$)/);
+        short = msgMatch ? msgMatch[1].trim() : (full.split('\n')[0] || 'Assertion failed');
+      }
+      if (short.length > 80) short = short.slice(0, 80) + '...';
+      verifyResult.textContent = '✗ ' + short;
+      verifyResult.style.color = 'var(--vscode-terminal-ansiRed)';
+      verifyResult.title = full;
+    }
+  }
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function populateTypes(t: typeof types) {
+  types = t;
+  assertType.innerHTML = '';
+  for (const type of types) {
+    const opt = document.createElement('option');
+    opt.value = type.value;
+    opt.textContent = type.label;
+    assertType.appendChild(opt);
+  }
+}
+
+function detectType(assertion: string) {
+  for (const type of types) {
+    if (assertion.includes(`.${type.value}(`)) {
+      assertType.value = type.value;
+      const typeDef = types.find(t => t.value === type.value);
+      argInput.style.display = typeDef?.needsArg ? 'block' : 'none';
+      // Extract arg from assertion
+      const argMatch = assertion.match(new RegExp(`\\.${type.value}\\((.*)\\)`));
+      if (argMatch && argMatch[1]) {
+        const cleaned = argMatch[1].replace(/^['"]|['"]$/g, '');
+        argInput.value = cleaned;
+      }
+      return;
+    }
+  }
+}

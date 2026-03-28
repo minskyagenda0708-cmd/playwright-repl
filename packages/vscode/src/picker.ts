@@ -11,12 +11,15 @@
 import * as vscode from 'vscode';
 import type { BrowserManager } from './browser.js';
 import type { LocatorsView } from './locatorsView';
+import type { AssertView } from './assertView';
 
 export class Picker {
   private _browserManager: BrowserManager;
   private _outputChannel: vscode.OutputChannel;
   private _locatorsView: LocatorsView | undefined;
+  private _assertView: AssertView | undefined;
   private _picking = false;
+  private _sendToAssert = false;
 
   constructor(browserManager: BrowserManager, outputChannel: vscode.OutputChannel) {
     this._browserManager = browserManager;
@@ -27,6 +30,16 @@ export class Picker {
 
   setLocatorsView(view: LocatorsView) {
     this._locatorsView = view;
+  }
+
+  setAssertView(view: AssertView) {
+    this._assertView = view;
+  }
+
+  /** Start pick and send result to Assert Builder */
+  async startForAssert() {
+    this._sendToAssert = true;
+    await this.start();
   }
 
   dispose() {
@@ -84,7 +97,10 @@ export class Picker {
             await vscode.env.clipboard.writeText(fullLocator);
 
           if (this._locatorsView)
-            this._locatorsView.showLocator(fullLocator, ariaSnapshot, assertion);
+            this._locatorsView.showLocator(fullLocator, ariaSnapshot);
+          if (this._assertView && this._sendToAssert)
+            this._assertView.showAssertion(fullLocator, assertion, info);
+          this._sendToAssert = false;
         }
         this._stop();
       }
