@@ -22,13 +22,16 @@
   "dependencies": {
     "@playwright-repl/core": "workspace:*",
     "@playwright-repl/extension": "workspace:*",
-    "@playwright/test": "1.59.0-alpha-2026-02-21",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
     "esbuild": "^0.25.0",
     "magic-string": "^0.30.21"
   },
+  "peerDependencies": {
+    "@playwright/test": ">=1.57.0"
+  },
   "devDependencies": {
+    "@playwright/test": "1.59.0-alpha-2026-02-21",
     "typescript": "^5.0.0"
   }
 }

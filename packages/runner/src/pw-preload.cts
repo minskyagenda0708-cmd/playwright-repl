@@ -75,6 +75,10 @@ const origLoad = (Module as any)._load;
               await sharedContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
               await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
               if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
+              await sharedPage.evaluate(() => {
+                try { localStorage.clear(); } catch {}
+                try { sessionStorage.clear(); } catch {}
+              }).catch(() => {});
               await sharedPage.goto('about:blank', { waitUntil: 'commit' });
             } catch {}
           }
@@ -105,6 +109,10 @@ const origLoad = (Module as any)._load;
             await sharedContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
             await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
             if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
+            await sharedPage.evaluate(() => {
+              try { localStorage.clear(); } catch {}
+              try { sessionStorage.clear(); } catch {}
+            }).catch(() => {});
             await sharedPage.goto('about:blank', { waitUntil: 'commit' });
           } catch {}
         }
