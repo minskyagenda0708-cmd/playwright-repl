@@ -58,16 +58,16 @@ jobs:
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
 
-      # ─── Benchmark: Playwright vs pw-cli (all examples, 1 worker) ─────────
-      - name: 'Benchmark: all examples via Playwright (1 worker)'
-        run: npx playwright test --workers 1 --reporter list
+      # ─── Benchmark: Playwright vs pw-cli (playwright-tests, 1 worker) ─────
+      - name: 'Benchmark: playwright-tests via Playwright (1 worker)'
+        run: npx playwright test playwright-tests/ --workers 1 --reporter list
         working-directory: packages/runner/examples
         timeout-minutes: 10
         env:
           FORCE_COLOR: '1'
 
-      - name: 'Benchmark: all examples via pw-cli (1 worker)'
-        run: node ../dist/pw-cli.js test --workers 1 --reporter list
+      - name: 'Benchmark: playwright-tests via pw-cli (1 worker)'
+        run: node ../dist/pw-cli.js test playwright-tests/ --workers 1 --reporter list
         working-directory: packages/runner/examples
         timeout-minutes: 10
         env:
@@ -91,6 +91,10 @@ jobs:
       - name: 'Benchmark: todomvc via bridge direct'
         run: node e2e/benchmark-bridge.js
         working-directory: packages/runner
+        timeout-minutes: 5
+
+      - name: 'Benchmark: pw repl (CDP) vs pw repl-extension (bridge)'
+        run: node packages/runner/script-examples/bench.js --headless
         timeout-minutes: 5
 
       - name: Run extension E2E tests
