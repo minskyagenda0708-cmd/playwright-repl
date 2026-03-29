@@ -76,7 +76,8 @@ export async function handleLaunch(argv: string[]): Promise<void> {
   let sw = browserContext.serviceWorkers()[0];
   if (!sw) sw = await browserContext.waitForEvent('serviceworker', { timeout: 10000 });
   await sw.evaluate((p: number) => {
-    chrome.storage.local.set({ bridgePort: p });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).chrome.storage.local.set({ bridgePort: p });
   }, bridgePort);
   console.log(`Bridge port ${bridgePort} set via service worker`);
 
