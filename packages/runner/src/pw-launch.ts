@@ -48,7 +48,7 @@ export async function handleLaunch(argv: string[]): Promise<void> {
   const extPath = findExtensionPath();
 
   // 1. Launch Chrome with extension
-  const pw = _require('playwright-core');
+  const pw = _require('@playwright/test');
   const os = await import('node:os');
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-'));
   const defaultDir = path.join(userDataDir, 'Default');
@@ -107,7 +107,7 @@ export async function handleClose(argv: string[]): Promise<void> {
   });
 
   const port = parseInt(args.port as string, 10);
-  const pw = _require('playwright-core');
+  const pw = _require('@playwright/test');
   const browser = await pw.chromium.connectOverCDP(`http://localhost:${port}`);
   await browser.close();
   console.log(`Browser on port ${port} closed.`);

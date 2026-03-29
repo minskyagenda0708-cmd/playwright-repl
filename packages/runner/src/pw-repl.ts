@@ -29,7 +29,7 @@ export async function handleRepl(argv: string[]): Promise<void> {
   const scriptFile = args._[0] as string | undefined;
 
   // Connect to browser via CDP
-  const pw = _require('playwright-core');
+  const pw = _require('@playwright/test');
   const browser = await pw.chromium.connectOverCDP(`http://localhost:${port}`);
   const context = browser.contexts()[0];
   // Skip internal pages (devtools://, chrome://, about:)
