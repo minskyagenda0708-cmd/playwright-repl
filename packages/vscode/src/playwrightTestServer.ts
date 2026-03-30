@@ -27,24 +27,8 @@ import { debugSessionName } from './debugSessionName';
 import type { TestModel } from './testModel';
 import { TestServerInterface } from './upstream/testServerInterface';
 
-// ─── pw-preload injection for context reuse + bridge mode ─────────────────────
-const _preloadPath = path.resolve(__dirname, '../../runner/dist/pw-preload.cjs');
-const _extPath = path.resolve(__dirname, '../chrome-extension');
-const _hasPreload = fs.existsSync(_preloadPath);
-
 function preloadEnv(): Record<string, string | undefined> {
-  if (!_hasPreload) return {};
-  const existing = process.env.NODE_OPTIONS || '';
-  const env: Record<string, string | undefined> = {
-    NODE_OPTIONS: `${existing} --require ${_preloadPath}`.trim(),
-    PW_EXT_PATH: _extPath,
-  };
-  // Forward endpoints so workers can reuse BrowserManager's browser
-  if (process.env.PW_REUSE_CDP)
-    env.PW_REUSE_CDP = process.env.PW_REUSE_CDP;
-  if (process.env.PW_BRIDGE_PORT)
-    env.PW_BRIDGE_PORT = process.env.PW_BRIDGE_PORT;
-  return env;
+  return {};
 }
 
 export type TestConfig = {
