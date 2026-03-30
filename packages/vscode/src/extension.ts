@@ -170,12 +170,17 @@ export class Extension implements RunHooks {
     this._treeItemObserver = new TreeItemObserver(this._vscode, this._logger);
   }
 
+  private _lastCdpUrl: string | undefined;
+
   async onWillRunTests(config: TestConfig, debug: boolean) {
     const showBrowser = this._settingsModel.showBrowser.get();
     if (showBrowser && !debug) {
       await this._ensureBrowserManager();
-      if (this._browserManager?.isRunning() && this._browserManager.wsEndpoint) {
-        return { connectWsEndpoint: this._browserManager.wsEndpoint };
+      if (this._browserManager?.isRunning() && this._browserManager.cdpUrl) {
+        const cdpUrl = this._browserManager.cdpUrl;
+        const needsReset = this._lastCdpUrl !== cdpUrl;
+        this._lastCdpUrl = cdpUrl;
+        return { connectWsEndpoint: cdpUrl, resetTestServer: needsReset };
       }
     }
 
@@ -1139,7 +1144,7 @@ test('test', async ({ page }) => {
   }
 
   private _asPosition(location: { line: number, column: number }): vscodeTypes.Position {
-    return new this._vscode.Position(Math.max(location.line - 1, 0), location.column - 1);
+    return new this._vscode.Position(Math.max(location.line - 1, 0), Math.max(location.column - 1, 0));
   }
 
   private _asLocation(location: reporterTypes.Location): vscodeTypes.Location {

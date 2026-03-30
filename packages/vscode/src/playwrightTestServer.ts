@@ -28,7 +28,14 @@ import type { TestModel } from './testModel';
 import { TestServerInterface } from './upstream/testServerInterface';
 
 function preloadEnv(): Record<string, string | undefined> {
-  return {};
+  // Use forward slashes — backslashes get stripped inside NODE_OPTIONS on Windows
+  const preloadPath = path.join(__dirname, 'cdpPreload.cjs').replace(/\\/g, '/');
+  if (!fs.existsSync(preloadPath))
+    return {};
+  const existing = process.env.NODE_OPTIONS || '';
+  return {
+    NODE_OPTIONS: `${existing} --require ${preloadPath}`.trim(),
+  };
 }
 
 export type TestConfig = {
