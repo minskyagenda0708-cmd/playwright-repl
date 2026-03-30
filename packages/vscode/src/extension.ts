@@ -171,11 +171,21 @@ export class Extension implements RunHooks {
   }
 
   async onWillRunTests(config: TestConfig, debug: boolean) {
+    const showBrowser = this._settingsModel.showBrowser.get();
+    if (showBrowser && !debug) {
+      await this._ensureBrowserManager();
+      if (this._browserManager?.isRunning() && this._browserManager.wsEndpoint) {
+        return { connectWsEndpoint: this._browserManager.wsEndpoint };
+      }
+    }
+
     await this._reusedBrowser.onWillRunTests(config, debug);
     return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint() };
   }
 
   async onDidRunTests() {
+    if (this._browserManager?.isRunning())
+      return;
     await this._reusedBrowser.onDidRunTests();
   }
 
