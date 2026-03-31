@@ -8,6 +8,8 @@ import fs from 'node:fs';
 // __filename is available at runtime in esbuild's CJS output
 declare const __filename: string;
 
+const CDP_PORT = 9222;
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface LaunchOptions {
@@ -96,7 +98,7 @@ export class BrowserManager {
         '--no-default-browser-check',
         '--disable-background-timer-throttling',
         '--disable-infobars',
-        '--remote-debugging-port=9222',
+        `--remote-debugging-port=${CDP_PORT}`,
       ],
     } as any);
     this._log.appendLine(`Chromium launched. wsEndpoint: ${this._browserServer.wsEndpoint()}`);
@@ -121,7 +123,7 @@ export class BrowserManager {
     try {
       const http = await import('node:http');
       const targets = await new Promise<any[]>((resolve, reject) => {
-        http.get('http://127.0.0.1:9222/json', res => {
+        http.get(`http://127.0.0.1:${CDP_PORT}/json`, res => {
           let data = '';
           res.on('data', (chunk: string) => data += chunk);
           res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
@@ -148,7 +150,7 @@ export class BrowserManager {
       }
       // Also fetch the CDP WebSocket URL for test runner
       const versionData = await new Promise<any>((resolve, reject) => {
-        http.get('http://127.0.0.1:9222/json/version', res => {
+        http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, res => {
           let data = '';
           res.on('data', (chunk: string) => data += chunk);
           res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
