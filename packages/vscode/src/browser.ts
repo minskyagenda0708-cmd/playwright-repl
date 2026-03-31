@@ -101,10 +101,12 @@ export class BrowserManager {
     this._log.appendLine(`Chromium launched. wsEndpoint: ${this._browserServer.wsEndpoint()}`);
 
     this._browserServer.on('close', () => {
-      this._log.appendLine('Browser server closed.');
+      this._log.appendLine('Browser closed by user.');
       this._running = false;
       this._browserServer = undefined;
       this._browserContext = undefined;
+      // Clean up bridge and HTTP proxy in background
+      this.stop().catch(() => {});
     });
 
     // 4. Connect to get browser context for REPL
