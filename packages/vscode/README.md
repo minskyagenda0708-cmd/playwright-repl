@@ -2,7 +2,7 @@
 
 Interactive browser automation inside VS Code — Test Explorer, live REPL, assertion builder, and element picker.
 
-![Playwright REPL](images/hero.png)
+<img src="images/hero.png" width="75%">
 
 ## Built on Playwright Test for VS Code
 
@@ -32,7 +32,7 @@ Node tests that need `fs`, `net`, etc. fall back to the standard Playwright test
 
 Run Playwright tests with a persistent browser and context reuse. Works with individual tests and files. Folders fall back to the standard multi-worker path.
 
-![Test Explorer](images/test-explorer.png)
+<img src="images/test-explorer.png" width="50%">
 
 ### REPL Panel
 
@@ -44,7 +44,7 @@ Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, 
 - Execution timing
 - Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
 
-![REPL](images/repl.png)
+<img src="images/repl.png" width="75%">
 
 ### Locator Panel
 
@@ -55,7 +55,7 @@ Pick elements from the browser and inspect their locator and ARIA snapshot.
 - **Editable locator** — modify and experiment
 - **ARIA snapshot** — accessibility tree for the picked element
 
-![Locator](images/locator.png)
+<img src="images/locator.png" width="75%">
 
 ### Assert Builder
 
@@ -69,7 +69,7 @@ Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttac
 
 Supports negation (`not` checkbox) and editable assertions.
 
-![Assert Builder](images/assert-builder.png)
+<img src="images/assert-builder.png" width="75%">
 
 ### Recorder
 
