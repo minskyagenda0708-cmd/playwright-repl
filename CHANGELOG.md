@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.21.0 — VS Code Extension, DevTools REPL & Runner
+
+**2026-03-31**
+
+### Features
+
+- **VS Code extension**: Full-featured Test Explorer integration with REPL, recorder, locator picker, and assert builder panels. ([#404](https://github.com/stevez/playwright-repl/pull/404)–[#439](https://github.com/stevez/playwright-repl/pull/439))
+- **pw CLI**: Drop-in `pw` command replaces `npx playwright test` with bridge-based execution — up to 35% faster on Linux/Windows. ([#361](https://github.com/stevez/playwright-repl/pull/361)–[#368](https://github.com/stevez/playwright-repl/pull/368))
+- **DevTools REPL panel**: Chrome DevTools now has a "Playwright" tab with re-attach on tab switch and attached URL indicator. ([#439](https://github.com/stevez/playwright-repl/pull/439), [#505](https://github.com/stevez/playwright-repl/pull/505), [#506](https://github.com/stevez/playwright-repl/pull/506))
+- **about:blank support**: Side panel and tab dropdown now support `about:blank` pages; `tab-new` opens `about:blank` by default. ([#507](https://github.com/stevez/playwright-repl/pull/507))
+- **CI benchmarks**: Automated Playwright vs pw-cli benchmark comparison in CI. ([#445](https://github.com/stevez/playwright-repl/pull/445))
+
+### Fixes
+
+- **Browser close detection**: Detect browser close and clean up immediately, handle CDP context reuse. ([#495](https://github.com/stevez/playwright-repl/pull/495), [#496](https://github.com/stevez/playwright-repl/pull/496), [#499](https://github.com/stevez/playwright-repl/pull/499))
+- **pw-cli outside monorepo**: Fix `pw` CLI to work outside the monorepo without Module._load hooks. ([#490](https://github.com/stevez/playwright-repl/pull/490))
+- **Playwright resolution**: Resolve playwright-core from user's project, not bundled copy. ([#487](https://github.com/stevez/playwright-repl/pull/487))
+- **VS Code headless hang**: Remove pw-preload from VS Code extension to fix headless hang. ([#483](https://github.com/stevez/playwright-repl/pull/483))
+- **Test Explorer folder click**: Fix folder click skipping tests via bridge. ([#482](https://github.com/stevez/playwright-repl/pull/482))
+- **Node tests browser reuse**: Node tests reuse browser via CDP, fix crash when browser not running. ([#480](https://github.com/stevez/playwright-repl/pull/480))
+- **Remove google.com default**: Remove hardcoded google.com navigation from pw-launch. ([#508](https://github.com/stevez/playwright-repl/pull/508))
+
+### Refactoring
+
+- **Simplify runner**: Remove pw-preload and pw-worker from runner package. ([#492](https://github.com/stevez/playwright-repl/pull/492))
+- **Engine to CLI**: Move Engine from core to cli, make core Playwright-free. ([#463](https://github.com/stevez/playwright-repl/pull/463))
+- **CDP_PORT constant**: Replace hardcoded port 9222 with CDP_PORT constant. ([#500](https://github.com/stevez/playwright-repl/pull/500))
+- **Shared sw-debugger-core**: Extract shared service worker debugger core for background.ts and panel. ([#442](https://github.com/stevez/playwright-repl/pull/442))
+
+### Docs
+
+- **README rewrite**: Rewrite all READMEs, remove speed claims, focus on DX. ([#471](https://github.com/stevez/playwright-repl/pull/471))
+
 ## v0.20.0 — MCP & Standalone Mode
 
 **2026-03-22**

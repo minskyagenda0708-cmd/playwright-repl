@@ -3,7 +3,7 @@
   "displayName": "Playwright REPL",
   "description": "Playwright REPL for VS Code — Test Explorer, REPL, assert builder, and element picker",
   "icon": "images/playwright-logo.png",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "publisher": "playwright-repl",
   "repository": {
