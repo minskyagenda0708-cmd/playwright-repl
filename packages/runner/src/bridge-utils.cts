@@ -85,7 +85,9 @@ export function needsNode(filePath: string): boolean {
  * Uses esbuild with an alias plugin to replace @playwright/test with the bridge shim.
  */
 export async function compile(testFilePath: string): Promise<string> {
-  const esbuild = require('esbuild');
+  // Use native esbuild when available (fast), fall back to esbuild-wasm (cross-platform)
+  let esbuild;
+  try { esbuild = require('esbuild'); } catch { esbuild = require('esbuild-wasm'); }
 
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
