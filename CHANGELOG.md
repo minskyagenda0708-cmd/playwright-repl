@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.21.1 — VS Code Marketplace & Documentation
+
+**2026-04-01**
+
+### Features
+
+- **VS Code Marketplace**: Published extension to the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=playwright-repl.playwright-repl-vscode). ([#510](https://github.com/stevez/playwright-repl/issues/510))
+- **Browser REPL section**: VS Code README now documents the Dramaturg Chrome extension and links to the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa). ([#516](https://github.com/stevez/playwright-repl/pull/516))
+
+### Docs
+
+- **GIF demos**: Added animated GIFs for REPL, Locator, Assert Builder, Recorder, and Browser REPL. ([#514](https://github.com/stevez/playwright-repl/pull/514))
+- **VS Code README**: Updated with screenshots, feature descriptions, and marketplace-ready formatting. ([#511](https://github.com/stevez/playwright-repl/pull/511), [#513](https://github.com/stevez/playwright-repl/pull/513))
+- **VS Code CHANGELOG**: Created for marketplace Changelog tab.
+
+### Fixes
+
+- **Recorder empty line**: Fixed recorder leaving an empty line gap when cursor is on a blank line. ([#514](https://github.com/stevez/playwright-repl/pull/514))
+
 ## v0.21.0 — VS Code Extension, DevTools REPL & Runner
 
 **2026-03-31**

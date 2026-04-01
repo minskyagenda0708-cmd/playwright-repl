@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.21.1
+
+**2026-04-01**
+
+### Docs
+
+- Added GIF demos for REPL, Locator, Assert Builder, Recorder, and Browser REPL
+- Added Browser REPL section with Dramaturg Chrome extension features
+- Documented `.clear` and `.history` commands
+- Fixed marketplace image rendering with absolute URLs
+
+### Fixes
+
+- Fixed recorder leaving an empty line gap when cursor is on a blank line
+
 ## 0.21.0
 
 **2026-03-31**
