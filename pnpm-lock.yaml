@@ -222,9 +222,6 @@ importers:
       '@playwright-repl/runner':
         specifier: workspace:*
         version: link:../runner
-      ws:
-        specifier: ^8.17.1
-        version: 8.19.0
     devDependencies:
       '@babel/core':
         specifier: ^7.23.2
@@ -280,6 +277,9 @@ importers:
       which:
         specifier: ^4.0.0
         version: 4.0.0
+      ws:
+        specifier: ^8.17.1
+        version: 8.19.0
 
 packages:
 
