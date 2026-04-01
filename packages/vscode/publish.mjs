@@ -1,83 +1,142 @@
 #!/usr/bin/env node
 /**
- * Publish VS Code extension to marketplace.
+ * Package/publish VS Code extension using @vercel/nft.
  *
- * Why a temp directory?  vsce uses npm internally and follows workspace
- * symlinks, pulling the entire monorepo into the VSIX.  Copying to a
- * standalone directory gives npm a clean install with no symlinks.
+ * 1. Build: esbuild + nft → copy dist/ and traced node_modules/ to .vsce-build/
+ * 2. Package: vsce package from .vsce-build/ (includes static assets)
  *
  * Usage:
- *   node scripts/publish-vscode.mjs          # package only (creates .vsix)
- *   node scripts/publish-vscode.mjs publish  # package + publish to marketplace
+ *   node publish.mjs          # package only (creates .vsix)
+ *   node publish.mjs publish  # package + publish to marketplace
  */
 
+import { nodeFileTrace } from '@vercel/nft';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 
 const VSCODE_PKG = import.meta.dirname;
 const ROOT = path.resolve(VSCODE_PKG, '..', '..');
-const publish = process.argv.includes('publish');
+const BUILD = path.join(VSCODE_PKG, '.vsce-build');
+const doPublish = process.argv.includes('publish');
 
 function run(cmd, opts = {}) {
   console.log(`\n> ${cmd}`);
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
-// ─── 1. Build monorepo ────────────────────────────────────────────────────
-console.log('=== Building monorepo ===');
+// ─── 1. Build monorepo + extension ───────────────────────────────────────
+console.log('=== Step 1: Build ===');
 run('pnpm run build', { cwd: ROOT });
 run('node build.mjs', { cwd: VSCODE_PKG });
 
-// ─── 2. Copy to temp directory ────────────────────────────────────────────
-const tmpDir = path.join(os.tmpdir(), 'vscode-publish');
-if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true });
-fs.mkdirSync(tmpDir, { recursive: true });
+// ─── 2. Trace runtime dependencies ──────────────────────────────────────
+console.log('\n=== Step 2: Trace dependencies ===');
+const distDir = path.join(VSCODE_PKG, 'dist');
+const entryPoints = [
+  'extension.js',
+  'babelBundle.js',
+  'debugTransform.js',
+  'oopReporter.js',
+  'playwrightFinder.js',
+].map(f => path.join(distDir, f)).filter(f => fs.existsSync(f));
 
-const items = [
-  'dist', 'chrome-extension', 'images', 'media', 'l10n',
-  'package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE',
-  '.vscodeignore',
-  // localization files
+const { fileList } = await nodeFileTrace(entryPoints, {
+  base: ROOT,
+  readFile: async (filePath) => {
+    const content = await fs.promises.readFile(filePath, 'utf8').catch(() => null);
+    if (!content) return null;
+    // Strip devDependencies so nft only traces production deps
+    if (filePath.endsWith('package.json')) {
+      try {
+        const pkg = JSON.parse(content);
+        delete pkg.devDependencies;
+        return JSON.stringify(pkg);
+      } catch { return content; }
+    }
+    return content;
+  },
+});
+console.log(`Traced ${fileList.size} files`);
+
+// ─── 3. Assemble build folder ───────────────────────────────────────────
+console.log('\n=== Step 3: Assemble .vsce-build/ ===');
+if (fs.existsSync(BUILD)) fs.rmSync(BUILD, { recursive: true, force: true });
+fs.mkdirSync(BUILD, { recursive: true });
+
+// 3a. Copy dist/
+fs.cpSync(path.join(VSCODE_PKG, 'dist'), path.join(BUILD, 'dist'), { recursive: true });
+
+// 3b. Copy traced node_modules (resolve pnpm symlinks)
+function toNodeModulesPath(absPath) {
+  const rel = path.relative(ROOT, absPath).split(path.sep).join('/');
+  if (!path.relative(VSCODE_PKG, absPath).startsWith('..')) return null;
+  const pnpmMatch = rel.match(/node_modules\/\.pnpm\/[^/]+\/node_modules\/(.*)/);
+  if (pnpmMatch) return `node_modules/${pnpmMatch[1]}`;
+  const nmMatch = rel.match(/(node_modules\/.*)/);
+  if (nmMatch) return nmMatch[1];
+  const pkgMatch = rel.match(/packages\/([^/]+)\/(.*)/);
+  if (pkgMatch) {
+    const pkgJsonPath = path.join(ROOT, 'packages', pkgMatch[1], 'package.json');
+    if (fs.existsSync(pkgJsonPath)) {
+      const p = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+      return `node_modules/${p.name}/${pkgMatch[2]}`;
+    }
+  }
+  return null;
+}
+
+let copied = 0;
+for (const relFile of fileList) {
+  const absSource = path.join(ROOT, relFile);
+  try {
+    const realSource = fs.realpathSync(absSource);
+    if (!fs.statSync(realSource).isFile()) continue;
+    const dest = toNodeModulesPath(absSource);
+    if (!dest) continue;
+    const destAbs = path.join(BUILD, dest);
+    fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+    fs.copyFileSync(realSource, destAbs);
+    copied++;
+  } catch { /* skip */ }
+}
+console.log(`Copied ${copied} files to node_modules/`);
+
+// 3c. Copy static assets
+const staticItems = [
+  'chrome-extension', 'images', 'media', 'l10n',
+  'README.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE',
   ...fs.readdirSync(VSCODE_PKG).filter(f => f.startsWith('package.nls')),
 ];
-
-for (const item of items) {
+for (const item of staticItems) {
   const src = path.join(VSCODE_PKG, item);
   if (!fs.existsSync(src)) continue;
-  const dest = path.join(tmpDir, item);
-  fs.cpSync(src, dest, { recursive: true });
+  fs.cpSync(src, path.join(BUILD, item), { recursive: true });
 }
 
-// ─── 3. Resolve workspace:* refs to real versions ────────────────────────
-const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, 'package.json'), 'utf8'));
-for (const [name, ver] of Object.entries(pkg.dependencies || {})) {
-  if (ver.startsWith('workspace:')) {
-    const depPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name.split('/').pop(), 'package.json'), 'utf8'));
-    pkg.dependencies[name] = depPkg.version;
-  }
-}
-fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+// 3d. Write package.json (no deps — everything is pre-assembled)
+const pkg = JSON.parse(fs.readFileSync(path.join(VSCODE_PKG, 'package.json'), 'utf8'));
+delete pkg.dependencies;
+delete pkg.devDependencies;
+delete pkg.scripts;
+fs.writeFileSync(path.join(BUILD, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 
-console.log(`\n=== Copied to ${tmpDir} ===`);
+// 3e. Write .vscodeignore
+fs.writeFileSync(path.join(BUILD, '.vscodeignore'), [
+  '*.map', '.gitignore',
+].join('\n') + '\n');
 
-// ─── 4. npm install (clean, no symlinks) ──────────────────────────────────
-console.log('\n=== Installing dependencies ===');
-run('npm install --production', { cwd: tmpDir });
-
-// ─── 5. Package / Publish ─────────────────────────────────────────────────
-if (publish) {
-  console.log('\n=== Publishing to VS Code Marketplace ===');
-  run('npx @vscode/vsce publish', { cwd: tmpDir });
+// ─── 4. Package / Publish ────────────────────────────────────────────────
+console.log('\n=== Step 4: Package ===');
+if (doPublish) {
+  run('npx @vscode/vsce publish --no-dependencies', { cwd: BUILD });
 } else {
-  console.log('\n=== Packaging VSIX ===');
-  run('npx @vscode/vsce package', { cwd: tmpDir });
-  // Copy VSIX back to packages/vscode
-  const vsix = fs.readdirSync(tmpDir).find(f => f.endsWith('.vsix'));
+  run('npx @vscode/vsce package --no-dependencies', { cwd: BUILD });
+  const vsix = fs.readdirSync(BUILD).find(f => f.endsWith('.vsix'));
   if (vsix) {
-    fs.cpSync(path.join(tmpDir, vsix), path.join(VSCODE_PKG, vsix));
-    console.log(`\nVSIX: packages/vscode/${vsix}`);
+    fs.cpSync(path.join(BUILD, vsix), path.join(VSCODE_PKG, vsix));
+    const size = fs.statSync(path.join(VSCODE_PKG, vsix)).size;
+    console.log(`\nVSIX: packages/vscode/${vsix} (${(size / 1024 / 1024).toFixed(1)} MB)`);
   }
 }
 

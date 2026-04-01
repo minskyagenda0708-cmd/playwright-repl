@@ -1,6 +1,8 @@
 src/**
 build.mjs
 publish.mjs
+publish-legacy.mjs
+.vsce-stage/**
 tsconfig.json
 *.map
 test/**
