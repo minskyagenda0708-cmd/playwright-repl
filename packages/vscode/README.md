@@ -26,6 +26,8 @@ With Show Browser enabled, browser-only tests bypass the Playwright test runner 
 
 Node tests that need `fs`, `net`, etc. fall back to the standard Playwright test runner with CDP browser reuse. Headless mode uses standard Playwright with parallel workers.
 
+> **Note:** Bridge execution requires `esbuild` installed in your project (`npm install -D esbuild`). Without it, tests fall back to the standard Playwright test runner automatically.
+
 ## Features
 
 ### Test Explorer

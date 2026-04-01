@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.5
+
+**2026-04-01**
+
+### Features
+
+- VSIX reduced from 26 MB to 12.7 MB using @vercel/nft dependency tracing
+- Bridge-mode falls back to standard test runner when esbuild is unavailable
+- Static imports for `ws` and `bridge-utils.cjs` — cleaner dependency resolution
+
 ## 0.21.4
 
 **2026-04-01**

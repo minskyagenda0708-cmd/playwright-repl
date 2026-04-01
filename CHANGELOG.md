@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.21.5 — nft Packaging & Bridge Fallback
+
+**2026-04-01**
+
+### Features
+
+- **nft-based VSIX packaging**: Use @vercel/nft to trace runtime dependencies — VSIX reduced from 26 MB to 12.7 MB. Key insight: `readlink: null` prevents nft from following pnpm symlinks. ([#530](https://github.com/stevez/playwright-repl/pull/530))
+- **esbuild fallback**: Bridge-mode gracefully falls back to standard Playwright test runner when esbuild platform binary is not available. ([#530](https://github.com/stevez/playwright-repl/pull/530))
+
+### Fixes
+
+- **Static imports**: Changed `createRequire` calls for `ws` and `bridge-utils.cjs` to static imports — esbuild bundles ws inline, nft traces bridge-utils automatically.
+
 ## v0.21.4 — VS Code Extension Fix
 
 **2026-04-01**
