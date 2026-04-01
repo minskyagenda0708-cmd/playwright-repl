@@ -267,6 +267,7 @@
     "@types/vscode": "1.93.0",
     "@types/which": "^3.0.3",
     "@types/ws": "^8.5.3",
+    "@vercel/nft": "^1.5.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.25.0",
     "stack-utils": "^2.0.6",

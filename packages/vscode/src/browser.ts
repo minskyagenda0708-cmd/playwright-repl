@@ -2,6 +2,7 @@ import type * as vscode from 'vscode';
 import { BridgeServer } from '@playwright-repl/core';
 import { createRequire } from 'node:module';
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
+import WebSocket from 'ws';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -132,7 +133,6 @@ export class BrowserManager {
       const swTarget = targets.find((t: any) => t.type === 'service_worker' && t.url.includes('chrome-extension://'));
       if (swTarget) {
         this._log.appendLine(`Found service worker: ${swTarget.url}`);
-        const WebSocket = _extRequire('ws') as any;
         const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
         await new Promise<void>((res, rej) => {
           cdpWs.on('open', () => {

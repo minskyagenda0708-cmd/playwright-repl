@@ -892,9 +892,7 @@ export class Extension implements RunHooks {
     if (!this._browserManager?.isRunning() || !this._browserManager.bridge)
       return false;
 
-    // Load bridge-utils at runtime (CJS module, can't be bundled by esbuild)
-    const _require = createRequire(__filename);
-    const bridgeUtils = _require('@playwright-repl/runner/dist/bridge-utils.cjs') as {
+    const bridgeUtils = require('@playwright-repl/runner/dist/bridge-utils.cjs') as {
       needsNode: (filePath: string) => boolean;
       compile: (filePath: string) => Promise<string>;
       parseAllResults: (text: string) => { status: string; duration: number; errors: { message: string }[] }[];
@@ -952,6 +950,9 @@ export class Extension implements RunHooks {
       try {
         compiled = await bridgeUtils.compile(filePath);
       } catch (e: unknown) {
+        // If esbuild binary is missing, fall back to standard runner
+        if ((e as Error).message?.includes('esbuild'))
+          return false;
         for (const testItem of testItems) {
           testRun.started(testItem);
           testRun.failed(testItem, [{ message: `Compile error: ${(e as Error).message}` }], 0);
