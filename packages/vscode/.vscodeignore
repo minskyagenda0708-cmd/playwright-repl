@@ -1,6 +1,6 @@
 src/**
-node_modules/**
 build.mjs
+publish.mjs
 tsconfig.json
 *.map
 test/**

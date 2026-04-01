@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/runner",
-  "version": "0.21.3",
+  "version": "0.21.4",
   "description": "Playwright test utilities — bridge-mode compilation, node detection, and CLI subcommands",
   "type": "module",
   "bin": {

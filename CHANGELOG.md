@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.21.4 — VS Code Extension Fix
+
+**2026-04-01**
+
+### Fixes
+
+- **VS Code extension**: Bundle runtime dependencies (`@playwright-repl/core`, `@playwright-repl/runner`, `esbuild`) into VSIX so bridge-mode tests work for marketplace users. ([#524](https://github.com/stevez/playwright-repl/issues/524))
+- **Publish script**: Added `packages/vscode/publish.mjs` to automate VSIX packaging via temp directory (avoids pnpm/vsce symlink conflict). ([#524](https://github.com/stevez/playwright-repl/issues/524))
+- **Dependencies**: Moved `@babel/*`, `stack-utils`, `which` to devDependencies — already bundled by esbuild at build time.
+
 ## v0.21.2 — npm Publish & VS Code Marketplace
 
 **2026-04-01**

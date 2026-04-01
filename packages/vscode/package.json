@@ -7,7 +7,7 @@
     "color": "#ffffff",
     "theme": "light"
   },
-  "version": "0.21.3",
+  "version": "0.21.4",
   "private": true,
   "publisher": "playwright-repl",
   "repository": {
@@ -245,21 +245,20 @@
   },
   "scripts": {
     "build": "node build.mjs",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "package": "node publish.mjs",
+    "publish:vsce": "node publish.mjs publish"
   },
   "dependencies": {
+    "@playwright-repl/core": "workspace:*",
+    "@playwright-repl/runner": "workspace:*"
+  },
+  "devDependencies": {
     "@babel/core": "^7.23.2",
     "@babel/helper-plugin-utils": "^7.22.5",
     "@babel/plugin-proposal-decorators": "^7.24.7",
     "@babel/preset-typescript": "^7.23.2",
     "@babel/traverse": "^7.23.2",
-    "@playwright-repl/core": "^0.21.3",
-    "@playwright-repl/runner": "^0.21.3",
-    "stack-utils": "^2.0.6",
-    "which": "^4.0.0",
-    "ws": "^8.17.1"
-  },
-  "devDependencies": {
     "@types/babel__core": "^7.20.3",
     "@types/babel__helper-plugin-utils": "^7.10.2",
     "@types/babel__traverse": "^7.20.3",
@@ -269,6 +268,9 @@
     "@types/which": "^3.0.3",
     "@types/ws": "^8.5.3",
     "@vscode/vsce": "^3.7.1",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "stack-utils": "^2.0.6",
+    "which": "^4.0.0",
+    "ws": "^8.17.1"
   }
 }

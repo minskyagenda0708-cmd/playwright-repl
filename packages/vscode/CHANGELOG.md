@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.4
+
+**2026-04-01**
+
+### Fixes
+
+- Bundle runtime dependencies (`esbuild`, `@playwright-repl/core`, `@playwright-repl/runner`) into VSIX — bridge-mode tests now work for marketplace users
+- Move `@babel/*`, `stack-utils`, `which` to devDependencies (already bundled by esbuild)
+- Add `publish.mjs` script for automated VSIX packaging
+
 ## 0.21.2
 
 **2026-04-01**
