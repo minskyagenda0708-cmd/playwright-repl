@@ -55,11 +55,11 @@ function findVSCodeCLI(): string {
         path.join(dir, 'bin', 'code.cmd'),  // Windows
         path.join(dir, 'code'),             // Linux direct binary
       ];
-      // macOS: look for .app bundle inside the download dir
+      // macOS: use the direct Electron binary inside the .app bundle (bin/code forks and exits)
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
         for (const sub of fs.readdirSync(dir)) {
           if (sub.endsWith('.app')) {
-            candidates.push(path.join(dir, sub, 'Contents', 'Resources', 'app', 'bin', 'code'));
+            candidates.push(path.join(dir, sub, 'Contents', 'MacOS', 'Electron'));
           }
         }
       }
