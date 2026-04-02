@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/runner",
-  "version": "0.21.6",
+  "version": "0.21.7",
   "description": "Playwright test utilities — bridge-mode compilation, node detection, and CLI subcommands",
   "type": "module",
   "bin": {
@@ -24,7 +24,6 @@
     "@playwright-repl/core": "workspace:*",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
-    "esbuild": "^0.25.0",
     "esbuild-wasm": "^0.27.4",
     "magic-string": "^0.30.21"
   },

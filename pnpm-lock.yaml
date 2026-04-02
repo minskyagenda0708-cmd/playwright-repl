@@ -200,9 +200,6 @@ importers:
       acorn-walk:
         specifier: ^8.3.5
         version: 8.3.5
-      esbuild:
-        specifier: ^0.25.0
-        version: 0.25.12
       esbuild-wasm:
         specifier: ^0.27.4
         version: 0.27.4
