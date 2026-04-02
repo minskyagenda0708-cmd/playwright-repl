@@ -102,11 +102,12 @@ export const test = base.extend<TestFixtures>({
 
     const args = [
       `--remote-debugging-port=${CDP_PORT}`,
+      '--no-sandbox',  // Required on Linux CI (chrome-sandbox not root-owned)
       '--disable-updates',
       '--skip-welcome',
       '--skip-release-notes',
       '--disable-workspace-trust',
-      '--wait',  // Keep the CLI script running (prevents fork-and-exit on Linux)
+      '--wait',
       `--extensionDevelopmentPath=${EXTENSION_PATH}`,
       `--extensions-dir=${extensionsDir}`,
       `--user-data-dir=${userDataDir}`,
