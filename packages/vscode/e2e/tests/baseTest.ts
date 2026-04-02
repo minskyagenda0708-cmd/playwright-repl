@@ -48,12 +48,12 @@ function findVSCodeCLI(): string {
   if (fs.existsSync(vscodeTestDir)) {
     for (const entry of fs.readdirSync(vscodeTestDir)) {
       const dir = path.join(vscodeTestDir, entry);
-      // Windows: bin/code.cmd
-      // Linux: bin/code
-      // macOS: downloaded as .app bundle inside the version dir
+      // Windows: bin/code.cmd (CLI wrapper that passes flags through)
+      // Linux: code (direct Electron binary — bin/code forks and exits)
+      // macOS: .app bundle inside the version dir
       const candidates = [
-        path.join(dir, 'bin', 'code.cmd'),
-        path.join(dir, 'bin', 'code'),
+        path.join(dir, 'bin', 'code.cmd'),  // Windows
+        path.join(dir, 'code'),             // Linux direct binary
       ];
       // macOS: look for .app bundle inside the download dir
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
@@ -114,12 +114,10 @@ export const test = base.extend<TestFixtures>({
     ];
     console.log(`[e2e] Launching VS Code: ${codePath}`);
     console.log(`[e2e] Args: ${args.join(' ')}`);
-    // On Windows, spawn .cmd with shell and quote the path
-    const vscodeProcess: ChildProcess = spawn(`"${codePath}"`, args, {
-      stdio: 'pipe',
-      shell: true,
-      windowsVerbatimArguments: false,
-    });
+    const isCmd = codePath.endsWith('.cmd');
+    const vscodeProcess: ChildProcess = isCmd
+      ? spawn(`"${codePath}"`, args, { stdio: 'pipe', shell: true, windowsVerbatimArguments: false })
+      : spawn(codePath, args, { stdio: 'pipe' });
 
     vscodeProcess.stdout?.on('data', (d) => process.stdout.write(`[vscode:out] ${d}`));
     vscodeProcess.stderr?.on('data', (d) => process.stderr.write(`[vscode:err] ${d}`));
