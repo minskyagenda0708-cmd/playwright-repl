@@ -269,6 +269,15 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
     if (!r || r.type === 'undefined') return formatBridgeResult(undefined);
     if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') return formatBridgeResult(r.value);
 
+    // Playwright Response object (e.g. from page.goto())
+    if (r.objectId && /^Response\d*$/.test(r.description ?? '')) {
+      const res = await cdpCallFunctionOn(r.objectId,
+        'function(){ return JSON.stringify({ status: this.status(), url: this.url() }, null, 2); }'
+      );
+      const val = res?.result?.value ?? res?.value;
+      if (val) return formatBridgeResult(val);
+    }
+
     // Map/Set: use callFunctionOn to get entries since preview doesn't include them
     if (r.objectId && /^(Map|Set)\(\d+\)$/.test(r.description ?? '')) {
       const isMap = r.description!.startsWith('Map');

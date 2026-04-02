@@ -1,7 +1,7 @@
 import type { ConsoleEntry } from './types';
 import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import { addCommand, getCommandHistory, clearHistory } from '@/lib/command-history';
-import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
+import { swDebugEval, swGetProperties, swCallFunctionOn } from '@/lib/sw-debugger';
 import { executeCommandForConsole } from '@/lib/bridge';
 import { fromCdpRemoteObject, type CdpRemoteObject } from './cdpToSerialized';
 import { resolveConsoleMode } from '@/lib/execute';
@@ -20,6 +20,16 @@ const executors = {
         if (!raw?.result) throw new Error('No result from service worker');
         const result = raw.result as CdpRemoteObject;
         if (result.type === 'undefined') return { text: 'Done' as string };
+        // Format known Playwright types (e.g. Response from page.goto())
+        if (result.objectId && /^Response\d*$/.test(result.description ?? '')) {
+            try {
+                const s = await swCallFunctionOn(result.objectId,
+                    'function(){ return JSON.stringify({ status: this.status(), url: this.url() }, null, 2); }'
+                ) as any;
+                const val = s?.result?.value ?? s?.value;
+                if (val) return { text: val as string };
+            } catch { /* fall through to ObjectTree */ }
+        }
         return { value: fromCdpRemoteObject(result), getProperties: swGetProperties };
     },
     pw: async (command: string) => {

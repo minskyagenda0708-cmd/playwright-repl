@@ -34,6 +34,16 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       return { text: val, isError: false };
     }
     if (r.type === 'number' || r.type === 'boolean') return { text: String(r.value), isError: false };
+    // Format known Playwright types (e.g. Response from page.goto())
+    if (r.objectId && /^Response\d*$/.test((r.description as string) ?? '')) {
+      try {
+        const s = await swCallFunctionOn(r.objectId,
+          'function(){ return JSON.stringify({ status: this.status(), url: this.url() }, null, 2); }'
+        ) as any;
+        const val: string = s?.result?.value ?? s?.value;
+        if (val) return { text: val, isError: false };
+      } catch { /* fall through */ }
+    }
     if (r.objectId) {
       try {
         const s = await swCallFunctionOn(r.objectId,
