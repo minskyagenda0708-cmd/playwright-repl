@@ -9,6 +9,7 @@ coverage/
 packages/*/dist/
 *.tsbuildinfo
 test-results/
+.vscode-test/
 __screenshots__/
 .yalc/
 yalc.lock

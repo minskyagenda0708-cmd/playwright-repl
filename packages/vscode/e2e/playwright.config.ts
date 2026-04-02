@@ -8,4 +8,5 @@ export default defineConfig({
   expect: {
     timeout: 30_000,
   },
+  globalSetup: './globalSetup',
 });

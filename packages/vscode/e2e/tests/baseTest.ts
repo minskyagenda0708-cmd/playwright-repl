@@ -40,6 +40,33 @@ async function waitForCDP(port: number, timeoutMs = 30_000): Promise<void> {
   throw new Error(`CDP on port ${port} did not respond within ${timeoutMs}ms`);
 }
 
+/** Find the VS Code CLI script — checks globalSetup download first, then system install */
+function findVSCodeCLI(): string {
+  // Check .vscode-test/ (downloaded by globalSetup via @vscode/test-electron)
+  // @ts-ignore — import.meta.dirname available in Node 22+
+  const vscodeTestDir = path.resolve(import.meta.dirname, '..', '..', '.vscode-test');
+  if (fs.existsSync(vscodeTestDir)) {
+    for (const entry of fs.readdirSync(vscodeTestDir)) {
+      const dir = path.join(vscodeTestDir, entry);
+      // Windows: bin/code.cmd, Linux: bin/code, macOS: Contents/Resources/app/bin/code
+      const candidates = [
+        path.join(dir, 'bin', 'code.cmd'),
+        path.join(dir, 'bin', 'code'),
+        path.join(dir, 'Contents', 'Resources', 'app', 'bin', 'code'),
+      ];
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+      }
+    }
+  }
+  // Fall back to system install
+  if (process.platform === 'win32')
+    return path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'bin', 'code.cmd');
+  if (process.platform === 'darwin')
+    return '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
+  return '/usr/bin/code';
+}
+
 /** Copy fixture project to a temp dir so VS Code doesn't pollute the repo */
 function copyFixtureProject(fixtureName = 'sample-project'): { tmpDir: string; projectDir: string } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-e2e-'));
@@ -54,14 +81,9 @@ export const test = base.extend<TestFixtures>({
   workbox: async ({}, use, testInfo) => {
     const { tmpDir, projectDir } = copyFixtureProject();
 
-    // 2. Find VS Code CLI script (passes flags through to Electron, unlike Code.exe)
-    //    Use VSCODE_CLI env var to override (e.g. for CI with downloaded VS Code)
-    const defaultCodePath = process.platform === 'win32'
-      ? path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'bin', 'code.cmd')
-      : process.platform === 'darwin'
-        ? '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
-        : '/usr/bin/code';
-    const codePath = process.env.VSCODE_CLI || defaultCodePath;
+    // 2. Find VS Code CLI script
+    //    Priority: VSCODE_CLI env var → downloaded by globalSetup → system install
+    const codePath = process.env.VSCODE_CLI || findVSCodeCLI();
 
     // 3. Spawn VS Code with CDP port and our extension
     const userDataDir = path.join(tmpDir, 'user-data');

@@ -109,16 +109,6 @@ jobs:
         run: pnpm exec playwright test
         working-directory: packages/extension
 
-      - name: Install VS Code for E2E tests
-        run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            curl -L "https://update.code.visualstudio.com/latest/linux-deb-x64/stable" -o /tmp/vscode.deb
-            sudo dpkg -i /tmp/vscode.deb || sudo apt-get install -f -y
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            curl -L "https://update.code.visualstudio.com/latest/darwin-universal/stable" -o /tmp/vscode.zip
-            unzip -q /tmp/vscode.zip -d /Applications
-          fi
-
       - name: Run VS Code extension E2E tests
         run: ${{ runner.os == 'Linux' && 'xvfb-run' || '' }} pnpm exec playwright test --config e2e/playwright.config.ts
         working-directory: packages/vscode
