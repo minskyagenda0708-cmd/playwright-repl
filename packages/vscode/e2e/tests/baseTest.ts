@@ -48,12 +48,21 @@ function findVSCodeCLI(): string {
   if (fs.existsSync(vscodeTestDir)) {
     for (const entry of fs.readdirSync(vscodeTestDir)) {
       const dir = path.join(vscodeTestDir, entry);
-      // Windows: bin/code.cmd, Linux: bin/code, macOS: Contents/Resources/app/bin/code
+      // Windows: bin/code.cmd
+      // Linux: bin/code
+      // macOS: downloaded as .app bundle inside the version dir
       const candidates = [
         path.join(dir, 'bin', 'code.cmd'),
         path.join(dir, 'bin', 'code'),
-        path.join(dir, 'Contents', 'Resources', 'app', 'bin', 'code'),
       ];
+      // macOS: look for .app bundle inside the download dir
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        for (const sub of fs.readdirSync(dir)) {
+          if (sub.endsWith('.app')) {
+            candidates.push(path.join(dir, sub, 'Contents', 'Resources', 'app', 'bin', 'code'));
+          }
+        }
+      }
       for (const c of candidates) {
         if (fs.existsSync(c)) return c;
       }
