@@ -318,7 +318,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         }
         .line { line-height: 1.4; }
         .line-command { color: var(--vscode-terminal-ansiBrightWhite, var(--vscode-editor-foreground)); }
-        .line-command::before { content: '> '; color: var(--vscode-terminal-ansiGreen); }
+        .line-command::before { content: 'pw> '; color: var(--vscode-terminal-ansiGreen); }
         .line-output { color: var(--vscode-editor-foreground); }
         .line-error { color: var(--vscode-terminal-ansiRed); }
         .line-info { color: var(--vscode-terminal-ansiCyan, var(--vscode-descriptionForeground)); }
@@ -359,7 +359,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
     <body class="repl-view">
       <div id="output"></div>
       <div id="input-row">
-        <span id="prompt">&gt;</span>
+        <span id="prompt">pw&gt;</span>
         <textarea id="command-input" rows="1" placeholder="Type a command..." autofocus></textarea>
       </div>
     </body>
