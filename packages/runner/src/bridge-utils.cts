@@ -87,7 +87,11 @@ export function needsNode(filePath: string): boolean {
 export async function compile(testFilePath: string): Promise<string> {
   // Use native esbuild when available (fast), fall back to esbuild-wasm (cross-platform)
   let esbuild;
-  try { esbuild = require('esbuild'); } catch { esbuild = require('esbuild-wasm'); }
+  if (process.env.PW_USE_ESBUILD_WASM) {
+    esbuild = require('esbuild-wasm');
+  } else {
+    try { esbuild = require('esbuild'); } catch { esbuild = require('esbuild-wasm'); }
+  }
 
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
