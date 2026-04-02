@@ -6,9 +6,18 @@
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+async function reconnect() {
+    try {
+        const port: number = await chrome.runtime.sendMessage({ type: 'get-bridge-port' });
+        connect(port || 9876);
+    } catch {
+        reconnectTimer = setTimeout(() => reconnect(), 3000);
+    }
+}
+
 function connect(port: number) {
     try {
-        ws = new WebSocket(`ws://localhost:${port}`);
+        ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
         ws.onmessage = async (e) => {
             const msg = JSON.parse(e.data as string) as {
@@ -40,12 +49,12 @@ function connect(port: number) {
         };
 
         ws.onclose = () => {
-            reconnectTimer = setTimeout(() => connect(port), 3000);
+            reconnectTimer = setTimeout(() => reconnect(), 3000);
         };
 
         ws.onerror = () => {};
     } catch {
-        reconnectTimer = setTimeout(() => connect(port), 3000);
+        reconnectTimer = setTimeout(() => reconnect(), 3000);
     }
 }
 

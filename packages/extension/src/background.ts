@@ -427,6 +427,9 @@ async function handleBridgeCommand(msg: {
   return result;
 }
 
+// Expose for VS Code CDP injection when chrome.offscreen is unavailable
+(self as any).handleBridgeCommand = handleBridgeCommand;
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
 // Serialize bridge commands so concurrent messages don't race on currentPage / attachToTab.

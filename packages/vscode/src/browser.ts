@@ -9,7 +9,7 @@ import fs from 'node:fs';
 // __filename is available at runtime in esbuild's CJS output
 declare const __filename: string;
 
-const CDP_PORT = 9222;
+let CDP_PORT = 9222;
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -87,6 +87,18 @@ export class BrowserManager {
       devtools: { preferences: { currentDockState: '"bottom"' } },
     }));
 
+    // Find a free port for CDP (9222 may be taken by the user's Chrome)
+    const net = await import('node:net');
+    CDP_PORT = await new Promise<number>((resolve, reject) => {
+      const srv = net.createServer();
+      srv.listen(0, '127.0.0.1', () => {
+        const port = (srv.address() as import('node:net').AddressInfo).port;
+        srv.close(() => resolve(port));
+      });
+      srv.on('error', reject);
+    });
+    this._log.appendLine(`CDP port: ${CDP_PORT}`);
+
     this._browserServer = await pw.chromium.launchServer({
       channel: 'chromium',
       headless,
@@ -130,23 +142,57 @@ export class BrowserManager {
           res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
         }).on('error', reject);
       });
+      this._log.appendLine(`CDP targets: ${targets.map((t: any) => `${t.type}:${t.url}`).join(', ')}`);
       const swTarget = targets.find((t: any) => t.type === 'service_worker' && t.url.includes('chrome-extension://'));
+      const hasOffscreen = targets.some((t: any) => t.url?.includes('offscreen'));
       if (swTarget) {
         this._log.appendLine(`Found service worker: ${swTarget.url}`);
-        const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
-        await new Promise<void>((res, rej) => {
+        // Helper to evaluate JS in the service worker via CDP
+        const swEval = (expr: string): Promise<void> => new Promise((res, rej) => {
+          const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
           cdpWs.on('open', () => {
-            cdpWs.send(JSON.stringify({
-              id: 1,
-              method: 'Runtime.evaluate',
-              params: { expression: `chrome.storage.local.set({ bridgePort: ${bridge.port} })` }
-            }));
+            cdpWs.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: expr } }));
             cdpWs.on('message', () => { cdpWs.close(); res(); });
           });
           cdpWs.on('error', rej);
-          setTimeout(() => { cdpWs.close(); rej(new Error('CDP timeout')); }, 5000);
+          setTimeout(() => { cdpWs.close(); rej(new Error('CDP timeout')); }, 10000);
         });
+
+        // Set bridge port in storage (for offscreen doc if it exists)
+        await swEval(`chrome.storage.local.set({ bridgePort: ${bridge.port} })`);
         this._log.appendLine(`Bridge port ${bridge.port} set via CDP.`);
+
+        // If no offscreen document, inject WebSocket bridge directly into SW
+        if (!hasOffscreen) {
+          this._log.appendLine('No offscreen document found — injecting WebSocket bridge into service worker.');
+          await swEval(`
+(function() {
+  if (self.__bridgeWs) { try { self.__bridgeWs.close(); } catch(e) {} }
+  const ws = new WebSocket('ws://127.0.0.1:${bridge.port}');
+  self.__bridgeWs = ws;
+  let commandQueue = Promise.resolve();
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    const execute = () => handleBridgeCommand({
+      command: msg.command,
+      scriptType: msg.type,
+      language: msg.language,
+      includeSnapshot: msg.includeSnapshot,
+    });
+    const queued = commandQueue.then(execute, execute);
+    commandQueue = queued.then(() => {}, () => {});
+    queued.then(result => {
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ id: msg.id, ...result }));
+    }).catch(err => {
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ id: msg.id, text: String(err), isError: true }));
+    });
+  };
+})()
+          `);
+          this._log.appendLine('WebSocket bridge injected into service worker.');
+        }
       }
       // Also fetch the CDP WebSocket URL for test runner
       const versionData = await new Promise<any>((resolve, reject) => {

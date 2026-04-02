@@ -19,6 +19,7 @@ export class BridgeServer {
     async start(port = 9876): Promise<void> {
         const createServer = () => new WebSocketServer({
             port,
+            host: '127.0.0.1',
             verifyClient: ({ origin }: { origin: string }) => {
                 // Allow: no origin (Node.js ws clients, curl, tests)
                 // Allow: chrome-extension:// (our offscreen document)
