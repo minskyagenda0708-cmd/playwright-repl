@@ -238,6 +238,9 @@ importers:
       '@babel/traverse':
         specifier: ^7.23.2
         version: 7.29.0
+      '@playwright/test':
+        specifier: ^1.59.1
+        version: 1.59.1
       '@types/babel__core':
         specifier: ^7.20.3
         version: 7.20.5

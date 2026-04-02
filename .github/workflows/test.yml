@@ -109,6 +109,12 @@ jobs:
         run: pnpm exec playwright test
         working-directory: packages/extension
 
+      - name: Run VS Code extension E2E tests
+        run: xvfb-run pnpm exec playwright test --config e2e/playwright.config.ts
+        if: runner.os == 'Linux'
+        working-directory: packages/vscode
+        timeout-minutes: 5
+
       - name: Merge extension coverage
         run: pnpm run coverage:merge
         working-directory: packages/extension
