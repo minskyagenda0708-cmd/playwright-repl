@@ -117,6 +117,12 @@ export const test = base.extend<TestFixtures>({
     console.log(`[e2e] Launching VS Code: ${codePath}`);
     console.log(`[e2e] Args: ${args.join(' ')}`);
     const isCmd = codePath.endsWith('.cmd');
+    // On Linux/macOS with direct Electron binary, add --extensionTestsPath
+    // to keep the extension host alive (without it, the host exits after activate())
+    if (!isCmd) {
+      // @ts-ignore — import.meta.dirname available in Node 22+
+      args.push(`--extensionTestsPath=${path.resolve(import.meta.dirname, '..', 'fixtures', 'keep-alive.js')}`);
+    }
     const vscodeProcess: ChildProcess = isCmd
       ? spawn(`"${codePath}"`, args, { stdio: 'pipe', shell: true, windowsVerbatimArguments: false })
       : spawn(codePath, args, { stdio: 'pipe' });
