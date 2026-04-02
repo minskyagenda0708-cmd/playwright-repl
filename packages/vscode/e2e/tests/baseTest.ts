@@ -106,11 +106,14 @@ export const test = base.extend<TestFixtures>({
       '--skip-welcome',
       '--skip-release-notes',
       '--disable-workspace-trust',
+      '--wait',  // Keep the CLI script running (prevents fork-and-exit on Linux)
       `--extensionDevelopmentPath=${EXTENSION_PATH}`,
       `--extensions-dir=${extensionsDir}`,
       `--user-data-dir=${userDataDir}`,
       projectDir,
     ];
+    console.log(`[e2e] Launching VS Code: ${codePath}`);
+    console.log(`[e2e] Args: ${args.join(' ')}`);
     // On Windows, spawn .cmd with shell and quote the path
     const vscodeProcess: ChildProcess = spawn(`"${codePath}"`, args, {
       stdio: 'pipe',
@@ -118,7 +121,9 @@ export const test = base.extend<TestFixtures>({
       windowsVerbatimArguments: false,
     });
 
-    vscodeProcess.stderr?.on('data', (d) => process.stderr.write(`[vscode] ${d}`));
+    vscodeProcess.stdout?.on('data', (d) => process.stdout.write(`[vscode:out] ${d}`));
+    vscodeProcess.stderr?.on('data', (d) => process.stderr.write(`[vscode:err] ${d}`));
+    vscodeProcess.on('exit', (code) => console.log(`[e2e] VS Code exited with code ${code}`));
 
     // 4. Wait for CDP and connect Playwright
     await waitForCDP(CDP_PORT);
