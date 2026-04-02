@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/extension",
-  "version": "0.21.8",
+  "version": "0.21.9",
   "private": true,
   "description": "Dramaturg — Chrome extension with console, recorder, and element picker",
   "type": "module",

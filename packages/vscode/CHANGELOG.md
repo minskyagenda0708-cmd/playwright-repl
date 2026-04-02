@@ -1,14 +1,14 @@
 # Changelog
 
-## 0.21.8
+## 0.21.9
 
 **2026-04-02**
 
 ### Fixes
 
-- Fix VSIX missing `node_modules` on marketplace — restore legacy packaging with `npm install --production`
+- Fix Mac: bridge connection timeout — use `127.0.0.1`, dynamic CDP port, SW fallback injection
+- Fix VSIX missing `node_modules` on marketplace — restore legacy packaging
 - Remove platform-specific `esbuild` binary from VSIX — use portable `esbuild-wasm` only
-- Fix `workspace:*` in published npm packages — use `pnpm publish` instead of `npm publish`
 
 ## 0.21.6
 
