@@ -102,7 +102,8 @@ export const test = base.extend<TestFixtures>({
 
     const args = [
       `--remote-debugging-port=${CDP_PORT}`,
-      '--no-sandbox',  // Required on Linux CI (chrome-sandbox not root-owned)
+      '--no-sandbox',      // Required on Linux CI (chrome-sandbox not root-owned)
+      '--disable-gpu',     // Avoid GPU errors on CI
       '--disable-updates',
       '--skip-welcome',
       '--skip-release-notes',
@@ -169,7 +170,14 @@ export const test = base.extend<TestFixtures>({
       });
     } catch {}
     await browser.close().catch(() => {});
-    vscodeProcess.kill();
+    // Wait for VS Code process to fully exit before starting next test
+    if (!vscodeProcess.killed) vscodeProcess.kill();
+    await new Promise<void>((resolve) => {
+      if (vscodeProcess.exitCode !== null) return resolve();
+      vscodeProcess.on('exit', () => resolve());
+      setTimeout(resolve, 5000); // fallback timeout
+    });
+    // Ensure CDP port is free
     await new Promise(r => setTimeout(r, 1000));
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {};
   },
