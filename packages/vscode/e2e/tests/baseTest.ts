@@ -128,10 +128,16 @@ export const test = base.extend<TestFixtures>({
     // 4. Wait for CDP and connect Playwright
     await waitForCDP(CDP_PORT);
     const browser: Browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
-    const contexts = browser.contexts();
-    const page = contexts[0]?.pages()[0] || await contexts[0]?.newPage();
 
-    if (!page) throw new Error('No VS Code window found');
+    // Wait for VS Code's main window to appear (may take a moment on CI)
+    let page = browser.contexts()[0]?.pages()[0];
+    if (!page) {
+      for (let i = 0; i < 30 && !page; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        page = browser.contexts()[0]?.pages()[0];
+      }
+    }
+    if (!page) throw new Error('No VS Code window found after 30s');
 
     // Start tracing for debugging
     await page.context().tracing.start({ screenshots: true, snapshots: true, title: testInfo.title });
