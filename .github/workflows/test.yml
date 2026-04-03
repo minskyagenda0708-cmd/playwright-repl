@@ -114,6 +114,14 @@ jobs:
         working-directory: packages/vscode
         timeout-minutes: 5
 
+      - name: Upload VS Code E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-e2e-results-${{ matrix.os }}
+          path: packages/vscode/e2e/test-results/
+          retention-days: 7
+
       - name: Merge extension coverage
         run: pnpm run coverage:merge
         working-directory: packages/extension
