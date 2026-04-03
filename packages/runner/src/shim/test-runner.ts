@@ -236,5 +236,15 @@ async function __runTests(): Promise<string> {
 // Expose __runTests on globalThis so the bundler can call it after the IIFE.
 // esbuild tree-shakes unexported functions, but globalThis assignments survive.
 (globalThis as any).__runTests = __runTests;
+(globalThis as any).__resetTestState = () => {
+  rootSuite.tests.length = 0;
+  rootSuite.children.length = 0;
+  rootSuite.beforeAll.length = 0;
+  rootSuite.afterAll.length = 0;
+  rootSuite.beforeEach.length = 0;
+  rootSuite.afterEach.length = 0;
+  currentSuite = rootSuite;
+  hasOnly = false;
+};
 
 export { test, _expect as expect };
