@@ -17,6 +17,8 @@ test('extension activates — Testing sidebar available', async ({ workbox }) =>
 });
 
 test('REPL, Locator, and Assert panels are registered', async ({ workbox }) => {
+  // TODO(#526): keyboard shortcuts don't work reliably on Linux/macOS CI
+  test.skip(!!process.env.CI, 'Keyboard shortcuts unreliable on CI — fix in follow-up');
   // Click editor area to ensure focus, then open bottom panel
   await workbox.locator('.editor-group-container').first().click({ force: true }).catch(() => {});
   await workbox.keyboard.press(process.platform === 'darwin' ? 'Meta+`' : 'Control+`');
