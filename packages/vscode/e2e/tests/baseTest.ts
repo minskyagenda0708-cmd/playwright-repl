@@ -43,34 +43,50 @@ async function waitForCDP(port: number, timeoutMs = 30_000): Promise<void> {
   throw new Error(`CDP on port ${port} did not respond within ${timeoutMs}ms`);
 }
 
-/** Find the VS Code CLI — checks .vscode-test/ download first, then system install */
-function findVSCodeCLI(): string {
+/**
+ * Find VS Code paths — returns both CLI (for --install-extension) and
+ * the launch binary (for running VS Code with CDP).
+ *
+ * On Windows, bin/code.cmd works for both (doesn't fork).
+ * On Linux/macOS, bin/code forks and exits — use direct binary for launch.
+ */
+function findVSCode(): { cli: string; launch: string } {
   const vscodeTestDir = path.resolve(EXTENSION_DIR, '.vscode-test');
   if (fs.existsSync(vscodeTestDir)) {
     for (const entry of fs.readdirSync(vscodeTestDir)) {
       const dir = path.join(vscodeTestDir, entry);
-      // Windows: bin/code.cmd, Linux: bin/code, macOS: .app bundle
-      const candidates = [
-        path.join(dir, 'bin', 'code.cmd'),
-        path.join(dir, 'bin', 'code'),
-      ];
+      // Windows
+      const codeCmd = path.join(dir, 'bin', 'code.cmd');
+      if (fs.existsSync(codeCmd))
+        return { cli: codeCmd, launch: codeCmd };
+      // Linux
+      const codeBin = path.join(dir, 'bin', 'code');
+      const codeDirect = path.join(dir, 'code');
+      if (fs.existsSync(codeBin) && fs.existsSync(codeDirect))
+        return { cli: codeBin, launch: codeDirect };
+      // macOS
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
         for (const sub of fs.readdirSync(dir)) {
-          if (sub.endsWith('.app'))
-            candidates.push(path.join(dir, sub, 'Contents', 'Resources', 'app', 'bin', 'code'));
+          if (sub.endsWith('.app')) {
+            const cli = path.join(dir, sub, 'Contents', 'Resources', 'app', 'bin', 'code');
+            const launch = path.join(dir, sub, 'Contents', 'MacOS', 'Electron');
+            if (fs.existsSync(cli) && fs.existsSync(launch))
+              return { cli, launch };
+          }
         }
-      }
-      for (const c of candidates) {
-        if (fs.existsSync(c)) return c;
       }
     }
   }
-  // Fall back to system install
-  if (process.platform === 'win32')
-    return path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'bin', 'code.cmd');
-  if (process.platform === 'darwin')
-    return '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
-  return '/usr/bin/code';
+  // Fall back to system install (CLI works for both on system installs)
+  if (process.platform === 'win32') {
+    const p = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'bin', 'code.cmd');
+    return { cli: p, launch: p };
+  }
+  if (process.platform === 'darwin') {
+    const cli = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
+    return { cli, launch: cli };
+  }
+  return { cli: '/usr/bin/code', launch: '/usr/bin/code' };
 }
 
 /** Build VSIX if not already built for current version */
@@ -99,7 +115,8 @@ function copyFixtureProject(fixtureName = 'sample-project'): { tmpDir: string; p
 export const test = base.extend<TestFixtures>({
   workbox: async ({}, use, testInfo) => {
     const { tmpDir, projectDir } = copyFixtureProject();
-    const codePath = process.env.VSCODE_CLI || findVSCodeCLI();
+    const vscode = findVSCode();
+    const codePath = process.env.VSCODE_CLI || vscode.cli;
     const vsixPath = buildAndFindVSIX();
 
     const userDataDir = path.join(tmpDir, 'user-data');

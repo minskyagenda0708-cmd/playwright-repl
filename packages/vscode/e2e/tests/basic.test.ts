@@ -22,7 +22,8 @@ test('REPL, Locator, and Assert panels are available in bottom bar', async ({ wo
   await expect(workbox.getByText('PLAYWRIGHT REPL')).toBeAttached({ timeout: 15_000 });
   // Open bottom panel
   await workbox.locator('.monaco-workbench').click();
-  await workbox.keyboard.press('Control+J');
+  // Ctrl+J on Windows/Linux, Cmd+J on macOS
+  await workbox.keyboard.press(process.platform === 'darwin' ? 'Meta+J' : 'Control+J');
   // REPL, Locator, and Assert tabs should exist in the panel bar
   await expect(workbox.getByRole('tab', { name: 'REPL' })).toBeVisible({ timeout: 10_000 });
   await expect(workbox.getByRole('tab', { name: 'LOCATOR' })).toBeVisible();
