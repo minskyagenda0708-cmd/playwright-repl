@@ -16,18 +16,11 @@ test('extension activates — Testing sidebar available', async ({ workbox }) =>
   await expect(workbox.getByText('PLAYWRIGHT REPL')).toBeAttached({ timeout: 5_000 });
 });
 
-test('REPL, Locator, and Assert panels are available in bottom bar', async ({ workbox }) => {
-  test.skip(!!process.env.CI, 'Panel tabs may not register on CI without full interaction');
-  // Activate Testing sidebar first (extension registers panels on activation)
-  await workbox.getByRole('tab', { name: /Testing/i }).click();
-  await expect(workbox.getByText('PLAYWRIGHT REPL')).toBeAttached({ timeout: 15_000 });
-  // Open bottom panel
-  await workbox.locator('.monaco-workbench').click();
-  // Ctrl+J on Windows/Linux, Cmd+J on macOS
-  await workbox.keyboard.press(process.platform === 'darwin' ? 'Meta+J' : 'Control+J');
-  // Debug: screenshot to see panel state on CI
-  await workbox.screenshot({ path: 'e2e/test-results/panel-state.png' });
-  // REPL, Locator, and Assert tabs should exist in the DOM (may be in overflow/hidden)
+test('REPL, Locator, and Assert panels are registered', async ({ workbox }) => {
+  // Click editor area to ensure focus, then open bottom panel
+  await workbox.locator('.editor-group-container').first().click({ force: true }).catch(() => {});
+  await workbox.keyboard.press(process.platform === 'darwin' ? 'Meta+`' : 'Control+`');
+  // REPL, Locator, and Assert tabs should exist in the DOM
   await expect(workbox.getByRole('tab', { name: 'REPL' })).toBeAttached({ timeout: 15_000 });
   await expect(workbox.getByRole('tab', { name: 'LOCATOR' })).toBeAttached({ timeout: 5_000 });
   await expect(workbox.getByRole('tab', { name: 'ASSERT' })).toBeAttached({ timeout: 5_000 });

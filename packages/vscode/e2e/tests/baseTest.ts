@@ -1,8 +1,8 @@
 /**
  * Base test fixtures for VS Code E2E tests.
  *
- * Builds a VSIX, installs it into a fresh VS Code, spawns VS Code
- * with --remote-debugging-port, then connects Playwright via CDP.
+ * Launches VS Code once per worker, installs extension via VSIX,
+ * connects Playwright via CDP, and shares the page across all tests.
  */
 import { test as base, chromium, type Browser, type Page } from '@playwright/test';
 export { expect } from '@playwright/test';
@@ -14,12 +14,16 @@ import http from 'node:http';
 
 const CDP_PORT = 9333;
 // @ts-ignore — import.meta.dirname available in Node 22+
-const TESTS_DIR = import.meta.dirname;                          // e2e/tests/
-const E2E_DIR = path.resolve(TESTS_DIR, '..');                  // e2e/
-const EXTENSION_DIR = path.resolve(E2E_DIR, '..');              // packages/vscode/
+const TESTS_DIR = import.meta.dirname;
+const E2E_DIR = path.resolve(TESTS_DIR, '..');
+const EXTENSION_DIR = path.resolve(E2E_DIR, '..');
 
 type TestFixtures = {
   workbox: Page;
+};
+
+type WorkerFixtures = {
+  vscodePage: Page;
 };
 
 /** Wait until CDP endpoint responds */
@@ -43,28 +47,19 @@ async function waitForCDP(port: number, timeoutMs = 30_000): Promise<void> {
   throw new Error(`CDP on port ${port} did not respond within ${timeoutMs}ms`);
 }
 
-/**
- * Find VS Code paths — returns both CLI (for --install-extension) and
- * the launch binary (for running VS Code with CDP).
- *
- * On Windows, bin/code.cmd works for both (doesn't fork).
- * On Linux/macOS, bin/code forks and exits — use direct binary for launch.
- */
+/** Find VS Code CLI and launch binary */
 function findVSCode(): { cli: string; launch: string } {
   const vscodeTestDir = path.resolve(EXTENSION_DIR, '.vscode-test');
   if (fs.existsSync(vscodeTestDir)) {
     for (const entry of fs.readdirSync(vscodeTestDir)) {
       const dir = path.join(vscodeTestDir, entry);
-      // Windows
       const codeCmd = path.join(dir, 'bin', 'code.cmd');
       if (fs.existsSync(codeCmd))
         return { cli: codeCmd, launch: codeCmd };
-      // Linux
       const codeBin = path.join(dir, 'bin', 'code');
       const codeDirect = path.join(dir, 'code');
       if (fs.existsSync(codeBin) && fs.existsSync(codeDirect))
         return { cli: codeBin, launch: codeDirect };
-      // macOS
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
         for (const sub of fs.readdirSync(dir)) {
           if (sub.endsWith('.app')) {
@@ -77,7 +72,6 @@ function findVSCode(): { cli: string; launch: string } {
       }
     }
   }
-  // Fall back to system install (CLI works for both on system installs)
   if (process.platform === 'win32') {
     const p = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'bin', 'code.cmd');
     return { cli: p, launch: p };
@@ -89,7 +83,7 @@ function findVSCode(): { cli: string; launch: string } {
   return { cli: '/usr/bin/code', launch: '/usr/bin/code' };
 }
 
-/** Build VSIX if not already built for current version */
+/** Build VSIX if not already built */
 function buildAndFindVSIX(): string {
   const pkg = JSON.parse(fs.readFileSync(path.join(EXTENSION_DIR, 'package.json'), 'utf-8'));
   const vsixName = `playwright-repl-vscode-${pkg.version}.vsix`;
@@ -103,35 +97,33 @@ function buildAndFindVSIX(): string {
   return vsixPath;
 }
 
-/** Copy fixture project to a temp dir */
-function copyFixtureProject(fixtureName = 'sample-project'): { tmpDir: string; projectDir: string } {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-e2e-'));
-  const fixtureDir = path.resolve(E2E_DIR, 'fixtures', fixtureName);
-  const projectDir = path.join(tmpDir, 'project');
-  fs.cpSync(fixtureDir, projectDir, { recursive: true });
-  return { tmpDir, projectDir };
-}
-
-export const test = base.extend<TestFixtures>({
-  workbox: async ({}, use, testInfo) => {
-    const { tmpDir, projectDir } = copyFixtureProject();
+export const test = base.extend<TestFixtures, WorkerFixtures>({
+  // Launch VS Code once per worker — shared across all tests
+  vscodePage: [async ({}, use) => {
     const vscode = findVSCode();
-    const codePath = process.env.VSCODE_CLI || vscode.cli;
+    const codeCli = process.env.VSCODE_CLI || vscode.cli;
+    const codeLaunch = vscode.launch;
     const vsixPath = buildAndFindVSIX();
 
-    const userDataDir = path.join(tmpDir, 'user-data');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-e2e-'));
     const extensionsDir = path.join(tmpDir, 'extensions');
-    fs.mkdirSync(userDataDir, { recursive: true });
+    const userDataDir = path.join(tmpDir, 'user-data');
+    const projectDir = path.join(tmpDir, 'project');
     fs.mkdirSync(extensionsDir, { recursive: true });
+    fs.mkdirSync(userDataDir, { recursive: true });
 
-    // 1. Install VSIX into the temp extensions dir
+    // Copy fixture project
+    const fixtureDir = path.resolve(E2E_DIR, 'fixtures', 'sample-project');
+    fs.cpSync(fixtureDir, projectDir, { recursive: true });
+
+    // Install VSIX
     console.log(`[e2e] Installing VSIX: ${vsixPath}`);
     execSync(
-      `"${codePath}" --install-extension "${vsixPath}" --extensions-dir "${extensionsDir}" --force`,
+      `"${codeCli}" --install-extension "${vsixPath}" --extensions-dir "${extensionsDir}" --force`,
       { stdio: 'pipe', shell: true as any }
     );
 
-    // 2. Launch VS Code in normal mode (not extension development mode)
+    // Launch VS Code
     const args = [
       `--remote-debugging-port=${CDP_PORT}`,
       '--no-sandbox',
@@ -144,21 +136,20 @@ export const test = base.extend<TestFixtures>({
       `--user-data-dir=${userDataDir}`,
       projectDir,
     ];
-    console.log(`[e2e] Launching VS Code: ${codePath}`);
-    const vscodeProcess: ChildProcess = spawn(`"${codePath}"`, args, {
-      stdio: 'pipe',
-      shell: true,
-    });
+    console.log(`[e2e] Launching VS Code: ${codeLaunch}`);
+    const isCmd = codeLaunch.endsWith('.cmd');
+    const vscodeProcess: ChildProcess = isCmd
+      ? spawn(`"${codeLaunch}"`, args, { stdio: 'pipe', shell: true, windowsVerbatimArguments: false })
+      : spawn(codeLaunch, args, { stdio: 'pipe' });
 
     vscodeProcess.stdout?.on('data', (d: Buffer) => process.stdout.write(`[vscode:out] ${d}`));
     vscodeProcess.stderr?.on('data', (d: Buffer) => process.stderr.write(`[vscode:err] ${d}`));
     vscodeProcess.on('exit', (code) => console.log(`[e2e] VS Code exited with code ${code}`));
 
-    // 3. Wait for CDP and connect Playwright
+    // Connect Playwright via CDP
     await waitForCDP(CDP_PORT);
     const browser: Browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
 
-    // Wait for VS Code's main window
     let page = browser.contexts()[0]?.pages()[0];
     if (!page) {
       for (let i = 0; i < 30 && !page; i++) {
@@ -168,17 +159,9 @@ export const test = base.extend<TestFixtures>({
     }
     if (!page) throw new Error('No VS Code window found after 30s');
 
-    // Start tracing
-    await page.context().tracing.start({ screenshots: true, snapshots: true, title: testInfo.title });
-
     await use(page);
 
-    // Save trace
-    const tracePath = testInfo.outputPath('trace.zip');
-    await page.context().tracing.stop({ path: tracePath }).catch(() => {});
-    testInfo.attachments.push({ name: 'trace', path: tracePath, contentType: 'application/zip' });
-
-    // Cleanup: close VS Code via CDP Browser.close
+    // Cleanup: close VS Code
     try {
       const { default: WebSocket } = await import('ws');
       const versionRes = await new Promise<string>((resolve, reject) => {
@@ -205,7 +188,11 @@ export const test = base.extend<TestFixtures>({
       vscodeProcess.on('exit', () => resolve());
       setTimeout(resolve, 5000);
     });
-    await new Promise(r => setTimeout(r, 1000));
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {};
+  }, { scope: 'worker' }],
+
+  // Each test gets the shared page
+  workbox: async ({ vscodePage }, use) => {
+    await use(vscodePage);
   },
 });
