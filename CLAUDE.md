@@ -99,55 +99,27 @@ browser:     locator.click()
 Chrome:      actual DOM click event
 ```
 
-### Engine (packages/core/src/engine.ts)
+### EvaluateConnection (packages/core/src/evaluate-connection.ts)
 
-The `Engine` class wraps Playwright's `BrowserServerBackend` in-process:
+The primary execution mode. Launches Chromium with the Dramaturg extension and executes commands via `serviceWorker.evaluate()`:
 
 ```js
-const engine = new Engine();
-await engine.start({ headed: true, browser: 'chrome' });
-const result = await engine.run({ _: ['click', 'e5'] });
-// result = { text: '### Result\nClicked', isError: false }
-await engine.close();
+const conn = new EvaluateConnection();
+await conn.start(extensionPath, { headed: true, chromium });
+const result = await conn.run('click e5');
+// result = { text: 'Clicked', isError: false }
+await conn.close();
 ```
 
-Three connection modes via `start(opts)`:
-- **launch** (default): `contextFactory(config)` → new browser
-- **connect**: `opts.connect = 9222` → `cdpEndpoint` → `connectOverCDP()`
-- **extension**: `opts.extension = true` → starts `CommandServer`, Chrome launched with `--remote-debugging-port`, side panel sends commands via HTTP
-- Dependency injection: constructor accepts `deps` for testing
+No WebSocket bridge, no port management. Playwright talks directly to the extension's service worker.
 
-Key Playwright internals used (via `createRequire`):
-- `playwright/lib/mcp/browser/browserServerBackend` → `BrowserServerBackend`
-- `playwright/lib/mcp/browser/browserContextFactory` → `contextFactory`
-- `playwright/lib/mcp/browser/config` → `resolveConfig`
-- `playwright/lib/cli/daemon/commands` → `commands` map
-- `playwright/lib/cli/daemon/command` → `parseCommand`
+### Engine (packages/cli/src/engine.ts)
 
-### CommandServer (packages/core/src/extension-server.ts)
+Fallback mode when the extension is not available. Wraps Playwright's `BrowserServerBackend` in-process. Only supports keyword commands (no JavaScript).
 
-When `--extension` mode is used, `CommandServer` starts an HTTP server:
+### BridgeServer (packages/core/src/bridge-server.ts)
 
-```
-┌──────────────────────────────────────────────┐
-│  Chrome Extension (Side Panel)               │
-│  panel.js ─── fetch POST /run ───────────┐   │
-│     ▲                                    │   │
-│     │ JSON response                      │   │
-└─────┼────────────────────────────────────┼───┘
-      │                                    │
-      │                                    ▼
-┌─────────────────────────────────────────────────────┐
-│  CommandServer (HTTP :6781)                          │
-│    ├── POST /run   ← panel sends commands here      │
-│    └── GET /health ← panel checks server status     │
-│  Engine → connectOverCDP → CDP :3001 → Chrome       │
-└─────────────────────────────────────────────────────┘
-```
-
-- **Direct CDP**: Engine connects to Chrome via `--remote-debugging-port` (no relay)
-- **Command channel**: panel sends commands via `fetch()` → CommandServer → `Engine.run()` → results back
-- **Recording**: extension-side (inject recorder.js via `chrome.scripting.executeScript`)
+WebSocket server for `--bridge` mode — connects to the user's existing Chrome with Dramaturg installed. Used when the user wants to automate their real browser session with cookies/auth intact.
 
 ### Element Refs (e1, e5, etc.)
 

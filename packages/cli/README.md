@@ -1,16 +1,17 @@
 # playwright-repl
 
-Interactive terminal REPL for browser automation powered by Playwright. Type a command, see the result — no code, no boilerplate.
+Interactive terminal REPL for browser automation powered by Playwright. Supports keyword commands and JavaScript.
 
 ```bash
 npm install -g playwright-repl
-playwright-repl --headed
+playwright-repl
 ```
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
 pw> fill "What needs to be done?" Buy groceries
 pw> press Enter
+pw> await page.title()
 pw> verify text 1 item left
 pw> screenshot
 ```
@@ -20,26 +21,24 @@ pw> screenshot
 ```bash
 npm install -g playwright-repl
 
-# Browser binaries (only needed for standalone mode)
-npx playwright install
+# Install Chromium (needed for standalone mode)
+npx playwright install chromium
 ```
 
 ## Connection Modes
 
 | Mode | Flag | How it works |
 |------|------|--------------|
-| **Standalone** | *(default)* | Launches Chromium via Playwright |
+| **Standalone** | *(default)* | Launches Chromium with Dramaturg extension — keyword + JS |
 | **Bridge** | `--bridge` | Connects to your real Chrome via Dramaturg extension — cookies and logins intact |
 
 ### Standalone
 
-Playwright launches and manages the browser. Headless by default, headed with `--headed`.
+Launches Chromium with the Dramaturg extension pre-installed. Headed by default — use `--headless` for CI/scripting. Supports both keyword commands and JavaScript.
 
 ```bash
-playwright-repl
-playwright-repl --headed
-playwright-repl --browser firefox
-playwright-repl --persistent   # keeps profile between sessions
+playwright-repl                # headed (default)
+playwright-repl --headless     # headless for CI/scripting
 ```
 
 ### Bridge
@@ -87,19 +86,16 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 | Mode | Standalone | Bridge |
 |------|:---:|:---:|
 | **Keyword** — `click "Sign in"`, `goto https://...` | Yes | Yes |
-| **Playwright API / JS** — `await page.title()`, `1 + 1` | No | Yes (auto-detected) |
+| **Playwright API / JS** — `await page.title()`, `1 + 1` | Yes | Yes |
 
-Bridge mode auto-detects Playwright API and JavaScript expressions. For DOM access use `await page.evaluate(() => document.title)`. For keyword commands, see [Command Reference](#command-reference).
+Both modes auto-detect keyword commands and JavaScript expressions. For DOM access use `await page.evaluate(() => document.title)`. For keyword commands, see [Command Reference](#command-reference).
 
 ## CLI Options
 
 | Option | Description |
 |--------|-------------|
-| `-b, --browser <type>` | Browser: `chrome`, `firefox`, `webkit`, `msedge` |
-| `--headed` | Run browser in headed (visible) mode |
-| `--persistent` | Use persistent browser profile |
-| `--profile <dir>` | Persistent profile directory |
-| `--bridge` | Start WebSocket bridge server; Chrome extension connects to CLI |
+| `--headless` | Run browser in headless mode (default: headed) |
+| `--bridge` | Connect to existing Chrome via WebSocket bridge |
 | `--bridge-port <port>` | Bridge server port (default: `9876`) |
 | `--config <file>` | Path to config file |
 | `--replay <files...>` | Replay `.pw` or `.js` file(s) or folder(s) |

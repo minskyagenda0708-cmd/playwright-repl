@@ -4,7 +4,7 @@ MCP server that lets AI agents (Claude Desktop, Claude Code, or any MCP client) 
 
 Two modes:
 - **Bridge mode** (default) — controls your real Chrome browser through the **Dramaturg** Chrome extension
-- **Standalone mode** (`--standalone`) — launches its own browser via Playwright, no extension needed
+- **Standalone mode** (`--standalone`) — launches Chromium with the Dramaturg extension, supports keyword commands and JavaScript
 
 ## Why
 
@@ -53,10 +53,10 @@ Playwright running in your real Chrome session
 Claude Desktop / Claude Code (or any MCP client)
   ↕ MCP (stdio)
 playwright-repl MCP server
-  ↕ Engine.run() (in-process)
-Playwright BrowserServerBackend
-  ↕ CDP
-Browser (launched by Playwright)
+  ↕ serviceWorker.evaluate()
+Dramaturg extension (service worker)
+  ↕ playwright-crx
+Chromium (launched with extension)
 ```
 
 ## Setup
@@ -77,12 +77,12 @@ Load `packages/extension/dist/` as an unpacked extension in Chrome (`chrome://ex
 
 Or install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa).
 
-#### Standalone mode — no extension needed
+#### Standalone mode — launches browser with extension
 
-Add `--standalone` to the MCP server command. The server launches its own browser via Playwright.
+Add `--standalone` to the MCP server command. The server launches Chromium with the Dramaturg extension pre-installed.
 
 - Default: headless. Add `--headed` to show the browser window.
-- Only `.pw` keyword commands are supported (no raw Playwright API or JavaScript expressions). Use `run-code` or `eval` keywords within `.pw` mode for Playwright API / JS.
+- Supports both keyword commands and JavaScript/Playwright API.
 
 ### 3. Configure your MCP client
 
@@ -180,9 +180,9 @@ select "Country" "United States"     # select dropdown option
 localstorage-list                    # list localStorage
 ```
 
-### Playwright API / JavaScript (bridge mode only)
+### Playwright API / JavaScript
 
-In bridge mode, `run_command` also accepts raw Playwright expressions and JavaScript:
+Both modes accept raw Playwright expressions and JavaScript:
 
 ```
 await page.url()
@@ -192,9 +192,6 @@ await page.getByRole('link', { name: 'Get started', exact: true }).click()
 await page.evaluate(() => document.title)
 await page.evaluate(() => document.querySelectorAll('a').length)
 ```
-
-> In standalone mode, use the `run-code` or `eval` keywords to run Playwright API / JavaScript:
-> `run-code await page.url()` or `eval document.title`.
 
 ## Tool: `run_script`
 
@@ -211,9 +208,7 @@ press Enter
 verify-text "Buy groceries"
 ```
 
-> In standalone mode, `run_script` only accepts `.pw` keyword scripts (no `language` parameter needed).
-
-### JavaScript (`language="javascript"`) — bridge mode only
+### JavaScript (`language="javascript"`)
 
 Runs the entire block as one evaluation — use for Playwright API with assertions:
 

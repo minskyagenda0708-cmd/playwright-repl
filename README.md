@@ -50,17 +50,18 @@ Test Explorer, interactive REPL, assert builder, and element picker — all insi
 
 ## CLI
 
-Terminal REPL for Playwright. Type a command, see the result.
+Terminal REPL for Playwright. Supports keyword commands and JavaScript.
 
 ```bash
 npm install -g playwright-repl
-playwright-repl --headed
+playwright-repl
 ```
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
 pw> fill "What needs to be done?" Buy groceries
 pw> press Enter
+pw> await page.title()
 pw> verify text 1 item left
 pw> screenshot
 ```
@@ -69,8 +70,10 @@ pw> screenshot
 
 | Mode | Flag | How it works |
 |------|------|--------------|
-| **Standalone** | *(default)* | Launches Chromium via Playwright |
+| **Standalone** | *(default)* | Launches Chromium with Dramaturg extension |
 | **Bridge** | `--bridge` | Connects to your real Chrome via Dramaturg extension |
+
+Standalone launches a fresh Chromium with the extension pre-installed — keyword commands and JavaScript both work. Use `--headless` for CI/scripting.
 
 > **[Full CLI docs](packages/cli/README.md)**
 
@@ -85,11 +88,9 @@ npm install -D @playwright-repl/runner
 ```
 
 ```bash
-pw test                              # run Playwright tests with context reuse
-pw launch --port 9222                # launch Chrome with extension + CDP port
-pw repl --port 9222                  # Node REPL with Playwright globals (page, context, browser, expect)
-pw repl-extension --bridge-port 9877 # REPL via extension bridge
-pw close --port 9222                 # close browser
+pw test                              # run Playwright tests (2.8x faster via extension)
+pw repl                              # interactive REPL with keyword + JS support
+pw repl --headless                   # headless mode for scripting
 ```
 
 > **[Full runner docs](packages/runner/README.md)**
@@ -116,11 +117,12 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dra
 
 ## MCP Server — AI Browser Agent
 
-AI agents control your **real** Chrome session — already logged in, cookies intact.
+AI agents control the browser — standalone or connected to your real Chrome.
 
 ```bash
 npm install -g @playwright-repl/mcp
-playwright-repl-mcp
+playwright-repl-mcp --standalone     # launch fresh browser (keyword + JS)
+playwright-repl-mcp                  # connect to existing Chrome via bridge
 ```
 
 | | `@playwright-repl/mcp` | Playwright MCP | Playwriter |

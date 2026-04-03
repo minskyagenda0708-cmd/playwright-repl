@@ -1,12 +1,12 @@
 # @playwright-repl/runner
 
-Drop-in replacement for `npx playwright test` with context reuse. Keeps the browser open between tests — no teardown/recreate per test.
+Drop-in replacement for `npx playwright test` — 2.8x faster for browser-only tests.
 
 ## Performance
 
-Bridge mode sends test scripts directly to the browser, bypassing the Playwright test runner entirely. This eliminates the per-run overhead (worker startup, TypeScript compilation, fixture setup) that dominates single-test execution time in the IDE.
+`pw test` compiles tests with esbuild and executes them directly in the browser via the Dramaturg Chrome extension's service worker (`serviceWorker.evaluate()`). This bypasses the Playwright test runner overhead (worker startup, TypeScript compilation, fixture setup).
 
-Node-mode tests that need server-side APIs fall back to the standard Playwright test runner, but reuse the existing browser via CDP instead of launching a new one.
+Node-mode tests that need server-side APIs fall back to the standard Playwright test runner automatically.
 
 ## Quick Start
 
@@ -19,72 +19,40 @@ Replace `npx playwright test` with `pw test`:
 ```bash
 pw test                         # run all tests
 pw test todomvc/                # run tests in a folder
-pw test --workers 1             # single worker
-pw test --reporter list         # custom reporter
+pw test --headless              # headless mode
 ```
-
-All Playwright CLI flags work — `pw` passes them through.
 
 ## How It Works
 
-Standard Playwright creates a new browser context for every test. `pw test` reuses the same persistent browser context across tests in the same worker.
+1. **Compile** — esbuild bundles the test with a lightweight shim replacing `@playwright/test`
+2. **Launch** — Chromium starts with the Dramaturg extension via `launchPersistentContext`
+3. **Execute** — compiled test sent to the service worker via `serviceWorker.evaluate()`
+4. **Results** — pass/fail returned directly, no test runner process needed
 
-- **Bridge mode** — compiles the test with esbuild, sends it to the Chrome extension for in-browser execution. Bypasses the Playwright test runner for near-instant feedback in the IDE
-- **Node mode** — falls back to standard Playwright for tests that use Node-only APIs (fs, net, etc.). Reuses the existing browser via CDP when available
-- **Automatic routing** — static analysis detects which mode each test needs
+Tests that use Node-only APIs (`fs`, `net`, `child_process`) are detected by static analysis and fall back to standard Playwright automatically.
 
 ## pw Commands
 
 ```bash
-pw test [files...]                       # run Playwright tests with context reuse
-pw launch --port 9222                    # launch Chrome with extension + CDP port
-pw launch --port 9222 --bridge-port 9877 # custom bridge port
-pw launch --port 9222 --headless         # headless mode
-pw repl --port 9222                      # Node REPL with Playwright globals
-pw repl --port 9222 script.js            # run script, exit (browser stays alive)
-pw repl-extension --bridge-port 9877     # REPL via extension bridge
-pw close --port 9222                     # close browser
+pw test [files...]              # run Playwright tests (fast path)
+pw repl                         # interactive REPL with keyword + JS support
+pw repl --headless              # headless REPL for scripting
+pw repl --port 9222             # connect to existing Chrome via CDP
 ```
 
 ### pw repl
 
-Lightweight Node REPL with `page`, `context`, `browser`, and `expect` as globals. Powered by `node:repl` — full JavaScript with tab completion and history.
-
-```bash
-pw launch --port 9222
-pw repl --port 9222
-```
+Interactive REPL with keyword commands and JavaScript support. Launches Chromium with the extension by default.
 
 ```
-pw> await page.goto('https://example.com')
+pw> goto https://example.com
 pw> await page.title()
 Example Domain
-(3.2ms)
+(5ms)
 pw> await page.locator('a').count()
 1
-(12.4ms)
-pw> 1 + 1
-2
+(12ms)
 ```
-
-### pw repl-extension
-
-REPL that routes commands through the Chrome extension bridge. Useful for testing the extension path.
-
-```bash
-pw launch --port 9222 --bridge-port 9877
-pw repl-extension --bridge-port 9877
-```
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--port <n>` | Chrome CDP port (default: 9222) |
-| `--bridge-port <n>` | BridgeServer WebSocket port (default: 9877) |
-| `--headless` | Launch browser in headless mode |
-
-All `pw test` options are passed through to Playwright.
 
 ## CI Setup
 
@@ -96,7 +64,7 @@ All `pw test` options are passed through to Playwright.
   run: npx playwright install --with-deps chromium
 
 - name: Run tests
-  run: npx pw test
+  run: npx pw test --headless
 ```
 
 ## Compatibility
@@ -105,7 +73,7 @@ Works with standard `@playwright/test` tests. No changes needed to your test fil
 
 **Supported:** All Playwright test features — fixtures, assertions, test.describe, test.beforeEach, etc.
 
-**Bridge mode limitations:** Tests that use Node-only APIs (`fs`, `net`, `child_process`) automatically fall back to Node mode.
+**Automatic fallback:** Tests that use Node-only APIs automatically fall back to standard Playwright.
 
 ## Development
 
