@@ -121,7 +121,7 @@ export const test = base.extend<TestFixtures>({
     // to keep the extension host alive (without it, the host exits after activate())
     if (!isCmd) {
       // @ts-ignore — import.meta.dirname available in Node 22+
-      args.push(`--extensionTestsPath=${path.resolve(import.meta.dirname, '..', 'fixtures', 'keep-alive.cjs')}`);
+      args.push(`--extensionTestsPath=${path.resolve(import.meta.dirname, '..', 'fixtures', 'keep-alive.js')}`);
     }
     const vscodeProcess: ChildProcess = isCmd
       ? spawn(`"${codePath}"`, args, { stdio: 'pipe', shell: true, windowsVerbatimArguments: false })
