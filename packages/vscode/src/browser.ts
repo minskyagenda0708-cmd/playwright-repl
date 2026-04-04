@@ -125,12 +125,20 @@ export class BrowserManager {
     this._sw = sw;
     this._log.appendLine(`Service worker: ${sw.url()}`);
 
-    // 4. Wait for handleBridgeCommand to be available
+    // 4. Wait for handleBridgeCommand and set up event queue
     await sw.evaluate(async () => {
       for (let i = 0; i < 50; i++) {
-        if ((self as any).handleBridgeCommand) return;
+        if ((self as any).handleBridgeCommand) break;
         await new Promise(r => setTimeout(r, 100));
       }
+      // Set up event queue for pick/record events
+      (self as any).__eventQueue = [] as any[];
+      chrome.runtime.onMessage.addListener((msg: any) => {
+        const eventTypes = ['element-picked-raw', 'pick-cancelled', 'recorded-action', 'recorded-fill-update'];
+        if (eventTypes.includes(msg.type)) {
+          (self as any).__eventQueue.push(msg);
+        }
+      });
     });
 
     // 5. Start HTTP proxy for test workers
@@ -184,7 +192,38 @@ export class BrowserManager {
   }
 
   onEvent(fn: ((event: Record<string, unknown>) => void) | null) {
-    // No-op — events were a bridge concept
+    if (!this._sw) return;
+    if (!fn) {
+      this._stopEventPolling();
+      return;
+    }
+    this._startEventPolling(fn);
+  }
+
+  private _eventPollTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _startEventPolling(fn: (event: Record<string, unknown>) => void) {
+    this._stopEventPolling();
+    // Poll for events
+    this._eventPollTimer = setInterval(async () => {
+      try {
+        const events = await this._sw?.evaluate(() => {
+          const q = (self as any).__eventQueue || [];
+          (self as any).__eventQueue = [];
+          return q;
+        });
+        if (events && Array.isArray(events)) {
+          for (const event of events) fn(event);
+        }
+      } catch {}
+    }, 100);
+  }
+
+  private _stopEventPolling() {
+    if (this._eventPollTimer) {
+      clearInterval(this._eventPollTimer);
+      this._eventPollTimer = null;
+    }
   }
 
   // ─── HTTP proxy for test workers ──────────────────────────────────────────

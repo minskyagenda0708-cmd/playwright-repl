@@ -223,7 +223,6 @@ export class Recorder {
     const template = [
       '',
       `test('new test', async ({ page }) => {`,
-      ``,  // recording inserts here
       `});`,
       '',
     ].join('\n');
@@ -234,7 +233,7 @@ export class Recorder {
 
     // Position for recording: inside the template body
     this._indentation = indent.length;
-    lastInsertLine = line + 3; // the empty line inside the template
+    lastInsertLine = line + 2; // inside the test body (after opening brace)
     lastInsertLength = 0;
   }
 }
