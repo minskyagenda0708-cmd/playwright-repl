@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.22.0 — serviceWorker.evaluate() Architecture
+
+**2026-04-03**
+
+### Architecture
+
+- **New default execution mode**: all packages now use `serviceWorker.evaluate()` instead of the WebSocket bridge. Launches Chromium with the Dramaturg extension and talks directly to the service worker — no bridge server, no port management, no offscreen relay.
+- **2.8x faster test runner**: `pw test` compiles tests and sends them to the service worker via `serviceWorker.evaluate()`. 24 todomvc tests in 5.9s (was 16.3s). ([#561](https://github.com/stevez/playwright-repl/pull/561))
+- **JavaScript support everywhere**: standalone mode now supports both keyword commands and Playwright API / JavaScript in all packages (CLI, MCP, runner). ([#559](https://github.com/stevez/playwright-repl/pull/559))
+
+### Features
+
+- **CLI**: `playwright-repl` now launches Chromium with extension by default (headed). `--headless` for CI/scripting. `--bridge` for connecting to existing Chrome. ([#559](https://github.com/stevez/playwright-repl/pull/559))
+- **MCP**: `--standalone` mode uses `serviceWorker.evaluate()` with full JS support. Falls back to Engine for npm users without bundled extension. ([#562](https://github.com/stevez/playwright-repl/pull/562))
+- **VS Code**: `BrowserManager` uses `launchPersistentContext` + `serviceWorker.evaluate()` instead of bridge. ([#563](https://github.com/stevez/playwright-repl/pull/563))
+- **VS Code REPL**: `pw>` prompt added. ([#554](https://github.com/stevez/playwright-repl/pull/554))
+- **VS Code E2E tests**: real VS Code tests via `connectOverCDP` — spawn VS Code, connect Playwright, test UI. ([#556](https://github.com/stevez/playwright-repl/pull/556))
+- **Core**: `EvaluateConnection` class and `findExtensionPath()` shared across all packages. ([#564](https://github.com/stevez/playwright-repl/pull/564))
+
+### Removed
+
+- `--extension` mode (CLI) — replaced by evaluate mode
+- `--server` mode (CLI) — replaced by `@playwright-repl/mcp`
+- `CommandServer` / `extension-server.ts` (core) — no longer needed
+- `pw launch`, `pw close`, `pw repl-extension` subcommands (runner)
+- CI benchmarks (bridge vs CDP — no longer relevant)
+- ~1000 lines of dead code
+
 ## v0.21.9 — Mac Bridge Fix
 
 **2026-04-02**

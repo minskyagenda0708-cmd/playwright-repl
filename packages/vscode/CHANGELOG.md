@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.22.0
+
+**2026-04-03**
+
+### Architecture
+
+- Replace WebSocket bridge with `serviceWorker.evaluate()` — direct communication with the Dramaturg extension
+- `BrowserManager` uses `launchPersistentContext` instead of `launchServer` + bridge injection
+- 2.8x faster test execution via service worker
+
+### Features
+
+- Add `pw>` prompt to REPL panel
+- E2E test infrastructure for the VS Code extension
+
+### Removed
+
+- `--extension` and `--server` CLI modes (replaced by evaluate mode and MCP)
+- `CommandServer` / `extension-server.ts`
+
 ## 0.21.9
 
 **2026-04-02**
