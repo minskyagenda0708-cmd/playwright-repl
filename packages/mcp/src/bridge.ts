@@ -16,7 +16,8 @@ export const descriptions = {
 1. KEYWORD (.pw) — playwright-repl commands:
    snapshot, goto <url>, click <text>, fill <label> <value>, press <key>,
    verify-text <text>, verify-no-text <text>, screenshot,
-   check <label>, select <label> <value>, localstorage-list, localstorage-clear
+   check <label>, select <label> <value>, localstorage-list, localstorage-clear,
+   video-start, video-stop, video-chapter <title>
 
 2. PLAYWRIGHT — Playwright API (page.* / crxApp.*):
    await page.url(), await page.title(),

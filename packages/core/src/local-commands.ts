@@ -80,7 +80,8 @@ export function isLocalCommand(cmd: string): boolean {
  */
 export async function handleLocalCommand(cmd: string, context: BrowserContext | null): Promise<LocalCommandResult | null> {
   if (!isLocalCommand(cmd)) return null;
-  if (!context) return { text: 'Local commands require evaluate mode.', isError: true };
+  // No context → let the command fall through to the bridge (extension handles video via tabCapture)
+  if (!context) return null;
 
   if (isVideoCommand(cmd)) return handleVideoCommand(cmd, context);
 

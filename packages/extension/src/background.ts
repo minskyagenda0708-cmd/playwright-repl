@@ -543,7 +543,20 @@ async function handleBridgeCommand(msg: {
   }
   if (cmd === 'video-stop') {
     const r = await stopVideoCapture();
-    return { text: r.ok ? 'Video recorded' : (r.error || 'Failed'), isError: !r.ok, blobUrl: r.blobUrl, duration: r.duration, size: r.size };
+    if (!r.ok) return { text: r.error || 'Failed', isError: true };
+    // Auto-save to Downloads/pw-videos/ for bridge callers (CLI, MCP)
+    const d = new Date();
+    const timestamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+    const filename = `pw-videos/pw-video-${timestamp}.webm`;
+    if (r.blobUrl) {
+      chrome.downloads.download({ url: r.blobUrl, filename, saveAs: false });
+      chrome.runtime.sendMessage({ type: 'video-revoke' }).catch(() => {});
+    }
+    const info: string[] = [];
+    if (r.duration) info.push(`${r.duration}s`);
+    if (r.size) info.push(r.size < 1024 * 1024 ? `${(r.size / 1024).toFixed(0)} KB` : `${(r.size / (1024 * 1024)).toFixed(1)} MB`);
+    const suffix = info.length ? ` (${info.join(', ')})` : '';
+    return { text: `Video saved to Downloads/${filename}${suffix}`, isError: false };
   }
 
   if (!currentPage) {

@@ -178,7 +178,12 @@ screenshot                           # capture page (returned as image to AI)
 check "Remember me"                  # check a checkbox
 select "Country" "United States"     # select dropdown option
 localstorage-list                    # list localStorage
+video-start                          # start video recording
+video-stop                           # stop recording and save video
+video-chapter "Login flow"           # add chapter marker
 ```
+
+Video recordings are saved to `Downloads/pw-videos/` (bridge mode) or `~/pw-videos/` (standalone mode).
 
 ### Playwright API / JavaScript
 

@@ -187,6 +187,8 @@ verify text 1 item left
 | [06-edit-todo.pw](examples/06-edit-todo.pw) | Double-click to edit a todo |
 | [07-test-click-nth.pw](examples/07-test-click-nth.pw) | `--nth` disambiguation |
 | [08-localstorage.pw](examples/08-localstorage.pw) | localStorage commands |
+| [09-inspection-commands.pw](examples/09-inspection-commands.pw) | Inspection commands |
+| [10-video-recording.pw](examples/10-video-recording.pw) | Video recording with chapters |
 
 ```bash
 playwright-repl --replay examples/01-add-todos.pw --headed
@@ -322,6 +324,17 @@ pw> highlight --clear                # dismiss the highlight overlay
 | `dialog-dismiss` | Dismiss a browser dialog |
 | `resize <w> <h>` | Resize browser window |
 | `pdf` | Save page as PDF |
+
+### Video Recording
+
+| Command | Description |
+|---------|-------------|
+| `video-start [--size WxH]` | Start video recording |
+| `video-stop` | Stop recording and save video |
+| `video-chapter <title>` | Add chapter marker to recording |
+
+In **standalone mode**, video uses Playwright's screencast API and saves to `~/pw-videos/`.
+In **bridge mode**, video uses Chrome's tab capture and saves to `Downloads/pw-videos/`.
 
 ### Browser Control
 
