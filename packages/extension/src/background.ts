@@ -545,6 +545,39 @@ async function handleBridgeCommand(msg: {
     const r = await stopVideoCapture();
     return { text: r.ok ? 'Video recorded' : (r.error || 'Failed'), isError: !r.ok, blobUrl: r.blobUrl, duration: r.duration, size: r.size };
   }
+  if (cmd === 'tracing-start') {
+    try {
+      const app = await ensureCrxApp();
+      await app.context().tracing.start({ screenshots: true, snapshots: true });
+      return { text: 'Tracing started', isError: false };
+    } catch (e: any) {
+      return { text: e?.message ?? String(e), isError: true };
+    }
+  }
+  if (cmd === 'tracing-stop') {
+    try {
+      const app = await ensureCrxApp();
+      const tracePath = `/tmp/trace-${Date.now()}.zip`;
+      await app.context().tracing.stop({ path: tracePath });
+      // Read trace from memfs and download via chrome.downloads
+      const data = crx.fs.readFileSync(tracePath);
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const dataUrl = `data:application/zip;base64,${btoa(binary)}`;
+      const d = new Date();
+      const timestamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+      const filename = `pw-traces/trace-${timestamp}.zip`;
+      chrome.downloads.download({ url: dataUrl, filename, saveAs: false });
+      // Clean up memfs
+      crx.fs.unlinkSync(tracePath);
+      const size = bytes.length;
+      const sizeStr = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+      return { text: `Trace saved to Downloads/${filename} (${sizeStr})`, isError: false };
+    } catch (e: any) {
+      return { text: e?.message ?? String(e), isError: true };
+    }
+  }
 
   if (!currentPage) {
     const tabId = await getActiveTabId();
@@ -614,6 +647,33 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'pick-stop')     { stopPicking().then(sendResponse); return true; }
   if (msg.type === 'video-start')   { startVideoCapture().then(sendResponse); return true; }
   if (msg.type === 'video-stop')    { stopVideoCapture().then(sendResponse); return true; }
+  if (msg.type === 'tracing-start') {
+    ensureCrxApp().then(app => app.context().tracing.start({ screenshots: true, snapshots: true }))
+      .then(() => sendResponse({ ok: true }))
+      .catch((e: Error) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg.type === 'tracing-stop') {
+    (async () => {
+      const app = await ensureCrxApp();
+      const tracePath = `/tmp/trace-${Date.now()}.zip`;
+      await app.context().tracing.stop({ path: tracePath });
+      const data = crx.fs.readFileSync(tracePath);
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const dataUrl = `data:application/zip;base64,${btoa(binary)}`;
+      const d = new Date();
+      const timestamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+      const filename = `pw-traces/trace-${timestamp}.zip`;
+      chrome.downloads.download({ url: dataUrl, filename, saveAs: false });
+      crx.fs.unlinkSync(tracePath);
+      const size = bytes.length;
+      const sizeStr = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+      return { ok: true, text: `Trace saved to Downloads/${filename} (${sizeStr})` };
+    })().then(sendResponse).catch((e: Error) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
   if (msg.type === 'video-state')   { sendResponse({ recording: videoRecording, startTime: videoStartTime }); return false; }
   if (msg.type === 'video-save') {
     const d = new Date();

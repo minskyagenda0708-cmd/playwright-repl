@@ -7,12 +7,17 @@ export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: stri
 type CdpResult = { type?: string; value?: unknown; description?: string; objectId?: string };
 
 export async function executeCommand(command: string): Promise<CommandResult> {
-  // Video capture — bypass parseReplCommand, send directly to SW
+  // Video/tracing capture — bypass parseReplCommand, send directly to SW
   const cmdName = command.trim().split(/\s+/)[0].toLowerCase();
   if (cmdName === 'video-start' || cmdName === 'video-stop') {
     const r = await chrome.runtime.sendMessage({ type: cmdName });
     if (!r?.ok) return { text: r?.error || 'Failed', isError: true };
     return { text: cmdName === 'video-start' ? 'Video recording started' : 'Video recording stopped', isError: false };
+  }
+  if (cmdName === 'tracing-start' || cmdName === 'tracing-stop') {
+    const r = await chrome.runtime.sendMessage({ type: cmdName });
+    if (!r?.ok) return { text: r?.error || 'Failed', isError: true };
+    return { text: r.text || (cmdName === 'tracing-start' ? 'Tracing started' : 'Tracing stopped'), isError: false };
   }
 
   const parsed = parseReplCommand(command);
@@ -95,6 +100,11 @@ export async function executeCommandForConsole(command: string): Promise<Console
     if (!r?.ok) throw new Error(r?.error || 'Failed');
     if (cmdName === 'video-stop' && r.blobUrl) return { text: 'Video recorded', video: r.blobUrl, duration: r.duration, size: r.size };
     return { text: 'Video recording started' };
+  }
+  if (cmdName === 'tracing-start' || cmdName === 'tracing-stop') {
+    const r = await chrome.runtime.sendMessage({ type: cmdName });
+    if (!r?.ok) throw new Error(r?.error || 'Failed');
+    return { text: r.text || (cmdName === 'tracing-start' ? 'Tracing started' : 'Tracing stopped') };
   }
 
   const parsed = parseReplCommand(command);
