@@ -250,7 +250,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             }
         };
 
-        async function resolveAndInsert(msg: any, isUpdate: boolean) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async function resolveAndInsert(msg: Record<string, any>, isUpdate: boolean) {
             const { action, recId, opts, pw } = msg;
 
             // PW mode — use pre-built .pw command from content script
