@@ -462,9 +462,9 @@ describe('Toolbar component tests', () => {
 
     await renderToolbar({ editorRef: editorRef as any });
 
-    // Simulate a recorded-action message from content script
+    // Simulate a recorded-action message from content script (new format)
     for (const listener of listeners) {
-      listener({ type: 'recorded-action', action: { pw: 'click "Submit"', js: "await page.getByRole('button', { name: 'Submit' }).click();" } });
+      listener({ type: 'recorded-action', action: 'click', pw: 'click "Submit"', recId: 'rec-1' });
     }
 
     await vi.waitFor(() => {
