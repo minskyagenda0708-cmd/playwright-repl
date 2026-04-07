@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
-  BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
+  BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
   filterResponse as filterResponseBase, resolveArgs,
   isLocalCommand, handleLocalCommand,
 } from '@playwright-repl/core';
@@ -42,7 +42,6 @@ export interface ReplContext {
   sessionHistory: string[];
   commandCount: number;
   errors: number;
-  lastSnapshot?: { url: string; snapshotString: string };
 }
 
 // ─── Response filtering ─────────────────────────────────────────────────────
@@ -283,22 +282,6 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     return;
   }
 
-  // ── Locator (local — uses cached snapshot) ───────────────────────
-  if (line.startsWith('locator ')) {
-    const ref = line.slice(8).trim();
-    if (!ctx.lastSnapshot) {
-      console.log(`${c.yellow}No snapshot cached. Run "snapshot" first.${c.reset}`);
-      return;
-    }
-    const locator = refToLocator(ctx.lastSnapshot.snapshotString, ref);
-    if (!locator) {
-      console.log(`${c.yellow}Ref "${ref}" not found in last snapshot.${c.reset}`);
-      return;
-    }
-    console.log(`js: ${locator.js}\npw: ${locator.pw}`);
-    return;
-  }
-
   // ── Regular command — parse and send ─────────────────────────────
 
   let args: ParsedArgs | null = parseInput(line);
@@ -308,9 +291,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   if (!cmdName) return;
 
   // Validate command exists
-  const knownExtras = ['help', 'highlight', 'locator', 'list', 'close-all', 'kill-all', 'install', 'install-browser',
-                       'verify', 'verify-text', 'verify-element', 'verify-value', 'verify-visible', 'verify-input-value', 'verify-list',
-                       'verify-title', 'verify-url', 'verify-no-text', 'verify-no-element'];
+  const knownExtras = ['help', 'install'];
   if (!ALL_COMMANDS.includes(cmdName) && !knownExtras.includes(cmdName)) {
     console.log(`${c.yellow}Unknown command: ${cmdName}${c.reset}`);
     console.log(`${c.dim}Type .help for available commands${c.reset}`);
@@ -338,13 +319,6 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   const startTime = performance.now();
   try {
     const result = await ctx.conn.run(args);
-    const snapshotMatch = result?.text?.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
-    if (snapshotMatch) {
-      const urlMatch = result?.text?.match(/### Page\n-\s*\[.*?\]\((.*?)\)/);
-      const raw = snapshotMatch[1].trim();
-      const yamlBody = raw.replace(/^```(?:yaml)?\n?/, '').replace(/\n?```$/, '');
-      ctx.lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: yamlBody };
-    }
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {
       const filterOpts = (ctx.opts.includeSnapshot || ctx.opts.verbose)
@@ -865,7 +839,6 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
   const historyDir = path.join(os.homedir(), '.playwright-repl');
   const historyFile = path.join(historyDir, '.repl-history');
   const sessionHistory: string[] = [];
-  let lastSnapshot: { url: string; snapshotString: string } | null = null;
 
   const promptReady = `${c.cyan}pw>${c.reset} `;
   const promptCont  = `${c.dim}...${c.reset} `;
@@ -922,21 +895,6 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
       console.error(`${c.dim}Warning: could not write history: ${(err as Error).message}${c.reset}`);
     }
 
-    // Locator (local — uses cached snapshot)
-    if (command.startsWith('locator ')) {
-      const ref = command.slice(8).trim();
-      if (!lastSnapshot) {
-        log(`${c.yellow}No snapshot cached. Run "snapshot" first.${c.reset}`);
-        return;
-      }
-      const locator = refToLocator(lastSnapshot.snapshotString, ref);
-      if (!locator) {
-        log(`${c.yellow}Ref "${ref}" not found in last snapshot.${c.reset}`);
-        return;
-      }
-      log(`js: ${locator.js}\npw: ${locator.pw}`);
-      return;
-    }
 
     // ── Local commands (video, etc. — need Node.js filesystem) ─────
     const localResult = await handleLocalCommand(command, (srv as any).context);
@@ -954,15 +912,6 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     const runOpts = opts.includeSnapshot ? { includeSnapshot: true } : undefined;
     const result = await srv.run(command, runOpts);
     const elapsed = (performance.now() - startTime).toFixed(0);
-    // Cache snapshot for locator command
-    if (result?.text && !result.isError) {
-      const snapMatch = result.text.match(/### Snapshot\n([\s\S]+)$/);
-      if (snapMatch) {
-        lastSnapshot = { url: '', snapshotString: snapMatch[1].trim() };
-      } else if (command.trim().startsWith('snapshot')) {
-        lastSnapshot = { url: '', snapshotString: result.text.trim() };
-      }
-    }
     displayBridgeResult(result, silent);
     log(`${c.dim}(${elapsed}ms)${c.reset}`);
   }

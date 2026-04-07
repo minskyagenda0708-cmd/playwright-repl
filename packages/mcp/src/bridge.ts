@@ -4,7 +4,7 @@
 
 import { BridgeServer, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
-import type { RunnerModule, SnapshotCache } from './types.js';
+import type { RunnerModule } from './types.js';
 import { logEvent } from './logger.js';
 
 export const descriptions = {
@@ -45,7 +45,6 @@ IMPORTANT: Only use commands listed by 'help'. Run run_command('help') first if 
 
 export async function createBridgeRunner(
     argv: string[],
-    snapshotCache: SnapshotCache,
 ): Promise<RunnerModule> {
     const portIdx = argv.indexOf('--port');
     const port = portIdx !== -1
@@ -75,16 +74,6 @@ export async function createBridgeRunner(
                 // Request snapshot in the same round-trip for update commands
                 const result = await srv.run(command, isUpdate ? { includeSnapshot: true } : undefined);
                 if (result.isError) return result;
-
-                // Cache snapshot (from explicit snapshot command or appended by handler)
-                if (result.text) {
-                    const snapMatch = result.text.match(/### Snapshot\n([\s\S]+)$/);
-                    if (snapMatch) {
-                        snapshotCache.value = { url: '', snapshotString: snapMatch[1].trim() };
-                    } else if (cmdName === 'snapshot') {
-                        snapshotCache.value = { url: '', snapshotString: result.text.trim() };
-                    }
-                }
 
                 return result;
             },

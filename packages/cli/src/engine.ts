@@ -119,6 +119,13 @@ export class Engine {
     if (!this._backend)
       throw new Error('Engine not started');
 
+    // ── locator → run-code translation ──
+    if (args._[0] === 'locator') {
+      const ref = args._[1];
+      if (!ref) return { text: 'Usage: locator <ref>', isError: true };
+      args = { _: ['run-code', `async (page) => { return (await page.locator('aria-ref=${ref}').normalize()).toString(); }`] };
+    }
+
     // ── highlight → run-code translation ──
     if (args._[0] === 'highlight') {
       if (args.clear) {

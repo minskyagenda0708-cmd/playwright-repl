@@ -5,13 +5,12 @@
 
 import { EvaluateConnection, findExtensionPath, UPDATE_COMMANDS, parseInput, handleLocalCommand } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
-import type { RunnerModule, SnapshotCache } from './types.js';
+import type { RunnerModule } from './types.js';
 import { logEvent } from './logger.js';
 import { descriptions } from './bridge.js';
 
 export async function createEvaluateRunner(
     argv: string[],
-    snapshotCache: SnapshotCache,
 ): Promise<RunnerModule> {
     const headed = argv.includes('--headed');
     const extPath = findExtensionPath(import.meta.url);
@@ -38,15 +37,6 @@ export async function createEvaluateRunner(
 
                 const result = await conn.run(command, isUpdate ? { includeSnapshot: true } : undefined);
                 if (result.isError) return result;
-
-                if (result.text) {
-                    const snapMatch = result.text.match(/### Snapshot\n([\s\S]+)$/);
-                    if (snapMatch) {
-                        snapshotCache.value = { url: '', snapshotString: snapMatch[1].trim() };
-                    } else if (cmdName === 'snapshot') {
-                        snapshotCache.value = { url: '', snapshotString: result.text.trim() };
-                    }
-                }
 
                 return result;
             },

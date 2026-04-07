@@ -6,8 +6,7 @@ import { executeCommandForConsole } from '@/lib/bridge';
 import { fromCdpRemoteObject, type CdpRemoteObject } from './cdpToSerialized';
 import { resolveConsoleMode } from '@/lib/execute';
 import { runJsScript } from '@/lib/run';
-import { refToLocator } from '@/lib/snapshot-parser';
-import { getLastSnapshot, setLastSnapshot } from '@/lib/last-snapshot';
+import { setLastSnapshot } from '@/lib/last-snapshot';
 import type { Action } from '@/reducer';
 import type React from 'react';
 
@@ -103,29 +102,6 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
         if (trimmed.toLowerCase() === 'log time off') {
             localStorage.setItem('logTime', 'false');
             dispatch({ type: 'ADD_LINE', line: { text: 'Time logging disabled', type: 'info' } });
-            return;
-        }
-        if (trimmed.toLowerCase().startsWith('locator ')) {
-            const ref = trimmed.slice('locator '.length).trim();
-            if (!ref) {
-                dispatch({ type: 'ADD_LINE', line: { text: 'Usage: locator <ref>\nExample: locator e5', type: 'info' } });
-                return;
-            }
-            const snap = getLastSnapshot();
-            if (!snap) {
-                dispatch({ type: 'ADD_LINE', line: { text: 'No snapshot available. Run "snapshot" first.', type: 'error' } });
-                return;
-            }
-            const loc = refToLocator(snap, ref);
-            if (!loc) {
-                dispatch({ type: 'ADD_LINE', line: { text: `Element "${ref}" not found in last snapshot.`, type: 'error' } });
-                return;
-            }
-            dispatch({ type: 'ADD_LINE', line: { text: `js: ${loc.js}\npw: ${loc.pw}`, type: 'info' } });
-            return;
-        }
-        if (trimmed.toLowerCase() === 'locator') {
-            dispatch({ type: 'ADD_LINE', line: { text: 'Usage: locator <ref>\nExample: locator e5', type: 'info' } });
             return;
         }
 

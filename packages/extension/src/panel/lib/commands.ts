@@ -627,6 +627,13 @@ export function parseReplCommand(input: string): ParseResult {
     return { help: parts.join('\n') };
   }
 
+  // ── Locator (resolve aria-ref via Playwright) ──
+  if (trimmed.startsWith('locator ')) {
+    const ref = trimmed.slice('locator '.length).trim();
+    if (!ref) return { error: 'Usage: locator <ref>\nExample: locator e5' };
+    return { jsExpr: `(await page.locator(${ser('aria-ref=' + ref)}).normalize()).toString()` };
+  }
+
   // Parse input (tokenize + alias + options)
   const args = parseInput(input);
   if (!args) return { error: 'Empty command' };

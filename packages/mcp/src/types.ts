@@ -17,7 +17,3 @@ export interface RunnerModule {
     runner: Runner;
     descriptions: RunnerDescriptions;
 }
-
-export interface SnapshotCache {
-    value: { url: string; snapshotString: string } | null;
-}

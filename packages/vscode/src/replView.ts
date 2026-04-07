@@ -13,7 +13,6 @@ let _core: {
   COMMANDS: Record<string, { desc: string; usage?: string; examples?: string[] }>;
   CATEGORIES: Record<string, string[]>;
   ALIASES: Record<string, string>;
-  refToLocator: (yaml: string, ref: string) => { js: string; pw: string } | null;
 } | undefined;
 
 function core() {
@@ -30,7 +29,6 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
   private _extensionUri: vscodeTypes.Uri;
   private _browserManager: BrowserManager | undefined;
   private _history: string[] = [];
-  private _lastSnapshot: string = '';
   private _commandCount = 0;
 
   constructor(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri) {
@@ -129,10 +127,6 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     try {
       const result = await this._browserManager.runCommand(command) as { text?: string; isError?: boolean; image?: string };
       const elapsed = Date.now() - start;
-
-      // Cache snapshot for locator command
-      if (/^(snapshot|snap|s)(\s|$)/.test(command) && result.text && !result.isError)
-        this._lastSnapshot = result.text;
 
       // PDF — offer save
       if (result.image?.startsWith('data:application/pdf')) {
@@ -235,22 +229,6 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
       return true;
     }
 
-    // locator <ref> — convert ref to locator from last snapshot
-    if (trimmed.startsWith('locator ')) {
-      const ref = trimmed.slice(8).trim();
-      if (!this._lastSnapshot) {
-        this._appendOutput('No snapshot cached. Run "snapshot" first.', 'error');
-        return true;
-      }
-      const { refToLocator } = core();
-      const result = refToLocator(this._lastSnapshot, ref);
-      if (!result) {
-        this._appendOutput(`Ref "${ref}" not found in last snapshot. Run "snapshot" to refresh.`, 'error');
-        return true;
-      }
-      this._appendOutput(`js: page.${result.js}\npw: ${result.pw}`, 'output');
-      return true;
-    }
 
     return false;
   }

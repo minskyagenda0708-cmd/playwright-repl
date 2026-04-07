@@ -2,19 +2,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { COMMANDS, CATEGORIES, refToLocator } from '@playwright-repl/core';
+import { COMMANDS, CATEGORIES } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
 import { createBridgeRunner } from './bridge.js';
 import { createEvaluateRunner } from './evaluate.js';
 import { createStandaloneRunner } from './standalone.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, LOG_FILE } from './logger.js';
-import type { SnapshotCache } from './types.js';
-
 const argv = process.argv.slice(2);
 const standalone = argv.includes('--standalone');
 const headed = argv.includes('--headed');
-
-const snapshotCache: SnapshotCache = { value: null };
 
 // ─── Create runner ───────────────────────────────────────────────────────────
 
@@ -22,12 +18,12 @@ let runnerModule;
 if (standalone) {
     // Try evaluate mode (extension + JS support), fall back to Engine (keyword only)
     try {
-        runnerModule = await createEvaluateRunner(argv, snapshotCache);
+        runnerModule = await createEvaluateRunner(argv);
     } catch {
-        runnerModule = createStandaloneRunner(headed, snapshotCache);
+        runnerModule = createStandaloneRunner(headed);
     }
 } else {
-    runnerModule = await createBridgeRunner(argv, snapshotCache);
+    runnerModule = await createBridgeRunner(argv);
 }
 
 const { runner, descriptions } = runnerModule;
@@ -56,17 +52,6 @@ server.registerTool(
                 .join('\n');
             logToolResult('run_command', false, 'help', Date.now() - start);
             return { content: [{ type: 'text' as const, text: `Available commands:\n${lines}\n\nType "help <command>" for details.` }] };
-        }
-        if (trimmed.startsWith('locator ')) {
-            const ref = command.trim().slice(8).trim();
-            if (!snapshotCache.value) {
-                return { content: [{ type: 'text' as const, text: 'No snapshot cached. Run "snapshot" first.' }], isError: true };
-            }
-            const locator = refToLocator(snapshotCache.value.snapshotString, ref);
-            if (!locator) {
-                return { content: [{ type: 'text' as const, text: `Ref "${ref}" not found in last snapshot. Run "snapshot" to refresh.` }], isError: true };
-            }
-            return { content: [{ type: 'text' as const, text: `js: ${locator.js}\npw: ${locator.pw}` }] };
         }
         if (trimmed.startsWith('help ')) {
             const cmd = trimmed.slice(5).trim();

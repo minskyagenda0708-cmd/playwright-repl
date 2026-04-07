@@ -5,7 +5,7 @@
 import { parseInput, resolveArgs, filterResponse } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import { Engine } from 'playwright-repl';
-import type { RunnerModule, SnapshotCache } from './types.js';
+import type { RunnerModule } from './types.js';
 
 const INCLUDE_SNAPSHOT = { includeSnapshot: true } as const;
 
@@ -35,7 +35,6 @@ IMPORTANT: Only use commands listed by 'help'. Run run_command('help') first if 
 
 export function createStandaloneRunner(
     headed: boolean,
-    snapshotCache: SnapshotCache,
 ): RunnerModule {
     let engine: Engine | null = null;
     let starting: Promise<Engine> | null = null;
@@ -60,16 +59,6 @@ export function createStandaloneRunner(
         const cmdName = args._[0];
         const resolved = resolveArgs(args);
         const result = await e.run(resolved);
-
-        // Cache snapshot for locator command — strip YAML code fences
-        if (result.text && !result.isError) {
-            const snapshotMatch = result.text.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
-            if (snapshotMatch) {
-                const raw = snapshotMatch[1].trim();
-                const yamlBody = raw.replace(/^```(?:yaml)?\n?/, '').replace(/\n?```$/, '');
-                snapshotCache.value = { url: '', snapshotString: yamlBody };
-            }
-        }
 
         // Filter verbose Playwright response sections — keep snapshots for MCP
         if (result.text) result.text = filterResponse(result.text, cmdName, INCLUDE_SNAPSHOT);
