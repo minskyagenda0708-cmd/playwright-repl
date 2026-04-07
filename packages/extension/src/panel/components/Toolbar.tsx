@@ -252,7 +252,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async function resolveAndInsert(msg: Record<string, any>, isUpdate: boolean) {
-            const { action, recId, opts, pw } = msg;
+            const { action, recId, opts, pw, js } = msg;
 
             // PW mode — use pre-built .pw command from content script
             if (editorMode === 'pw') {
@@ -268,12 +268,17 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             if (recId) {
                 const cached = locatorCacheRef.current.get(recId);
                 const locatorStr = cached ?? await resolveRecLocator(recId);
-                if (!locatorStr) return;  // skip if resolution failed
-                if (!cached) locatorCacheRef.current.set(recId, locatorStr);
+
+                let text: string;
+                if (locatorStr) {
+                    if (!cached) locatorCacheRef.current.set(recId, locatorStr);
+                    text = buildJsCommand(locatorStr, action, opts);
+                } else {
+                    // Fallback to content script's JS command
+                    text = js ?? buildJsCommand('', action, opts);
+                }
 
                 const isFill = action === 'fill';
-                const text = buildJsCommand(locatorStr, action, opts);
-
                 if (isUpdate) {
                     editorRef.current?.replaceLastInsert(text);
                 } else {
@@ -287,7 +292,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 }
             } else {
                 // Global key press (no element)
-                const text = buildJsCommand('', action, opts);
+                const text = js ?? buildJsCommand('', action, opts);
                 editorRef.current?.insertAtCursor(text);
             }
         }

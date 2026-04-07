@@ -54,7 +54,7 @@ export function onClickCapture(e: MouseEvent) {
             const hoverCmds = buildCommands('hover', hoverTarget);
             if (hoverCmds) {
                 const hoverRecId = markElement(hoverTarget);
-                chrome.runtime.sendMessage({ type: 'recorded-action', recId: hoverRecId, action: 'hover', pw: hoverCmds.pw });
+                chrome.runtime.sendMessage({ type: 'recorded-action', recId: hoverRecId, action: 'hover', pw: hoverCmds.pw, js: hoverCmds.js });
             }
         }
     }
@@ -62,7 +62,7 @@ export function onClickCapture(e: MouseEvent) {
     const cmds = buildCommands('click', target);
     if (cmds) {
         const recId = markElement(target);
-        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'click', pw: cmds.pw });
+        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'click', pw: cmds.pw, js: cmds.js });
     }
 }
 
@@ -77,14 +77,14 @@ export function onInputCapture(e: Event) {
         pendingFill.value = value;
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-fill-update', recId, action: 'fill', opts: { value }, pw: cmds.pw });
+            chrome.runtime.sendMessage({ type: 'recorded-fill-update', recId, action: 'fill', opts: { value }, pw: cmds.pw, js: cmds.js });
         }
     } else {
         flushPendingFill();
         pendingFill = { el: target, recId, value };
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'fill', opts: { value }, pw: cmds.pw });
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'fill', opts: { value }, pw: cmds.pw, js: cmds.js });
         }
     }
 }
@@ -100,7 +100,7 @@ export function onChangeCapture(e: Event) {
         const cmds = buildCommands(action, target);
         if (cmds) {
             const recId = markElement(target);
-            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action, pw: cmds.pw });
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action, pw: cmds.pw, js: cmds.js });
         }
         return;
     }
@@ -111,7 +111,7 @@ export function onChangeCapture(e: Event) {
         const cmds = buildCommands('select', target, { option });
         if (cmds) {
             const recId = markElement(target);
-            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'select', opts: { option }, pw: cmds.pw });
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'select', opts: { option }, pw: cmds.pw, js: cmds.js });
         }
         return;
     }
@@ -131,7 +131,7 @@ export function onKeyDownCapture(e: KeyboardEvent) {
         : { pw: `press ${e.key}`, js: `await page.keyboard.press(${escapeString(e.key)});` };
     if (cmds) {
         const recId = hasTarget ? markElement(target) : '';
-        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'press', opts: { key: e.key }, pw: cmds.pw });
+        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'press', opts: { key: e.key }, pw: cmds.pw, js: cmds.js });
     }
 }
 
