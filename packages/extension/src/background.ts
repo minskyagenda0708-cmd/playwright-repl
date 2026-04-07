@@ -695,6 +695,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'pick')           { pickElement().then(sendResponse); return true; }
   if (msg.type === 'pick-cancel')   { cancelPick().then(sendResponse); return true; }
+  if (msg.type === 'resolve-locator') {
+    (async () => {
+      if (!currentPage) return { ok: false, error: 'No page' };
+      const selector = `[data-pw-rec-id="${msg.recId}"]`;
+      const loc = currentPage.locator(selector);
+      const normalized = await loc.normalize();
+      return { ok: true, locator: normalized.toString() };
+    })().then(sendResponse).catch((e: Error) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg.type === 'cleanup-rec-marker') {
+    if (currentPage) {
+      currentPage.locator(`[data-pw-rec-id="${msg.recId}"]`)
+        .evaluate((el: any) => el.removeAttribute('data-pw-rec-id'))
+        .catch(() => {});
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg.type === 'video-start')   { startVideoCapture().then(sendResponse); return true; }
   if (msg.type === 'video-stop')    { stopVideoCapture().then(sendResponse); return true; }
   if (msg.type === 'tracing-start') {

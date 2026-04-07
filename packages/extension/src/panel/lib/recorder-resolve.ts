@@ -4,18 +4,13 @@
  * and builds JS/PW commands from action type + locator.
  */
 
-import { swDebugEval } from '@/lib/sw-debugger';
-
 /**
  * Resolve a data-pw-rec-id marker to a Playwright locator string.
  */
 export async function resolveRecLocator(recId: string): Promise<string | null> {
     try {
-        const selector = `[data-pw-rec-id="${recId}"]`;
-        const expr = `page.locator('${selector}').normalize().then(l => l.toString())`;
-        const result = await swDebugEval(expr) as { result?: { type?: string; value?: string } };
-        if (result?.result?.type === 'string' && result.result.value)
-            return result.result.value;
+        const result = await chrome.runtime.sendMessage({ type: 'resolve-locator', recId }) as { ok: boolean; locator?: string; error?: string };
+        if (result?.ok && result.locator) return result.locator;
         return null;
     } catch {
         return null;
@@ -26,9 +21,7 @@ export async function resolveRecLocator(recId: string): Promise<string | null> {
  * Remove data-pw-rec-id attribute from an element.
  */
 export function cleanupRecMarker(recId: string): void {
-    const selector = `[data-pw-rec-id="${recId}"]`;
-    const expr = `page.locator('${selector}').evaluate(el => el.removeAttribute('data-pw-rec-id'))`;
-    swDebugEval(expr).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'cleanup-rec-marker', recId }).catch(() => {});
 }
 
 // ─── Command building ──────────────────────────────────────────────────────
