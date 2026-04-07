@@ -119,6 +119,8 @@ function resetCrxState() {
   crxApp = null;
   currentPage = null;
   activeTabId = null;
+  recording = false;
+  recorderInstalled = false;
 }
 
 async function ensureCrxApp(): Promise<CrxApplication> {
@@ -196,16 +198,48 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
   }
 }
 
-// ─── Recording ───────────────────────────────────────────────────────────────
+// ─── Recording (via Playwright's built-in _enableRecorder) ──────────────────
+// _enableRecorder registers permanent event listeners on the server-side
+// Recorder singleton (cached per context). Calling it again adds duplicates.
+// So we install once and gate forwarding with the `recording` flag.
+// We still call _disableRecorder() on stop to set the mode to 'none' and
+// suppress the native Playwright overlay on page navigations.
 
-let recordingTabId: number | null = null;
+let recording = false;
+let recorderInstalled = false;
+
 async function startRecording(): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
+    const app = await ensureCrxApp();
     const tabId = await getActiveTabId();
     if (!tabId) return { ok: false, error: 'No active tab' };
     const tab = await chrome.tabs.get(tabId);
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] });
-    recordingTabId = tabId;
+    // Ensure the tab is attached so Playwright has a page for it
+    if (!currentPage || activeTabId !== tabId) await attachToTab(tabId);
+    recording = true;
+    if (!recorderInstalled) {
+      const context = app.context();
+      await (context as any)._enableRecorder(
+        { mode: 'recording', language: 'javascript', recorderMode: 'api' },
+        {
+          actionAdded: (_page: any, _action: any, code: string) => {
+            if (!recording) return;
+            chrome.runtime.sendMessage({ type: 'recorded-action', action: { pw: code, js: code } }).catch(() => {});
+          },
+          actionUpdated: (_page: any, _action: any, code: string) => {
+            if (!recording) return;
+            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: { pw: code, js: code } }).catch(() => {});
+          },
+        },
+      );
+      // Hide Playwright's native recorder toolbar — we have our own UI.
+      await context.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = 'x-pw-overlay { display: none !important; }';
+        (document.head || document.documentElement).appendChild(style);
+      }).catch(() => {});
+      recorderInstalled = true;
+    }
     return { ok: true, url: tab.url ?? '' };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -213,19 +247,9 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
 }
 
 async function stopRecording(): Promise<{ ok: boolean }> {
-  if (recordingTabId) {
-    await chrome.tabs.sendMessage(recordingTabId, { type: 'record-stop' }).catch(e => console.debug('[pw-repl] record-stop:', e));
-    recordingTabId = null;
-  }
+  recording = false;
   return { ok: true };
 }
-
-// Re-inject recorder after navigation (page reload / SPA navigation)
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (tabId === recordingTabId && changeInfo.status === 'complete') {
-    chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] }).catch(e => console.debug('[pw-repl] recorder re-inject:', e));
-  }
-});
 
 // Invalidate stale state when a tab is closed (user clicks X, tab-close command, etc.)
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -233,8 +257,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     currentPage = null;
     activeTabId = null;
   }
-  if (tabId === recordingTabId) {
-    recordingTabId = null;
+  if (tabId === activeTabId && recording) {
+    stopRecording().catch(e => console.debug('[pw-repl] stop recording on tab close:', e));
   }
 });
 
