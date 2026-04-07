@@ -174,7 +174,8 @@ describe('recorder', () => {
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'recorded-action',
-                    action: expect.objectContaining({ pw: expect.stringContaining('check') }),
+                    action: 'check',
+                    pw: expect.stringContaining('check'),
                 })
             );
         });
@@ -189,7 +190,8 @@ describe('recorder', () => {
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'recorded-action',
-                    action: expect.objectContaining({ pw: expect.stringContaining('uncheck') }),
+                    action: 'uncheck',
+                    pw: expect.stringContaining('uncheck'),
                 })
             );
         });
@@ -204,7 +206,8 @@ describe('recorder', () => {
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'recorded-action',
-                    action: expect.objectContaining({ pw: expect.stringContaining('select') }),
+                    action: 'select',
+                    pw: expect.stringContaining('select'),
                 })
             );
         });
@@ -226,7 +229,9 @@ describe('recorder', () => {
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'recorded-action',
-                    action: expect.objectContaining({ pw: 'press Escape' }),
+                    action: 'press',
+                    pw: 'press Escape',
+                    recId: '',
                 })
             );
         });
@@ -240,7 +245,8 @@ describe('recorder', () => {
             expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'recorded-action',
-                    action: expect.objectContaining({ pw: expect.stringContaining('press') }),
+                    action: 'press',
+                    pw: expect.stringContaining('press'),
                 })
             );
         });
