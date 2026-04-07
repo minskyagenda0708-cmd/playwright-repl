@@ -167,6 +167,8 @@ export const COMMANDS: Record<string, CommandInfo> = {
   'video-chapter':     { desc: 'Add video chapter marker', options: ['--description', '--duration'],
                          usage: 'video-chapter <title> [--description <text>] [--duration <ms>]',
                          examples: ['video-chapter "Login flow"', 'video-chapter "Setup" --duration 3000'] },
+  'tracing-start':     { desc: 'Start trace recording', options: [] },
+  'tracing-stop':      { desc: 'Stop tracing and save trace file', options: [] },
   'install-browser':   { desc: 'Install browser', options: [] },
   'list':              { desc: 'List sessions', options: [] },
   'close-all':         { desc: 'Close all sessions', options: [] },
@@ -184,6 +186,7 @@ export const CATEGORIES: Record<string, string[]> = {
   'SessionStorage': ['sessionstorage-list', 'sessionstorage-get', 'sessionstorage-set', 'sessionstorage-delete', 'sessionstorage-clear'],
   'State':          ['state-save', 'state-load'],
   'Video':          ['video-start', 'video-stop', 'video-chapter'],
+  'Tracing':        ['tracing-start', 'tracing-stop'],
   'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'config-print'],
 };
 

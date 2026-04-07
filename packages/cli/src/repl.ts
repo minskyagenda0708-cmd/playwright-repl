@@ -649,18 +649,8 @@ function attachGhostCompletion(rl: any, items: CompletionItem[]): void {
   rl._ttyWrite = function (s: string, key: { name: string }) {
     // Tab handling — based on matches, not ghost text
     if (key && key.name === 'tab') {
-      // Cycle through multiple matches
-      if (matches.length > 1) {
-        rl.output.write('\x1b[K');
-        ghost = '';
-        matchIdx = (matchIdx + 1) % matches.length;
-        const input = rl.line || '';
-        const suffix = matches[matchIdx].slice(input.length);
-        if (suffix) renderGhost(suffix);
-        return;
-      }
-      // Single match — accept it
-      if (ghost && matches.length === 1) {
+      if (matches.length >= 1 && ghost) {
+        // Accept the currently shown ghost text
         const text = ghost;
         rl.output.write('\x1b[K');
         ghost = '';

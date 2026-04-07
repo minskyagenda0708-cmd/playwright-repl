@@ -68,10 +68,46 @@ export async function handleVideoCommand(cmd: string, context: BrowserContext): 
   return { text: `Unknown video command: ${trimmed}`, isError: true };
 }
 
+// ─── Tracing commands ──────────────────────────────────────────────────────
+
+export function isTracingCommand(cmd: string): boolean {
+  const trimmed = cmd.trim();
+  return trimmed === 'tracing-start' || trimmed === 'tracing-stop';
+}
+
+let tracingActive = false;
+
+export async function handleTracingCommand(cmd: string, context: BrowserContext): Promise<LocalCommandResult> {
+  const trimmed = cmd.trim();
+
+  if (trimmed === 'tracing-start') {
+    if (tracingActive) return { text: 'Tracing is already active.', isError: true };
+    await context.tracing.start({ screenshots: true, snapshots: true });
+    tracingActive = true;
+    return { text: 'Tracing started' };
+  }
+
+  if (trimmed === 'tracing-stop') {
+    if (!tracingActive) return { text: 'No active tracing session.', isError: true };
+    const outDir = path.join(os.homedir(), 'pw-traces');
+    fs.mkdirSync(outDir, { recursive: true });
+    const d = new Date();
+    const timestamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+    const outPath = path.join(outDir, `trace-${timestamp}.zip`);
+    await context.tracing.stop({ path: outPath });
+    tracingActive = false;
+    const size = fs.statSync(outPath).size;
+    const sizeStr = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return { text: `Trace saved to ${outPath} (${sizeStr})` };
+  }
+
+  return { text: `Unknown tracing command: ${trimmed}`, isError: true };
+}
+
 // ─── Local command dispatcher ───────────────────────────────────────────────
 
 export function isLocalCommand(cmd: string): boolean {
-  return isVideoCommand(cmd);
+  return isVideoCommand(cmd) || isTracingCommand(cmd);
 }
 
 /**
@@ -84,6 +120,7 @@ export async function handleLocalCommand(cmd: string, context: BrowserContext | 
   if (!context) return null;
 
   if (isVideoCommand(cmd)) return handleVideoCommand(cmd, context);
+  if (isTracingCommand(cmd)) return handleTracingCommand(cmd, context);
 
   return null;
 }

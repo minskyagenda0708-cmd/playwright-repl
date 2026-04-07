@@ -1,0 +1,23 @@
+# Record a trace of adding todos
+# App: https://demo.playwright.dev/todomvc/
+# Trace saved to ~/pw-traces/
+# View with: npx playwright show-trace ~/pw-traces/trace-*.zip
+
+goto https://demo.playwright.dev/todomvc/
+localstorage-clear
+reload
+
+tracing-start
+fill textbox "What needs to be done?" "Buy groceries"
+press Enter
+fill textbox "What needs to be done?" "Write tests"
+press Enter
+
+check "Buy groceries"
+click link "Completed"
+verify-text "Buy groceries"
+
+tracing-stop
+
+# Cleanup
+localstorage-clear

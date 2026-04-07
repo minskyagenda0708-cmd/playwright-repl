@@ -17,7 +17,8 @@ export const descriptions = {
    snapshot, goto <url>, click <text>, fill <label> <value>, press <key>,
    verify-text <text>, verify-no-text <text>, screenshot,
    check <label>, select <label> <value>, localstorage-list, localstorage-clear,
-   video-start, video-stop, video-chapter <title>
+   video-start, video-stop, video-chapter <title>,
+   tracing-start, tracing-stop
 
 2. PLAYWRIGHT — Playwright API (page.* / crxApp.*):
    await page.url(), await page.title(),
