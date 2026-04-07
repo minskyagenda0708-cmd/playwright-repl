@@ -1,11 +1,25 @@
 /**
  * Recorder content script.
  * Injected into the active tab via chrome.scripting.executeScript.
- * Captures DOM events, generates locator + PW/JS commands, sends to panel.
+ * Captures DOM events, marks elements with data-pw-rec-id, and sends:
+ * - recId: for panel-side locator resolution via normalize() (JS mode)
+ * - pw: pre-built .pw keyword command (PW mode)
+ * - action + opts: action type and parameters
  *
  * Transparent: never calls preventDefault/stopPropagation — user actions flow normally.
  */
 import { escapeString, isTextField, isCheckable, buildCommands, findHoverAncestor, isHoverRevealed } from './locator';
+
+// ─── Element marking ─────────────────────────────────────────────────────
+
+let recIdCounter = 0;
+function markElement(el: Element): string {
+    const existing = el.getAttribute('data-pw-rec-id');
+    if (existing) return existing;
+    const id = `rec-${++recIdCounter}-${Date.now()}`;
+    el.setAttribute('data-pw-rec-id', id);
+    return id;
+}
 
 // ─── Special key detection ────────────────────────────────────────────────
 
@@ -18,7 +32,7 @@ export const SPECIAL_KEYS = new Set([
 
 // ─── Fill buffering state machine ─────────────────────────────────────────
 
-export let pendingFill: { el: Element; value: string } | null = null;
+export let pendingFill: { el: Element; recId: string; value: string } | null = null;
 
 export function flushPendingFill() {
     pendingFill = null;
@@ -29,31 +43,26 @@ export function flushPendingFill() {
 export function onClickCapture(e: MouseEvent) {
     const target = e.target as Element;
     if (!target) return;
-
-    // Skip clicks on text fields (focus-click noise before fill)
     if (isTextField(target)) return;
-
-    // Skip clicks on checkable elements (handled by change event)
     if (isCheckable(target)) return;
-
-    // Flush any pending fill
     flushPendingFill();
 
-    // Detect hover-revealed elements: if a :hover CSS rule reveals this element,
-    // emit a hover command on the :hover ancestor so replay works.
+    // Detect hover-revealed elements
     if (isHoverRevealed(target)) {
         const hoverTarget = findHoverAncestor(target);
         if (hoverTarget) {
             const hoverCmds = buildCommands('hover', hoverTarget);
             if (hoverCmds) {
-                chrome.runtime.sendMessage({ type: 'recorded-action', action: hoverCmds });
+                const hoverRecId = markElement(hoverTarget);
+                chrome.runtime.sendMessage({ type: 'recorded-action', recId: hoverRecId, action: 'hover', pw: hoverCmds.pw });
             }
         }
     }
 
     const cmds = buildCommands('click', target);
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+        const recId = markElement(target);
+        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'click', pw: cmds.pw });
     }
 }
 
@@ -62,21 +71,20 @@ export function onInputCapture(e: Event) {
     if (!target || !isTextField(target)) return;
 
     const value = (target as HTMLInputElement | HTMLTextAreaElement).value ?? '';
+    const recId = markElement(target);
 
     if (pendingFill && pendingFill.el === target) {
-        // Same element — update
         pendingFill.value = value;
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-fill-update', recId, action: 'fill', opts: { value }, pw: cmds.pw });
         }
     } else {
-        // Different element or first input — flush old, start new
         flushPendingFill();
-        pendingFill = { el: target, value };
+        pendingFill = { el: target, recId, value };
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'fill', opts: { value }, pw: cmds.pw });
         }
     }
 }
@@ -85,24 +93,25 @@ export function onChangeCapture(e: Event) {
     const target = e.target as Element;
     if (!target) return;
 
-    // Checkbox / radio
     if (isCheckable(target)) {
         flushPendingFill();
         const checked = (target as HTMLInputElement).checked;
-        const cmds = buildCommands(checked ? 'check' : 'uncheck', target);
+        const action = checked ? 'check' : 'uncheck';
+        const cmds = buildCommands(action, target);
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            const recId = markElement(target);
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action, pw: cmds.pw });
         }
         return;
     }
 
-    // Select
     if (target instanceof HTMLSelectElement) {
         flushPendingFill();
         const option = target.value;
         const cmds = buildCommands('select', target, { option });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            const recId = markElement(target);
+            chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'select', opts: { option }, pw: cmds.pw });
         }
         return;
     }
@@ -112,22 +121,17 @@ export function onKeyDownCapture(e: KeyboardEvent) {
     if (!SPECIAL_KEYS.has(e.key)) return;
 
     const target = e.target as Element;
-
-    // Tab changes focus but is navigation noise — flush fill, don't emit
     if (e.key === 'Tab') { flushPendingFill(); return; }
-
-    // Inside a text field, only Enter is a meaningful action —
-    // everything else (Backspace, arrows, etc.) is editing noise
     if (e.key !== 'Enter' && target && isTextField(target)) return;
-
-    // Any special key during fill → flush fill, then fall through to emit press
     flushPendingFill();
 
-    const cmds = target && target !== document.body && target !== document.documentElement
+    const hasTarget = target && target !== document.body && target !== document.documentElement;
+    const cmds = hasTarget
         ? buildCommands('press', target, { key: e.key })
         : { pw: `press ${e.key}`, js: `await page.keyboard.press(${escapeString(e.key)});` };
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+        const recId = hasTarget ? markElement(target) : '';
+        chrome.runtime.sendMessage({ type: 'recorded-action', recId, action: 'press', opts: { key: e.key }, pw: cmds.pw });
     }
 }
 
@@ -157,7 +161,6 @@ function onMessage(msg: any) {
 // ─── Init ────────────────────────────────────────────────────────────────
 
 export function init() {
-    // Guard against double-injection
     if ((window as any).__pw_recorder_active) return;
     (window as any).__pw_recorder_active = true;
 

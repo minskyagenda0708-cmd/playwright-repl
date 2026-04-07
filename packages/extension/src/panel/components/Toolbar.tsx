@@ -6,6 +6,7 @@ import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon, ScreencastIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult } from '@/lib/pick-info';
+import { resolveRecLocator, cleanupRecMarker, buildJsCommand } from '@/lib/recorder-resolve';
 import type { ElementPickInfo } from '@/types';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
@@ -235,19 +236,63 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         });
     }
 
+    const locatorCacheRef = useRef<Map<string, string>>(new Map());
+
     useEffect(() => {
         if (!chrome.runtime?.onMessage) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const listener = (msg: any) => {
             if (msg.type === 'recorded-action') {
-                editorRef.current?.insertAtCursor(editorMode === 'pw' ? msg.action.pw : msg.action.js);
+                resolveAndInsert(msg, false);
             }
             if (msg.type === 'recorded-fill-update') {
-                editorRef.current?.replaceLastInsert(editorMode === 'pw' ? msg.action.pw : msg.action.js);
+                resolveAndInsert(msg, true);
             }
         };
+
+        async function resolveAndInsert(msg: any, isUpdate: boolean) {
+            const { action, recId, opts, pw } = msg;
+
+            // PW mode — use pre-built .pw command from content script
+            if (editorMode === 'pw') {
+                if (isUpdate) {
+                    editorRef.current?.replaceLastInsert(pw);
+                } else {
+                    editorRef.current?.insertAtCursor(pw);
+                }
+                return;
+            }
+
+            // JS mode — resolve locator via normalize() for best-practice output
+            if (recId) {
+                const cached = locatorCacheRef.current.get(recId);
+                const locatorStr = cached ?? await resolveRecLocator(recId);
+                if (!locatorStr) return;  // skip if resolution failed
+                if (!cached) locatorCacheRef.current.set(recId, locatorStr);
+
+                const isFill = action === 'fill';
+                const text = buildJsCommand(locatorStr, action, opts);
+
+                if (isUpdate) {
+                    editorRef.current?.replaceLastInsert(text);
+                } else {
+                    editorRef.current?.insertAtCursor(text);
+                }
+
+                // Clean up marker for non-fill actions
+                if (!isUpdate && !isFill) {
+                    locatorCacheRef.current.delete(recId);
+                    cleanupRecMarker(recId);
+                }
+            } else {
+                // Global key press (no element)
+                const text = buildJsCommand('', action, opts);
+                editorRef.current?.insertAtCursor(text);
+            }
+        }
+
         chrome.runtime.onMessage.addListener(listener);
-        return () => chrome.runtime.onMessage.removeListener(listener);
+        return () => { chrome.runtime.onMessage.removeListener(listener); locatorCacheRef.current.clear(); };
     }, [editorMode]);
 
     // Auto-stop recording when run/debug starts
