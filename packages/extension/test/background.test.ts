@@ -13,7 +13,7 @@ vi.mock('@playwright-repl/playwright-crx/test', () => ({
 
 vi.mock('@playwright-repl/playwright-crx', () => {
   mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
-  const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
+  const mockContext = { pages: vi.fn().mockReturnValue([mockPage]), _enableRecorder: vi.fn().mockResolvedValue(undefined) };
   mockCrxApp = {
     attach: vi.fn().mockResolvedValue(mockPage),
     detach: vi.fn().mockResolvedValue(undefined),
@@ -54,7 +54,7 @@ describe("background.ts message handlers", () => {
 
     // Reset playwright-crx mocks
     mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
-    const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
+    const mockContext = { pages: vi.fn().mockReturnValue([mockPage]), _enableRecorder: vi.fn().mockResolvedValue(undefined) };
     mockCrxApp = {
       attach: vi.fn().mockResolvedValue(mockPage),
       detach: vi.fn().mockResolvedValue(undefined),
@@ -197,30 +197,6 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     await sendMessage({ type: 'attach', tabId: 42 });
     expect(mockCrxApp.detach).toHaveBeenCalledWith(42);
-  });
-
-  // ─── record-start / record-stop ───────────────────────────────────────────
-
-  it("record-start injects recorder content script and returns url", async () => {
-    const result = await sendMessage({ type: 'record-start' });
-    expect(chrome.scripting.executeScript).toHaveBeenCalledWith(
-      expect.objectContaining({ target: { tabId: 42 }, files: ['content/recorder.js'] })
-    );
-    expect(result).toEqual({ ok: true, url: 'https://example.com' });
-  });
-
-  it("record-start returns ok:false when executeScript throws", async () => {
-    (chrome.scripting.executeScript as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('injection failed'));
-    const result = await sendMessage({ type: 'record-start' });
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('injection failed');
-  });
-
-  it("record-stop sends record-stop message to tab and returns ok:true", async () => {
-    await sendMessage({ type: 'record-start' });
-    const result = await sendMessage({ type: 'record-stop' });
-    expect((chrome.tabs as any).sendMessage).toHaveBeenCalledWith(42, { type: 'record-stop' });
-    expect(result).toEqual({ ok: true });
   });
 
   // ─── ping ─────────────────────────────────────────────────────────────────

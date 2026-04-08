@@ -16,12 +16,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/content/recorder.ts"],
-    rules: {
-      "no-var": "off",
-    },
-  },
-  {
     files: ["src/panel/lib/page-scripts.ts"],
     rules: {
       "@typescript-eslint/ban-ts-comment": "off",

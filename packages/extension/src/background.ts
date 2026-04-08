@@ -198,6 +198,57 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
   }
 }
 
+// ─── JS → .pw conversion for recorder ───────────────────────────────────────
+
+/** Convert a Playwright recorder action to a .pw keyword command. */
+function actionToPw(action: any): string | null {
+  const name: string = action?.action?.name;
+  if (!name) return null;
+
+  // Navigation
+  if (name === 'navigate') return `goto ${action.action.url}`;
+
+  // Extract role + name from ariaSnapshot (e.g. `- button "Submit" [ref=e2]`)
+  const snap: string | undefined = action.action.ariaSnapshot;
+  let role = '';
+  let accName = '';
+  if (snap) {
+    // Strip ref tags: `- button "Submit" [active] [ref=e2]` → `button "Submit"`
+    const cleaned = snap.replace(/^\s*-\s*/, '').replace(/\s*\[[\w=]+\]\s*/g, '').trim();
+    const match = cleaned.match(/^([\w-]+)\s+["'](.+?)["']$/);
+    if (match) { role = match[1]; accName = match[2]; }
+    else {
+      const roleOnly = cleaned.match(/^([\w-]+)$/);
+      if (roleOnly) role = roleOnly[1];
+    }
+  }
+
+  const target = role && accName ? `${role} "${accName}"` :
+                 role ? role :
+                 accName ? `"${accName}"` : null;
+
+  switch (name) {
+    case 'click': return target ? `click ${target}` : null;
+    case 'hover': return target ? `hover ${target}` : null;
+    case 'check': return target ? `check ${target}` : null;
+    case 'uncheck': return target ? `uncheck ${target}` : null;
+    case 'fill': {
+      const text = action.action.text ?? '';
+      return target ? `fill ${target} "${text}"` : null;
+    }
+    case 'press': {
+      const key = action.action.key ?? '';
+      return target ? `press ${target} ${key}` : `press ${key}`;
+    }
+    case 'select': {
+      const options: string[] = action.action.options ?? [];
+      const val = options[0] ?? '';
+      return target ? `select ${target} "${val}"` : null;
+    }
+    default: return null;
+  }
+}
+
 // ─── Recording (via Playwright's built-in _enableRecorder) ──────────────────
 // _enableRecorder registers permanent event listeners on the server-side
 // Recorder singleton (cached per context). Calling it again adds duplicates.
@@ -222,13 +273,15 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
       await (context as any)._enableRecorder(
         { mode: 'recording', language: 'javascript', recorderMode: 'api', hideToolbar: true },
         {
-          actionAdded: (_page: any, _action: any, code: string) => {
+          actionAdded: (_page: any, action: any, code: string) => {
             if (!recording) return;
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: { pw: code, js: code } }).catch(() => {});
+            const pw = actionToPw(action) ?? code;
+            chrome.runtime.sendMessage({ type: 'recorded-action', action: { pw, js: code } }).catch(() => {});
           },
-          actionUpdated: (_page: any, _action: any, code: string) => {
+          actionUpdated: (_page: any, action: any, code: string) => {
             if (!recording) return;
-            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: { pw: code, js: code } }).catch(() => {});
+            const pw = actionToPw(action) ?? code;
+            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: { pw, js: code } }).catch(() => {});
           },
         },
       );

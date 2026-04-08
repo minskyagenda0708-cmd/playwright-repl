@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@playwright-repl/playwright-crx':
+        specifier: file:.yalc/@playwright-repl/playwright-crx
+        version: file:.yalc/@playwright-repl/playwright-crx
     devDependencies:
       '@types/minimist':
         specifier: ^1.2.5
@@ -1107,6 +1111,10 @@ packages:
 
   '@playwright-repl/playwright-crx@1.21.2':
     resolution: {integrity: sha512-6imzLbw2e2XuyaIiuUJaXH4cVJEO6i2taLimU5Fif0RvoVcyJ03H28rF/tqANZDOWqH4oSr7noGyVGsqYitzww==}
+    engines: {node: '>=18'}
+
+  '@playwright-repl/playwright-crx@file:.yalc/@playwright-repl/playwright-crx':
+    resolution: {directory: .yalc/@playwright-repl/playwright-crx, type: directory}
     engines: {node: '>=18'}
 
   '@playwright/test@1.59.1':
@@ -4525,6 +4533,11 @@ snapshots:
       fastq: 1.20.1
 
   '@playwright-repl/playwright-crx@1.21.2':
+    dependencies:
+      zod: 4.3.6
+      zod-to-json-schema: 3.25.2(zod@4.3.6)
+
+  '@playwright-repl/playwright-crx@file:.yalc/@playwright-repl/playwright-crx':
     dependencies:
       zod: 4.3.6
       zod-to-json-schema: 3.25.2(zod@4.3.6)
