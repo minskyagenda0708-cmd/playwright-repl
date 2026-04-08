@@ -78,6 +78,15 @@ async function ensureOffscreen() {
 }
 ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
 
+// Re-check offscreen doc periodically — Chrome may kill it after idle.
+// chrome.alarms survive service worker restarts; setTimeout does not.
+chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'ensure-offscreen') {
+    ensureOffscreen().catch(() => {});
+  }
+});
+
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)

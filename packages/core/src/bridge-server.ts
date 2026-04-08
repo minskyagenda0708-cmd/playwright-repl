@@ -2,6 +2,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { execSync } from 'node:child_process';
 import type { EngineResult } from './types.js';
 
+function ts(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export class BridgeServer {
     private wss!: WebSocketServer;
     private socket: WebSocket | null = null;
@@ -27,7 +33,9 @@ export class BridgeServer {
                 // Allow: chrome-extension:// (our offscreen document)
                 // Block: http://, https:// (web pages)
                 if (!origin) return true;
-                return origin.startsWith('chrome-extension://');
+                if (origin.startsWith('chrome-extension://')) return true;
+                console.error(`[bridge ${ts()}] rejected connection from origin: ${origin}`);
+                return false;
             },
         });
 
@@ -46,7 +54,11 @@ export class BridgeServer {
                 this.wss.on('error', reject);
             });
         }
+        this.wss.on('error', (err) => {
+            console.error(`[bridge ${ts()}] server error: ${err.message}`);
+        });
         this.wss.on('connection', (ws) => {
+            console.error(`[bridge ${ts()}] new connection accepted`);
             this.socket = ws;
             (ws as any)._alive = true;
 
@@ -67,7 +79,8 @@ export class BridgeServer {
                 this.pending.get(msg.id)?.(msg);
                 this.pending.delete(msg.id);
             });
-            ws.on('close', () => {
+            ws.on('close', (code, reason) => {
+                console.error(`[bridge ${ts()}] connection closed (code: ${code}, reason: ${reason || 'none'})`);
                 this.socket = null;
                 // Reject all in-flight commands so tests don't hang
                 for (const [, resolve] of this.pending) {
@@ -82,7 +95,7 @@ export class BridgeServer {
         this.heartbeatTimer = setInterval(() => {
             if (!this.socket) return;
             if ((this.socket as any)._alive === false) {
-                console.error('[bridge] heartbeat: no pong received, terminating socket');
+                console.error(`[bridge ${ts()}] heartbeat: no pong received, terminating socket`);
                 this.socket.terminate();
                 return;
             }

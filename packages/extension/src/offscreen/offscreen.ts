@@ -79,15 +79,34 @@ async function stopVideoCapture(): Promise<{ blobUrl: string; size: number }> {
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnecting = false;
 
 async function reconnect() {
+    if (reconnecting) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    reconnecting = true;
     try {
         const port: number = await chrome.runtime.sendMessage({ type: 'get-bridge-port' });
         connect(port || 9876);
     } catch {
-        reconnectTimer = setTimeout(() => reconnect(), 3000);
+        scheduleReconnect();
+    } finally {
+        reconnecting = false;
     }
 }
+
+function scheduleReconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => reconnect(), 3000);
+}
+
+// Periodic health check — reconnect if WebSocket is dead.
+// Catches cases where setTimeout gets throttled or the offscreen doc restarts.
+setInterval(() => {
+    if (!ws || ws.readyState === WebSocket.CLOSED) {
+        reconnect();
+    }
+}, 10000);
 
 function connect(port: number) {
     try {
@@ -131,12 +150,12 @@ function connect(port: number) {
         };
 
         ws.onclose = () => {
-            reconnectTimer = setTimeout(() => reconnect(), 3000);
+            scheduleReconnect();
         };
 
         ws.onerror = () => {};
     } catch {
-        reconnectTimer = setTimeout(() => reconnect(), 3000);
+        scheduleReconnect();
     }
 }
 

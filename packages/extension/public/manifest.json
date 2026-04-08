@@ -10,6 +10,7 @@
     "debugger",
     "storage",
     "windows",
+    "alarms",
     "offscreen",
     "scripting",
     "tabCapture",
