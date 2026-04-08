@@ -9,6 +9,8 @@ export class BridgeServer {
     private _onConnect?: () => void;
     private _onDisconnect?: () => void;
     private _onEvent?: (event: Record<string, unknown>) => void;
+    private heartbeatTimer?: ReturnType<typeof setInterval>;
+    private waiters: Array<{ resolve: () => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }> = [];
 
     onConnect(fn: () => void)    { this._onConnect = fn; }
     onDisconnect(fn: () => void) { this._onDisconnect = fn; }
@@ -46,7 +48,14 @@ export class BridgeServer {
         }
         this.wss.on('connection', (ws) => {
             this.socket = ws;
+            (ws as any)._alive = true;
+
+            // Flush all pending waiters
+            for (const w of this.waiters) { clearTimeout(w.timer); w.resolve(); }
+            this.waiters = [];
             this._onConnect?.();
+
+            ws.on('pong', () => { (ws as any)._alive = true; });
             ws.on('message', (data) => {
                 const msg = JSON.parse(String(data));
                 // Events from extension (recording, picker) — no request ID
@@ -68,6 +77,17 @@ export class BridgeServer {
                 this._onDisconnect?.();
             });
         });
+
+        // Heartbeat: detect silent disconnects every 15s
+        this.heartbeatTimer = setInterval(() => {
+            if (!this.socket) return;
+            if ((this.socket as any)._alive === false) {
+                this.socket.terminate();
+                return;
+            }
+            (this.socket as any)._alive = false;
+            this.socket.ping();
+        }, 15000);
     }
 
     async run(command: string, opts?: { includeSnapshot?: boolean }): Promise<EngineResult> {
@@ -100,15 +120,10 @@ export class BridgeServer {
         if (this.connected) return;
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
+                this.waiters = this.waiters.filter(w => w.resolve !== resolve);
                 reject(new Error('Timed out waiting for extension to connect'));
             }, timeoutMs);
-            const prev = this._onConnect;
-            this._onConnect = () => {
-                clearTimeout(timer);
-                this._onConnect = prev;
-                prev?.();
-                resolve();
-            };
+            this.waiters.push({ resolve, reject, timer });
         });
     }
 
@@ -121,6 +136,7 @@ export class BridgeServer {
     }
 
     async close(): Promise<void> {
+        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.socket?.close();
         await new Promise<void>(r => this.wss.close(() => r()));
     }

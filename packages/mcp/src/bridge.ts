@@ -62,10 +62,6 @@ export async function createBridgeRunner(
         descriptions,
         runner: {
             async runCommand(command: string): Promise<EngineResult> {
-                if (!srv.connected) {
-                    return { text: 'Browser not connected. Open Chrome with the playwright-repl extension — it connects automatically.', isError: true };
-                }
-
                 // Determine command name for snapshot logic
                 const parsed = parseInput(command);
                 const cmdName = parsed?._[0];
@@ -78,9 +74,6 @@ export async function createBridgeRunner(
                 return result;
             },
             async runScript(script: string, language: 'pw' | 'javascript'): Promise<EngineResult> {
-                if (!srv.connected) {
-                    return { text: 'Browser not connected. Open Chrome with the playwright-repl extension — it connects automatically.', isError: true };
-                }
                 return srv.runScript(script, language);
             },
         },
