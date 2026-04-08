@@ -150,6 +150,7 @@ function connect(port: number) {
         };
 
         ws.onclose = () => {
+            ws = null;
             scheduleReconnect();
         };
 
