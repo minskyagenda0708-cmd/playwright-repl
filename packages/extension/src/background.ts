@@ -220,7 +220,7 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
     if (!recorderInstalled) {
       const context = app.context();
       await (context as any)._enableRecorder(
-        { mode: 'recording', language: 'javascript', recorderMode: 'api' },
+        { mode: 'recording', language: 'javascript', recorderMode: 'api', hideToolbar: true },
         {
           actionAdded: (_page: any, _action: any, code: string) => {
             if (!recording) return;
@@ -232,12 +232,6 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
           },
         },
       );
-      // Hide Playwright's native recorder toolbar — we have our own UI.
-      await context.addInitScript(() => {
-        const style = document.createElement('style');
-        style.textContent = 'x-pw-overlay { display: none !important; }';
-        (document.head || document.documentElement).appendChild(style);
-      }).catch(() => {});
       recorderInstalled = true;
     }
     return { ok: true, url: tab.url ?? '' };
