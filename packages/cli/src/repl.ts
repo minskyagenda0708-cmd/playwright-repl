@@ -936,6 +936,10 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
   if (!silent) {
     srv.onConnect(()    => printStatus(`${c.green}✓${c.reset} Extension connected`));
     srv.onDisconnect(() => printStatus(`${c.yellow}Extension disconnected${c.reset}`));
+    srv.onEvent((event) => {
+      if (event.type === 'tab-attached' && event.url)
+        printStatus(`${c.green}✓${c.reset} Attached to tab: ${event.url}`);
+    });
   }
 
   rl.prompt();

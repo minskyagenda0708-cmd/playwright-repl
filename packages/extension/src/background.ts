@@ -130,8 +130,12 @@ async function ensureCrxApp(): Promise<CrxApplication> {
 
 async function getActiveTabId(): Promise<number | null> {
   if (activeTabId) return activeTabId;
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return tab?.id ?? null;
+  // Try focused window first
+  const [focused] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (focused?.id) return focused.id;
+  // Fall back to any active tab (handles Chrome not being the focused app)
+  const [active] = await chrome.tabs.query({ active: true });
+  return active?.id ?? null;
 }
 
 // ─── Tab Attachment ───────────────────────────────────────────────────────────
@@ -682,6 +686,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     queued.then(sendResponse).catch(e =>
       sendResponse({ text: String(e), isError: true })
     );
+    return true;
+  }
+  if (msg.type === 'bridge-attach') {
+    (async () => {
+      const tabId = await getActiveTabId();
+      if (!tabId) return { ok: false, error: 'No active tab' };
+      return attachToTab(tabId);
+    })().then(sendResponse);
     return true;
   }
   if (msg.type === 'attach')        { attachToTab(msg.tabId).then(sendResponse); return true; }

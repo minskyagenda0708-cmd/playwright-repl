@@ -93,6 +93,14 @@ function connect(port: number) {
     try {
         ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
+        ws.onopen = () => {
+            // Trigger auto-attach so the CLI knows which tab is connected
+            chrome.runtime.sendMessage({ type: 'bridge-attach' }).then((result: any) => {
+                if (ws?.readyState === WebSocket.OPEN && result?.url)
+                    ws.send(JSON.stringify({ _event: true, type: 'tab-attached', url: result.url }));
+            }).catch(() => {});
+        };
+
         ws.onmessage = async (e) => {
             const msg = JSON.parse(e.data as string) as {
                 id: string;
@@ -163,8 +171,8 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any)
         revokeLastBlob();
     }
 
-    // Forward recording events to the bridge client (VS Code)
-    if (msg.type === 'recorded-action' || msg.type === 'recorded-fill-update') {
+    // Forward events to the bridge client (CLI/MCP/VS Code)
+    if (msg.type === 'tab-attached' || msg.type === 'recorded-action' || msg.type === 'recorded-fill-update') {
         if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ _event: true, ...msg }));
         }
