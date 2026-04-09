@@ -80,16 +80,20 @@ async function stopVideoCapture(): Promise<{ blobUrl: string; size: number }> {
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnecting = false;
+async function getPort(): Promise<number> {
+    try {
+        const { bridgePort } = await chrome.storage.local.get('bridgePort');
+        if (bridgePort) return bridgePort;
+    } catch {}
+    return 9876;
+}
 
 async function reconnect() {
     if (reconnecting) return;
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     reconnecting = true;
     try {
-        const port: number = await chrome.runtime.sendMessage({ type: 'get-bridge-port' });
-        connect(port || 9876);
-    } catch {
-        scheduleReconnect();
+        connect(await getPort());
     } finally {
         reconnecting = false;
     }
@@ -160,9 +164,7 @@ function connect(port: number) {
     }
 }
 
-chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
-    connect(port || 9876);
-});
+getPort().then(port => connect(port));
 
 // ─── Message routing from background SW ─────────────────────────────────────
 
