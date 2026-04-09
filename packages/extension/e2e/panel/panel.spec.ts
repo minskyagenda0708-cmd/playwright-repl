@@ -78,9 +78,9 @@ test.describe("Panel page test", () => {
   // ─── Command History ───────────────────────────────────────────────────────
 
   test('navigates history with ArrowUp/ArrowDown', async ({ sidePanel }) => {
-    await sidePanel.submitInput('goto https://a.com');
+    await sidePanel.submitInput('goto data:text/html,<h1>A</h1>');
     await expect(sidePanel.commandInput.locator('.cm-placeholder')).toBeVisible();
-    await sidePanel.submitInput('goto https://b.com');
+    await sidePanel.submitInput('goto data:text/html,<h1>B</h1>');
     await expect(sidePanel.commandInput.locator('.cm-placeholder')).toBeVisible();
 
     // Re-focus the input and wait for CodeMirror to be ready
@@ -88,13 +88,13 @@ test.describe("Panel page test", () => {
     await expect(sidePanel.commandInput.locator('.cm-editor.cm-focused')).toBeVisible();
 
     await sidePanel.raw.keyboard.press('ArrowUp');
-    await expect(sidePanel.commandInput).toContainText('goto https://b.com');
+    await expect(sidePanel.commandInput).toContainText('goto data:text/html,<h1>B</h1>');
 
     await sidePanel.raw.keyboard.press('ArrowUp');
-    await expect(sidePanel.commandInput).toContainText('goto https://a.com');
+    await expect(sidePanel.commandInput).toContainText('goto data:text/html,<h1>A</h1>');
 
     await sidePanel.raw.keyboard.press('ArrowDown');
-    await expect(sidePanel.commandInput).toContainText('goto https://b.com');
+    await expect(sidePanel.commandInput).toContainText('goto data:text/html,<h1>B</h1>');
 
     await sidePanel.raw.keyboard.press('ArrowDown');
     await expect(sidePanel.commandInput.locator('.cm-placeholder')).toBeVisible();
@@ -112,7 +112,7 @@ test.describe("Panel page test", () => {
   // ─── Editor ────────────────────────────────────────────────────────────────
 
   test('shows line numbers for content', async ({ sidePanel }) => {
-    await sidePanel.fillEditor('goto https://example.com\nclick OK\npress Enter');
+    await sidePanel.fillEditor('goto data:text/html,<h1>Test</h1>\nclick OK\npress Enter');
 
     const lineNums = sidePanel.raw.locator('.cm-lineNumbers .cm-gutterElement');
     // CM6 may include an extra gutter element; no exact-count Playwright assertion for >=
@@ -134,7 +134,7 @@ test.describe("Panel page test", () => {
   // ─── Run Button ────────────────────────────────────────────────────────────
 
   test('executes all editor lines and shows Run complete', async ({ sidePanel }) => {
-    await sidePanel.fillEditor('goto https://example.com\nclick OK');
+    await sidePanel.fillEditor('goto data:text/html,<h1>Hello</h1>\nclick OK');
 
     await sidePanel.runBtn.click();
 
