@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync } from 'fs';
 
+const sourcemap = process.env.SOURCEMAP === 'true';
+
 /**
  * Build content scripts as self-contained IIFE bundles via esbuild.
  * Content scripts injected via chrome.scripting.executeScript can't use
@@ -25,7 +27,7 @@ function contentScriptPlugin(): Plugin {
           bundle: true,
           format: 'iife',
           write: false,
-          sourcemap: false,
+          sourcemap,
           minify: false,
         });
         for (const file of result.outputFiles) {
@@ -51,7 +53,7 @@ export default defineConfig({
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: true,
     minify: false,
-    sourcemap: false,
+    sourcemap,
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background.ts"),
