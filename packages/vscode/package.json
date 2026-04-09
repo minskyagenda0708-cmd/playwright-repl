@@ -7,7 +7,7 @@
     "color": "#ffffff",
     "theme": "light"
   },
-  "version": "0.24.0",
+  "version": "0.24.1",
   "private": true,
   "publisher": "playwright-repl",
   "repository": {

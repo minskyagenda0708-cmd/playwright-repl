@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/browser-extension",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "description": "Dramaturg — Chrome extension with console, recorder, and element picker",
   "license": "MIT",
   "author": "Steve Zhang",
@@ -65,7 +65,7 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.16",
     "@lezer/highlight": "^1.2.3",
-    "@playwright-repl/playwright-crx": "^1.21.2",
+    "@playwright-repl/playwright-crx": "^1.21.4",
     "codemirror": "^6.0.2",
     "js-yaml": "^4.1.1",
     "react": "^19.2.4",

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.1
+
+**2026-04-09**
+
+### Build
+
+- **Disable sourcemaps** — disable sourcemap generation across all packages (tsconfig, Vite, esbuild). ([#656](https://github.com/stevez/playwright-repl/issues/656))
+- **playwright-crx 1.21.4** — ESM only, no sourcemaps. npm package reduced from 37MB to 8.7MB.
+- **VS Code publish** — `publish.mjs` now installs `@playwright-repl/browser-extension` from npm instead of copying locally.
+
 ## v0.24.0
 
 **2026-04-09**

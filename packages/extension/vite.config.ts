@@ -25,7 +25,7 @@ function contentScriptPlugin(): Plugin {
           bundle: true,
           format: 'iife',
           write: false,
-          sourcemap: true,
+          sourcemap: false,
           minify: false,
         });
         for (const file of result.outputFiles) {
@@ -51,7 +51,7 @@ export default defineConfig({
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: true,
     minify: false,
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background.ts"),

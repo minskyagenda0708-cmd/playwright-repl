@@ -72,20 +72,8 @@ fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(pkg, null, 2)
 console.log(`\n=== Copied to ${tmpDir} ===`);
 
 // ─── 4. npm install (clean, no symlinks) ──────────────────────────────────
-// Remove browser-extension from deps before npm install (not yet on npm)
-delete pkg.dependencies['@playwright-repl/browser-extension'];
-fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 console.log('\n=== Installing dependencies ===');
 run('npm install --production', { cwd: tmpDir });
-
-// ─── 4b. Copy browser-extension dist into node_modules ───────────────────
-// @playwright-repl/browser-extension is resolved via require.resolve at runtime
-const browserExtSrc = path.join(ROOT, 'packages', 'extension', 'dist');
-const browserExtDir = path.join(tmpDir, 'node_modules', '@playwright-repl', 'browser-extension');
-fs.mkdirSync(browserExtDir, { recursive: true });
-fs.cpSync(browserExtSrc, path.join(browserExtDir, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(browserExtDir, 'package.json'),
-  JSON.stringify({ name: '@playwright-repl/browser-extension', version: '0.23.1' }) + '\n');
 
 // ─── 5. Package / Publish ─────────────────────────────────────────────────
 if (publish) {

@@ -33,7 +33,7 @@ const options = {
   format: 'cjs',
   platform: 'node',
   target: 'ES2019',
-  sourcemap: true,
+  sourcemap: false,
   minify: !watch,
 };
 

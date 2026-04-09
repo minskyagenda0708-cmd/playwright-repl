@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.24.1
+
+**2026-04-09**
+
+### Build
+
+- Disable sourcemap generation — smaller VSIX package
+- Bump `@playwright-repl/playwright-crx` to 1.21.4 (ESM only, 37MB → 8.7MB)
+
 ## 0.24.0
 
 **2026-04-09**
