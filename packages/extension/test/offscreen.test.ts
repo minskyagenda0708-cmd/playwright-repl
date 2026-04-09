@@ -37,12 +37,17 @@ describe('offscreen bridge', () => {
 
     sendMessage = vi.fn().mockResolvedValue(9876);
 
-    // Mock chrome.runtime
+    // Mock chrome.runtime + chrome.storage.local
     (globalThis as any).chrome = {
       runtime: {
         sendMessage,
         onMessage: {
           addListener: vi.fn((fn: any) => { onMessageListener = fn; }),
+        },
+      },
+      storage: {
+        local: {
+          get: vi.fn().mockResolvedValue({ bridgePort: 9876 }),
         },
       },
     };
@@ -63,15 +68,15 @@ describe('offscreen bridge', () => {
     globalThis.WebSocket = OriginalWebSocket;
   });
 
-  it('requests bridge port and connects WebSocket on init', () => {
-    expect(sendMessage).toHaveBeenCalledWith({ type: 'get-bridge-port' });
+  it('reads bridge port from storage and connects WebSocket on init', () => {
+    expect((globalThis as any).chrome.storage.local.get).toHaveBeenCalledWith('bridgePort');
     expect(MockWebSocket.instances).toHaveLength(1);
     expect(MockWebSocket.instances[0].url).toBe('ws://127.0.0.1:9876');
   });
 
-  it('uses default port 9876 when get-bridge-port returns falsy', async () => {
+  it('uses default port 9876 when storage has no bridgePort', async () => {
     MockWebSocket.instances = [];
-    sendMessage.mockResolvedValue(0);
+    (globalThis as any).chrome.storage.local.get.mockResolvedValue({});
 
     vi.resetModules();
     await import('../src/offscreen/offscreen');
