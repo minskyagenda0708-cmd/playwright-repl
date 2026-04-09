@@ -84,7 +84,7 @@ async function getPort(): Promise<number> {
     try {
         const { bridgePort } = await chrome.storage.local.get('bridgePort');
         if (bridgePort) return bridgePort;
-    } catch {}
+    } catch { /* storage may be unavailable */ }
     return 9876;
 }
 
@@ -168,7 +168,6 @@ getPort().then(port => connect(port));
 
 // ─── Message routing from background SW ─────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
     if (msg.type === 'bridge-port-changed') {
         if (reconnectTimer) clearTimeout(reconnectTimer);
