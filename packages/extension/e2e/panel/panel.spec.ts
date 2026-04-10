@@ -142,7 +142,7 @@ test.describe("Panel page test", () => {
   });
 
   test('shows fail stats when command errors', async ({ sidePanel }) => {
-    await sidePanel.fillEditor('click missing');
+    await sidePanel.fillEditor('goto invalid://url');
 
     await sidePanel.runBtn.click();
 

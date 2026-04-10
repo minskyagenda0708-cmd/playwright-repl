@@ -52,7 +52,8 @@ export const test = base.extend<
     const bridge = new BridgeServer();
     await bridge.start(BRIDGE_PORT);
 
-    // 3. Launch browser with extension
+    // 3. Launch browser with extension (development install — offscreen doc not created
+    //    on startup because bridgePort is not in storage yet)
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
       headless: !process.env.HEADED,
@@ -64,12 +65,12 @@ export const test = base.extend<
       ],
     });
 
-    // 4. Get extension ID from service worker
+    // 5. Get extension ID from service worker
     let sw = context.serviceWorkers()[0];
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
 
-    // 5. Tell the test extension to connect to our random port.
+    // 6. Tell the test extension to connect to our random port.
     //    The offscreen doc defaults to 9876, which fails (no server there).
     //    Setting bridgePort in chrome.storage triggers background.ts to broadcast
     //    'bridge-port-changed', so the offscreen doc reconnects to our port.

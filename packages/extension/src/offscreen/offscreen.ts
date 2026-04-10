@@ -80,30 +80,40 @@ async function stopVideoCapture(): Promise<{ blobUrl: string; size: number }> {
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnecting = false;
+let lastPort = 9876;
+let retryCount = 0;
 
 async function reconnect() {
     if (reconnecting) return;
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+    // Kill stuck CONNECTING sockets
+    if (ws && ws.readyState === WebSocket.CONNECTING) {
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.close();
+        ws = null;
+    }
     reconnecting = true;
     try {
         const port: number = await chrome.runtime.sendMessage({ type: 'get-bridge-port' });
-        connect(port || 9876);
+        lastPort = port || 9876;
     } catch {
-        scheduleReconnect();
-    } finally {
-        reconnecting = false;
+        // Service worker may be waking up — use last known port
     }
+    connect(lastPort);
+    reconnecting = false;
 }
 
 function scheduleReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(() => reconnect(), 3000);
+    const delay = Math.min(3000 * Math.pow(2, retryCount), 30000);
+    reconnectTimer = setTimeout(() => reconnect(), delay);
+    retryCount++;
 }
 
-// Periodic health check — reconnect if WebSocket is dead.
-// Catches cases where setTimeout gets throttled or the offscreen doc restarts.
+// Periodic health check — reconnect if WebSocket is not open and bridge is enabled.
 setInterval(() => {
-    if (!ws || ws.readyState === WebSocket.CLOSED) {
+    if (lastPort && (!ws || ws.readyState !== WebSocket.OPEN)) {
         reconnect();
     }
 }, 10000);
@@ -113,6 +123,7 @@ function connect(port: number) {
         ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
         ws.onopen = () => {
+            retryCount = 0;
             // Trigger auto-attach so the CLI knows which tab is connected
             chrome.runtime.sendMessage({ type: 'bridge-attach' }).then((result: any) => {
                 if (ws?.readyState === WebSocket.OPEN && result?.url)
@@ -161,7 +172,8 @@ function connect(port: number) {
 }
 
 chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
-    connect(port || 9876);
+    lastPort = port || 9876;
+    connect(lastPort);
 });
 
 // ─── Message routing from background SW ─────────────────────────────────────
@@ -169,9 +181,10 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
     if (msg.type === 'bridge-port-changed') {
+        lastPort = msg.port as number;
         if (reconnectTimer) clearTimeout(reconnectTimer);
-        if (ws) { ws.onclose = null; ws.close(); }
-        connect(msg.port as number);
+        if (ws) { ws.onclose = null; ws.close(); ws = null; }
+        if (lastPort) connect(lastPort);
     }
 
     // Video capture messages

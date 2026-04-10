@@ -76,10 +76,20 @@ async function ensureOffscreen() {
     justification: 'Maintains WebSocket connection to CLI/MCP bridge server and handles video capture',
   });
 }
-ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+
+// Web Store installs: always create offscreen doc (auto-connect to bridge).
+// Development installs (--load-extension): only create if bridgePort was previously
+// configured, to avoid connecting to a real bridge during CLI/tests/VS Code.
+chrome.management.getSelf().then(async (info) => {
+  if (info.installType === 'normal') {
+    ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  } else {
+    const { bridgePort } = await chrome.storage.local.get(['bridgePort']);
+    if (bridgePort) ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  }
+});
 
 // Re-check offscreen doc periodically — Chrome may kill it after idle.
-// chrome.alarms survive service worker restarts; setTimeout does not.
 chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'ensure-offscreen') {
@@ -100,7 +110,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     cachedSettings.openAs = changes.openAs.newValue;
   }
   if (area === 'local' && changes.bridgePort) {
-    chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => { /* panel may not be open */ });
+    // Ensure offscreen doc exists before telling it to reconnect (may not exist in development mode)
+    ensureOffscreen().then(() => {
+      chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => {});
+    }).catch(() => {});
   }
 });
 

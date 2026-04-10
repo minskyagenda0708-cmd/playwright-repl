@@ -40,6 +40,13 @@ if (!globalThis.chrome.offscreen) {
   };
 }
 
+// vitest-chrome doesn't include chrome.management — add it manually
+if (!globalThis.chrome.management) {
+  (globalThis.chrome as any).management = {
+    getSelf: async () => ({ installType: 'development' }),
+  };
+}
+
 // vitest-chrome doesn't include chrome.webNavigation — add it manually
 if (!globalThis.chrome.webNavigation) {
   (globalThis.chrome as any).webNavigation = {

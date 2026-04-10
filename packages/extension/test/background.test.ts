@@ -72,6 +72,8 @@ describe("background.ts message handlers", () => {
     (crx.start as ReturnType<typeof vi.fn>).mockResolvedValue(mockCrxApp);
 
     // Set up chrome stubs
+    (chrome.management as any).getSelf = vi.fn().mockResolvedValue({ installType: 'development' });
+    (chrome.storage.local.get as any).mockResolvedValue({});
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 42, url: 'https://example.com' });
     (chrome.tabs as any).query = vi.fn().mockResolvedValue([{ id: 42, url: 'https://example.com' }]);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
@@ -423,6 +425,8 @@ describe("background.ts message handlers", () => {
 
   it("storage onChanged sends bridge-port-changed message", async () => {
     onStorageChanged({ bridgePort: { newValue: 5555 } }, 'local');
+    // ensureOffscreen is async — flush promises before checking sendMessage
+    await new Promise(r => setTimeout(r, 0));
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'bridge-port-changed', port: 5555 })
     );
