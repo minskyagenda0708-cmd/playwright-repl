@@ -305,8 +305,8 @@ importers:
         specifier: ^10.2.4
         version: 10.2.4
       nextcov:
-        specifier: ^1.2.1
-        version: 1.2.1(@playwright/test@1.59.1)(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@playwright/test@1.59.1)(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1)
       stack-utils:
         specifier: ^2.0.6
         version: 2.0.6
@@ -2914,6 +2914,13 @@ packages:
 
   nextcov@1.2.1:
     resolution: {integrity: sha512-hqGnqOS4fDdcfiXWvx3lhJJ0EFOVmwwalDYeudYwz5skUFCmsXXOa3YmYFOpfjjnp0Q11sptd3Uk8kF64D1gFg==}
+    engines: {node: '>=20.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@playwright/test': ^1.40.0
+
+  nextcov@1.3.0:
+    resolution: {integrity: sha512-jr4nGh1FTZkIoyjEs34vMk6HWn/hTf8s2scLJ1Z/KRt16XLUZNDYTuPXFqOyOC7j906YYy3U2WphIMdSIrMhyw==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -6590,38 +6597,6 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  nextcov@1.2.1(@playwright/test@1.59.1)(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1):
-    dependencies:
-      '@babel/parser': 7.29.0
-      '@babel/traverse': 7.29.0
-      '@bcoe/v8-coverage': 1.0.2
-      '@inquirer/prompts': 8.3.0(@types/node@18.19.130)
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@playwright/test': 1.59.1
-      ast-v8-to-istanbul: 0.3.12
-      chalk: 4.1.2
-      convert-source-map: 2.0.0
-      glob: 11.1.0
-      istanbul-lib-coverage: 3.2.2
-      istanbul-lib-report: 3.0.1
-      istanbul-lib-source-maps: 5.0.6
-      istanbul-reports: 3.2.0
-      monocart-coverage-reports: 2.12.9
-      vite: 6.4.1(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1)
-    transitivePeerDependencies:
-      - '@types/node'
-      - jiti
-      - less
-      - lightningcss
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - tsx
-      - yaml
-
   nextcov@1.2.1(@playwright/test@1.59.1)(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1):
     dependencies:
       '@babel/parser': 7.29.0
@@ -6640,6 +6615,38 @@ snapshots:
       istanbul-reports: 3.2.0
       monocart-coverage-reports: 2.12.9
       vite: 6.4.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)
+    transitivePeerDependencies:
+      - '@types/node'
+      - jiti
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - tsx
+      - yaml
+
+  nextcov@1.3.0(@playwright/test@1.59.1)(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1):
+    dependencies:
+      '@babel/parser': 7.29.0
+      '@babel/traverse': 7.29.0
+      '@bcoe/v8-coverage': 1.0.2
+      '@inquirer/prompts': 8.3.0(@types/node@18.19.130)
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@playwright/test': 1.59.1
+      ast-v8-to-istanbul: 0.3.12
+      chalk: 4.1.2
+      convert-source-map: 2.0.0
+      glob: 11.1.0
+      istanbul-lib-coverage: 3.2.2
+      istanbul-lib-report: 3.0.1
+      istanbul-lib-source-maps: 5.0.6
+      istanbul-reports: 3.2.0
+      monocart-coverage-reports: 2.12.9
+      vite: 6.4.1(@types/node@18.19.130)(jiti@2.6.1)(lightningcss@1.31.1)
     transitivePeerDependencies:
       - '@types/node'
       - jiti

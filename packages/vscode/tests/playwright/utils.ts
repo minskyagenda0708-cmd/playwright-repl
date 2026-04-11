@@ -15,7 +15,7 @@
  */
 
 import { expect as baseExpect, test as baseTest, Browser, BrowserContextOptions, chromium, Page } from '@playwright/test';
-import { filterAppCoverage, saveClientCoverage } from 'nextcov/playwright';
+import { filterAppCoverage, saveClientCoverage, InProcessV8Collector } from 'nextcov/playwright';
 // @ts-ignore
 import { Extension } from '../../dist/extension';
 import { TestController, VSCode, WebviewPagePool, WorkspaceFolder, TestRun, TestItem } from './mock/vscode';
@@ -59,6 +59,7 @@ type TestFixtures = {
 
 type WorkerFixtures = {
   webviewPool: WebviewPagePool;
+  _serverCoverage: void;
 };
 
 export type WorkerOptions = {
@@ -143,6 +144,17 @@ export const test = baseTest.extend<TestFixtures, WorkerOptions & WorkerFixtures
     await use(pool);
     await pool.close();
   }, { scope: 'worker' }],
+
+  // Worker-scoped: collect V8 coverage from the Extension code running in-process.
+  _serverCoverage: [async ({}, use, workerInfo) => {
+    const collector = new InProcessV8Collector({ include: ['/dist/'] });
+    await collector.start();
+    await use();
+    const coverage = await collector.collect();
+    if (coverage.length > 0)
+      await saveClientCoverage(`server-${workerInfo.workerIndex}`, coverage as any);
+    await collector.stop();
+  }, { scope: 'worker', auto: true }],
 
   // Auto-fixture: collect client-side JS coverage from webview pages after each test.
   _collectCoverage: [async ({ webviewPool }, use, testInfo) => {

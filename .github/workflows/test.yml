@@ -69,6 +69,10 @@ jobs:
         working-directory: packages/vscode
         timeout-minutes: 10
 
+      - name: Merge VS Code extension coverage
+        run: pnpm run coverage:merge
+        working-directory: packages/vscode
+
       # VS Code E2E tests disabled — flaky on CI, works locally
       # - name: Run VS Code extension E2E tests
       #   run: ${{ runner.os == 'Linux' && 'xvfb-run' || '' }} pnpm exec playwright test --config e2e/playwright.config.ts

@@ -24,7 +24,7 @@ export const nextcov: NextcovConfig = {
   collectServer: false,
   include: ['src/**/*.ts'],
   exclude: ['src/upstream/**'],
-  reporters: ['html', 'lcov', 'json', 'text-summary'],
+  reporters: ['html', 'lcov', 'json', 'text', 'text-summary'],
 };
 
 export default defineConfig<WorkerOptions>({

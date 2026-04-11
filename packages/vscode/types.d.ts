@@ -13,6 +13,12 @@ declare module "nextcov/playwright" {
   export function initCoverage(config: unknown): Promise<void>;
   export function finalizeCoverage(config: unknown): Promise<void>;
   export function loadNextcovConfig(configPath?: string): Promise<unknown>;
+  export class InProcessV8Collector {
+    constructor(config?: { include?: string[]; exclude?: string[] });
+    start(): Promise<void>;
+    collect(): Promise<Array<{ url: string; source?: string; functions: unknown[] }>>;
+    stop(): Promise<void>;
+  }
 }
 
 declare module "nextcov" {

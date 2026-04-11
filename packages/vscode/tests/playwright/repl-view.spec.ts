@@ -7,10 +7,18 @@
  */
 
 import { test as base, expect, Page } from '@playwright/test';
+import { filterAppCoverage, saveClientCoverage } from 'nextcov/playwright';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 const EXTENSION_DIR = path.resolve(__dirname, '../..');
+
+function transformUrl(url: string): string {
+  if (!url.startsWith('http://localhost/')) return url;
+  const suffix = url.substring('http://localhost/'.length);
+  return pathToFileURL(path.join(EXTENSION_DIR, suffix)).href;
+}
 
 const replHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -55,8 +63,17 @@ const test = base.extend<{ replPage: Page }>({
       });
     });
 
+    await page.coverage.startJSCoverage();
     await page.goto('http://localhost');
     await use(page);
+
+    // Collect client-side coverage from the standalone replView page
+    const jsCoverage = await page.coverage.stopJSCoverage();
+    const entries = jsCoverage.map(e => ({ ...e, url: transformUrl(e.url) }));
+    const appCoverage = filterAppCoverage(entries);
+    if (appCoverage.length > 0)
+      await saveClientCoverage('replview-standalone', appCoverage as any);
+
     await context.close();
   },
 });
