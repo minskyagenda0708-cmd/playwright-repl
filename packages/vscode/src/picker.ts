@@ -5,7 +5,7 @@
  * Single await — no polling, no content script injection.
  */
 
-import * as vscode from 'vscode';
+import type * as vscodeTypes from './vscodeTypes';
 import type { IBrowserManager } from './browser.js';
 
 export interface ILocatorsView {
@@ -17,14 +17,16 @@ export interface IAssertView {
 }
 
 export class Picker {
+  private _vscode: vscodeTypes.VSCode;
   private _browserManager: IBrowserManager;
-  private _outputChannel: vscode.OutputChannel;
+  private _outputChannel: vscodeTypes.LogOutputChannel;
   private _locatorsView: ILocatorsView | undefined;
   private _assertView: IAssertView | undefined;
   private _picking = false;
   private _sendToAssert = false;
 
-  constructor(browserManager: IBrowserManager, outputChannel: vscode.OutputChannel) {
+  constructor(vscode: vscodeTypes.VSCode, browserManager: IBrowserManager, outputChannel: vscodeTypes.LogOutputChannel) {
+    this._vscode = vscode;
     this._browserManager = browserManager;
     this._outputChannel = outputChannel;
   }
@@ -52,7 +54,7 @@ export class Picker {
     if (this._picking) return;
     const page = this._browserManager.page;
     if (!page) {
-      vscode.window.showWarningMessage('Launch browser first.');
+      this._vscode.window.showWarningMessage('Launch browser first.');
       return;
     }
 
@@ -75,9 +77,9 @@ export class Picker {
       const assertion = deriveAssertion(info, fullLocator);
 
       // Copy to clipboard if setting is enabled
-      const copyOnPick = vscode.workspace.getConfiguration('playwright-repl').get('pickLocatorCopyToClipboard', false);
+      const copyOnPick = this._vscode.workspace.getConfiguration('playwright-repl').get('pickLocatorCopyToClipboard', false);
       if (copyOnPick)
-        await vscode.env.clipboard.writeText(fullLocator);
+        await this._vscode.env.clipboard.writeText(fullLocator);
 
       if (this._locatorsView)
         this._locatorsView.showLocator(fullLocator, ariaSnapshot);

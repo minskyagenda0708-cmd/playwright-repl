@@ -122,7 +122,7 @@ export class BrowserController {
       return;
     }
     if (!this._recorder)
-      this._recorder = new Recorder(this._browserManager, this._logger);
+      this._recorder = new Recorder(this._vscode, this._browserManager, this._logger);
     await this._recorder.start();
     this._settingsView?.setRecording(true);
   }
@@ -162,7 +162,7 @@ export class BrowserController {
 
   private _ensurePicker() {
     if (this._picker || !this._browserManager) return;
-    this._picker = new Picker(this._browserManager, this._logger);
+    this._picker = new Picker(this._vscode, this._browserManager, this._logger);
     if (this._locatorsView)
       this._picker.setLocatorsView(this._locatorsView);
     if (this._assertView) {

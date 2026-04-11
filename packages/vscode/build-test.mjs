@@ -1,10 +1,10 @@
 /**
  * Test-specific build that bundles @playwright-repl/* packages inline
- * so the mock test infrastructure can require() the extension as CJS.
+ * so the Playwright Test loader (which transforms TS→CJS) can load
+ * the extension without ESM/CJS conflicts.
  *
- * The production build (build.mjs) externalizes these packages because
- * VS Code handles ESM/CJS interop at runtime, but the mock tests run
- * in plain Node.js where require(ESM) fails.
+ * Since recorder.ts and picker.ts accept vscode as a constructor
+ * parameter (not a module import), no vscode alias is needed.
  */
 import * as esbuild from 'esbuild';
 
@@ -13,12 +13,8 @@ const extensionOptions = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outdir: 'dist',
-  alias: {
-    // Stub the 'vscode' module — our recorder.ts/picker.ts import it
-    // at runtime, unlike upstream which only uses type imports.
-    'vscode': './tests/playwright/vscode-shim.ts',
-  },
   external: [
+    'vscode',
     // These are loaded dynamically by the extension at runtime
     './babelBundle',
     './debugTransform',

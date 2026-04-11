@@ -9,7 +9,7 @@
  * 5. Inserts each action at cursor in the active editor
  */
 
-import * as vscode from 'vscode';
+import type * as vscodeTypes from './vscodeTypes';
 import type { IBrowserManager } from './browser.js';
 
 // ─── Cursor Context Detection ──────────────────────────────────────────────
@@ -25,7 +25,7 @@ interface CursorContext {
  * If inside, returns the indentation and insert position.
  * If outside, returns inside=false so we generate a template.
  */
-export function detectCursorContext(editor: vscode.TextEditor): CursorContext {
+export function detectCursorContext(editor: vscodeTypes.TextEditor): CursorContext {
   const doc = editor.document;
   const cursorLine = editor.selection.active.line;
 
@@ -56,70 +56,23 @@ export function detectCursorContext(editor: vscode.TextEditor): CursorContext {
   return { inside: false, indentation: 4, insertLine: cursorLine };
 }
 
-// ─── Editor Insertion ──────────────────────────────────────────────────────
-
-let lastInsertLine = -1;
-let lastInsertLength = 0;
-let editQueue: Promise<void> = Promise.resolve();
-
-function insertAtCursor(editor: vscode.TextEditor, text: string, indent: number) {
-  editQueue = editQueue.then(async () => {
-    const indentStr = ' '.repeat(indent);
-    const line = `${indentStr}${text}\n`;
-    const pos = new vscode.Position(lastInsertLine, 0);
-
-    await editor.edit(editBuilder => {
-      editBuilder.insert(pos, line);
-    });
-
-    lastInsertLength = 1;
-    lastInsertLine++;
-
-    // Move cursor to inserted line
-    const newPos = new vscode.Position(lastInsertLine, 0);
-    editor.selection = new vscode.Selection(newPos, newPos);
-    editor.revealRange(new vscode.Range(newPos, newPos));
-  });
-}
-
-function replaceLastInsert(editor: vscode.TextEditor, text: string, indent: number) {
-  editQueue = editQueue.then(async () => {
-    if (lastInsertLength === 0) {
-      // No previous insert — do a regular insert instead (inline, not queued again)
-      const indentStr = ' '.repeat(indent);
-      const line = `${indentStr}${text}\n`;
-      const pos = new vscode.Position(lastInsertLine, 0);
-      await editor.edit(editBuilder => { editBuilder.insert(pos, line); });
-      lastInsertLength = 1;
-      lastInsertLine++;
-      return;
-    }
-
-    const indentStr = ' '.repeat(indent);
-    const line = `${indentStr}${text}`;
-    const replaceLine = lastInsertLine - 1;
-
-    await editor.edit(editBuilder => {
-      const range = new vscode.Range(
-        new vscode.Position(replaceLine, 0),
-        new vscode.Position(replaceLine, editor.document.lineAt(replaceLine).text.length),
-      );
-      editBuilder.replace(range, line);
-    });
-  });
-}
-
 // ─── Recorder Class ────────────────────────────────────────────────────────
 
 export class Recorder {
+  private _vscode: vscodeTypes.VSCode;
   private _browserManager: IBrowserManager;
-  private _outputChannel: vscode.OutputChannel;
+  private _outputChannel: vscodeTypes.LogOutputChannel;
   private _recording = false;
-  private _statusBarItem: vscode.StatusBarItem;
+  private _statusBarItem;
   private _indentation = 4;
-  private _editor: vscode.TextEditor | undefined;
+  private _editor: vscodeTypes.TextEditor | undefined;
 
-  constructor(browserManager: IBrowserManager, outputChannel: vscode.OutputChannel) {
+  private _lastInsertLine = -1;
+  private _lastInsertLength = 0;
+  private _editQueue: Promise<void> = Promise.resolve();
+
+  constructor(vscode: vscodeTypes.VSCode, browserManager: IBrowserManager, outputChannel: vscodeTypes.LogOutputChannel) {
+    this._vscode = vscode;
     this._browserManager = browserManager;
     this._outputChannel = outputChannel;
 
@@ -140,24 +93,24 @@ export class Recorder {
   async start() {
     if (this._recording) return;
     if (!this._browserManager.isRunning()) {
-      vscode.window.showWarningMessage('Launch browser first.');
+      this._vscode.window.showWarningMessage('Launch browser first.');
       return;
     }
 
-    this._editor = vscode.window.activeTextEditor;
+    this._editor = this._vscode.window.activeTextEditor;
     const ctx = this._editor ? detectCursorContext(this._editor) : null;
 
     // If outside test function (or no editor), generate template
     if (!ctx || !ctx.inside) {
       if (!this._editor) {
-        vscode.window.showWarningMessage('Open a test file first.');
+        this._vscode.window.showWarningMessage('Open a test file first.');
         return;
       }
       await this._insertTemplate(this._editor, ctx!.insertLine);
     } else {
       this._indentation = ctx.indentation;
-      lastInsertLine = ctx.insertLine;
-      lastInsertLength = 0;
+      this._lastInsertLine = ctx.insertLine;
+      this._lastInsertLength = 0;
     }
 
     // Register event listener BEFORE starting recording to avoid race condition
@@ -165,19 +118,19 @@ export class Recorder {
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright REPL: Stop Recording';
     this._statusBarItem.command = 'playwright-repl.stopRecording';
-    this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    this._statusBarItem.backgroundColor = new this._vscode.ThemeColor('statusBarItem.errorBackground');
 
     this._browserManager.onEvent((event) => {
       if (!this._recording || !this._editor) return;
 
       if (event.type === 'recorded-action') {
         const action = event.action as { js: string; pw: string };
-        insertAtCursor(this._editor!, action.js, this._indentation);
+        this._insertAtCursor(this._editor!, action.js, this._indentation);
       }
 
       if (event.type === 'recorded-fill-update') {
         const action = event.action as { js: string; pw: string };
-        replaceLastInsert(this._editor!, action.js, this._indentation);
+        this._replaceLastInsert(this._editor!, action.js, this._indentation);
       }
     });
 
@@ -189,7 +142,7 @@ export class Recorder {
       this._statusBarItem.command = 'playwright-repl.startRecording';
       this._statusBarItem.backgroundColor = undefined;
       this._browserManager.onEvent(null);
-      vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
+      this._vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
       return;
     }
 
@@ -198,7 +151,7 @@ export class Recorder {
       const urlMatch = result.text?.match(/Recording started:\s*(.+)/);
       const url = urlMatch?.[1]?.trim() || '';
       if (url && this._editor) {
-        insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
+        this._insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
       }
     }
 
@@ -218,7 +171,56 @@ export class Recorder {
     this._outputChannel.appendLine('Recording stopped.');
   }
 
-  private async _insertTemplate(editor: vscode.TextEditor, line: number) {
+  // ─── Private ───────────────────────────────────────────────────────────
+
+  private _insertAtCursor(editor: vscodeTypes.TextEditor, text: string, indent: number) {
+    this._editQueue = this._editQueue.then(async () => {
+      const indentStr = ' '.repeat(indent);
+      const line = `${indentStr}${text}\n`;
+      const pos = new this._vscode.Position(this._lastInsertLine, 0);
+
+      await editor.edit(editBuilder => {
+        editBuilder.insert(pos, line);
+      });
+
+      this._lastInsertLength = 1;
+      this._lastInsertLine++;
+
+      // Move cursor to inserted line
+      const newPos = new this._vscode.Position(this._lastInsertLine, 0);
+      editor.selection = new this._vscode.Selection(newPos, newPos);
+      editor.revealRange(new this._vscode.Range(newPos, newPos));
+    });
+  }
+
+  private _replaceLastInsert(editor: vscodeTypes.TextEditor, text: string, indent: number) {
+    this._editQueue = this._editQueue.then(async () => {
+      if (this._lastInsertLength === 0) {
+        // No previous insert — do a regular insert instead (inline, not queued again)
+        const indentStr = ' '.repeat(indent);
+        const line = `${indentStr}${text}\n`;
+        const pos = new this._vscode.Position(this._lastInsertLine, 0);
+        await editor.edit(editBuilder => { editBuilder.insert(pos, line); });
+        this._lastInsertLength = 1;
+        this._lastInsertLine++;
+        return;
+      }
+
+      const indentStr = ' '.repeat(indent);
+      const line = `${indentStr}${text}`;
+      const replaceLine = this._lastInsertLine - 1;
+
+      await editor.edit(editBuilder => {
+        const range = new this._vscode.Range(
+          new this._vscode.Position(replaceLine, 0),
+          new this._vscode.Position(replaceLine, editor.document.lineAt(replaceLine).text.length),
+        );
+        editBuilder.replace(range, line);
+      });
+    });
+  }
+
+  private async _insertTemplate(editor: vscodeTypes.TextEditor, line: number) {
     const indent = '  ';
     const template = [
       '',
@@ -228,12 +230,12 @@ export class Recorder {
     ].join('\n');
 
     await editor.edit(editBuilder => {
-      editBuilder.insert(new vscode.Position(line, 0), template);
+      editBuilder.insert(new this._vscode.Position(line, 0), template);
     });
 
     // Position for recording: inside the template body
     this._indentation = indent.length;
-    lastInsertLine = line + 2; // inside the test body (after opening brace)
-    lastInsertLength = 0;
+    this._lastInsertLine = line + 2; // inside the test body (after opening brace)
+    this._lastInsertLength = 0;
   }
 }
