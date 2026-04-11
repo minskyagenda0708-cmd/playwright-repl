@@ -248,7 +248,7 @@
     "build:test": "node build-test.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:playwright": "node build-test.mjs && playwright test --config tests/playwright/playwright.config.ts --project default",
+    "test:playwright": "playwright test --config tests/playwright/playwright.config.ts --project default",
     "coverage:merge": "nextcov merge coverage/unit coverage/e2e -o coverage/merged",
     "coverage:all": "npm run test:coverage && npm run test:playwright && npm run coverage:merge",
     "watch": "node build.mjs --watch",

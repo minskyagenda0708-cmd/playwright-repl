@@ -64,10 +64,6 @@ jobs:
         run: pnpm run coverage:merge
         working-directory: packages/extension
 
-      - name: Build VS Code extension for tests
-        run: node build-test.mjs
-        working-directory: packages/vscode
-
       - name: Run VS Code extension mock tests
         run: pnpm exec playwright test --config tests/playwright/playwright.config.ts --project default
         working-directory: packages/vscode
