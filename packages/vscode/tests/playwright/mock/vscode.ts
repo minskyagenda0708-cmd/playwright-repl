@@ -904,7 +904,7 @@ class Debug {
       });
     });
     this._debuggerProcess.stderr.on('data', data => this.output += data.toString());
-    this._debuggerProcess.on('exit', () => this._didTerminateDebugSession.fire(session));
+    this._debuggerProcess.on('close', () => this._didTerminateDebugSession.fire(session));
     return true;
   }
 
