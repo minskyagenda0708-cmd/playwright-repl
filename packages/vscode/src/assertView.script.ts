@@ -27,7 +27,7 @@ let currentMode: 'locator' | 'snapshot' = 'locator';
 
 function switchMode(mode: 'locator' | 'snapshot') {
   currentMode = mode;
-  locatorMode.style.display = mode === 'locator' ? 'block' : 'none';
+  locatorMode.style.display = mode === 'locator' ? 'flex' : 'none';
   snapshotMode.style.display = mode === 'snapshot' ? 'block' : 'none';
   rebuild();
 }
@@ -57,7 +57,11 @@ function rebuild() {
   }
 }
 
-assertType.addEventListener('change', rebuild);
+assertType.addEventListener('change', () => {
+  // Clear stale arg value when user picks a different assertion type
+  argInput.value = '';
+  rebuild();
+});
 argInput.addEventListener('input', rebuild);
 negateCheckbox.addEventListener('change', rebuild);
 
@@ -108,7 +112,18 @@ function renderSuggestions(
     const btn = document.createElement('button');
     btn.className = 'inline-btn';
     btn.style.cssText = 'display:block;width:100%;text-align:left;margin-bottom:3px;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;';
-    const argPart = s.arg ? `(${JSON.stringify(s.arg)})` : '()';
+    const typeDef = types.find(t => t.value === s.type);
+    let argPart = '()';
+    if (s.arg) {
+      if (typeDef?.argType === 'pair') {
+        const parts = s.arg.split(',').map(p => p.trim());
+        argPart = `(${JSON.stringify(parts[0] || '')}, ${JSON.stringify(parts[1] || '')})`;
+      } else if (typeDef?.argType === 'number') {
+        argPart = `(${s.arg})`;
+      } else {
+        argPart = `(${JSON.stringify(s.arg)})`;
+      }
+    }
     const notPart = s.negate ? '.not' : '';
     btn.innerHTML = `<span style="color:var(--vscode-textLink-foreground);">${notPart}.${s.type}${argPart}</span>` +
       (s.explanation ? ` <span style="color:var(--vscode-descriptionForeground);font-size:11px;">— ${escapeHtml(s.explanation)}</span>` : '');
@@ -123,8 +138,14 @@ function applySuggestion(s: { type: string; arg?: string; negate?: boolean }) {
   switchMode('locator');
   // Select the assertion type
   assertType.value = s.type;
-  // Fill the arg input
-  argInput.value = s.arg || '';
+  // Fill the arg input (normalize pair args to "name, value" matching placeholder)
+  const suggestionTypeDef = types.find(t => t.value === s.type);
+  if (s.arg && suggestionTypeDef?.argType === 'pair') {
+    const parts = s.arg.split(',').map(p => p.trim());
+    argInput.value = `${parts[0] || ''}, ${parts[1] || ''}`;
+  } else {
+    argInput.value = s.arg || '';
+  }
   // Set negate
   negateCheckbox.checked = !!s.negate;
   // Trigger rebuild
