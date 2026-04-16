@@ -156,7 +156,7 @@ window.addEventListener('message', event => {
     aiSuggestions.style.display = 'none';
   } else if (method === 'aiSuggestProcessing') {
     aiSuggestBtn.disabled = params.processing;
-    aiSuggestBtn.title = params.processing ? 'Thinking...' : 'Get AI-suggested assertions';
+    aiSuggestBtn.title = params.processing ? 'Thinking...' : 'Suggest with AI';
     if (params.processing) {
       aiSuggestions.style.display = 'block';
       aiSuggestions.innerHTML = '<div style="font-size:12px;color:var(--vscode-descriptionForeground);padding:4px;">Thinking...</div>';

@@ -129,6 +129,12 @@ export class AssertView extends WebviewBase {
           height: 16px;
           fill: var(--vscode-editor-foreground);
         }
+        .icon-btn.ai-sparkle svg {
+          fill: var(--vscode-charts-yellow, gold);
+        }
+        .icon-btn.ai-sparkle:disabled svg {
+          opacity: 0.5;
+        }
         .inline-btn {
           cursor: pointer;
           background: var(--vscode-button-secondaryBackground);
@@ -198,9 +204,6 @@ export class AssertView extends WebviewBase {
         <div class="hbox">
           <span class="step-num">2</span>
           <label>Assert using</label>
-          <button id="aiSuggestBtn" title="Get AI-suggested assertions" class="icon-btn" style="margin-left:auto;" disabled>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1l1.5 4L14 6.5 9.5 8 8 12 6.5 8 2 6.5 6.5 5zm5 9l.75 2L15.5 12.75 13.75 13.5 13 15.5 12.25 13.5 10.5 12.75 12.25 12z"/></svg>
-          </button>
         </div>
         <div class="hbox" style="gap:8px;margin-top:2px;">
           <label class="radio-label"><input type="radio" name="assertMode" value="locator" checked> Locator</label>
@@ -215,6 +218,9 @@ export class AssertView extends WebviewBase {
           <input id="argInput" placeholder="Expected value" aria-label="Expected value" style="display:none;">
         </div>
         <div id="snapshotMode" style="display:none;"></div>
+        <button id="aiSuggestBtn" title="Suggest with AI" class="icon-btn ai-sparkle" style="margin-top:6px;width:fit-content;" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1l1.5 4L14 6.5 9.5 8 8 12 6.5 8 2 6.5 6.5 5zm5 9l.75 2L15.5 12.75 13.75 13.5 13 15.5 12.25 13.5 10.5 12.75 12.25 12z"/></svg>
+        </button>
         <div id="aiSuggestions" style="margin-top:6px;display:none;"></div>
       </div>
       <div class="section">
