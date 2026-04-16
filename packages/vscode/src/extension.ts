@@ -37,6 +37,7 @@ import { findTestEndPosition } from './babelHighlightUtil';
 import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
+import { VSCodeLMProvider } from './ai/provider';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -203,6 +204,7 @@ export class Extension implements RunHooks {
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._context.extensionUri);
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
+    this._assertView.setAIProvider(new VSCodeLMProvider(vscode));
     this._browserController = new BrowserController(vscode, this._logger);
     this._browserController.setViews(this._replView, this._locatorsView, this._assertView, this._settingsView);
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');

@@ -6,6 +6,7 @@ import { WebviewBase } from './webviewBase';
 import type { IBrowserManager } from './browser';
 import type { Picker } from './picker';
 import * as vscodeTypes from './vscodeTypes';
+import type { AIProvider, ElementInfo } from './ai/provider';
 
 interface AssertionType {
   value: string;
@@ -52,9 +53,11 @@ export function filterTypes(tag?: string, inputType?: string): AssertionType[] {
 export class AssertView extends WebviewBase {
   private _browserManager: IBrowserManager | undefined;
   private _picker: Picker | undefined;
+  private _aiProvider: AIProvider | undefined;
   private _locator = '';
   private _assertion = '';
   private _ariaSnapshot = '';
+  private _elementInfo: ElementInfo | undefined;
 
   get viewId() { return 'playwright-repl.assertView'; }
   get scriptName() { return 'assertView.script.js'; }
@@ -72,11 +75,16 @@ export class AssertView extends WebviewBase {
     this._picker = picker;
   }
 
+  setAIProvider(provider: AIProvider) {
+    this._aiProvider = provider;
+  }
+
   /** Called from pick event — fills locator and default assertion */
-  public async showAssertion(locator: string, assertion: string, elementInfo?: { tag?: string; attributes?: Record<string, string> }, ariaSnapshot?: string) {
+  public async showAssertion(locator: string, assertion: string, elementInfo?: ElementInfo, ariaSnapshot?: string) {
     this._locator = locator;
     this._assertion = assertion;
     this._ariaSnapshot = ariaSnapshot || '';
+    this._elementInfo = elementInfo;
     const types = filterTypes(elementInfo?.tag, elementInfo?.attributes?.type);
     await this._vscode.commands.executeCommand('playwright-repl.assertView.focus');
     if (!this._view)
@@ -190,6 +198,9 @@ export class AssertView extends WebviewBase {
         <div class="hbox">
           <span class="step-num">2</span>
           <label>Assert using</label>
+          <button id="aiSuggestBtn" title="Get AI-suggested assertions" class="icon-btn" style="margin-left:auto;" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1l1.5 4L14 6.5 9.5 8 8 12 6.5 8 2 6.5 6.5 5zm5 9l.75 2L15.5 12.75 13.75 13.5 13 15.5 12.25 13.5 10.5 12.75 12.25 12z"/></svg>
+          </button>
         </div>
         <div class="hbox" style="gap:8px;margin-top:2px;">
           <label class="radio-label"><input type="radio" name="assertMode" value="locator" checked> Locator</label>
@@ -204,6 +215,7 @@ export class AssertView extends WebviewBase {
           <input id="argInput" placeholder="Expected value" aria-label="Expected value" style="display:none;">
         </div>
         <div id="snapshotMode" style="display:none;"></div>
+        <div id="aiSuggestions" style="margin-top:6px;display:none;"></div>
       </div>
       <div class="section">
         <div class="hbox">
@@ -230,7 +242,28 @@ export class AssertView extends WebviewBase {
       this._rebuildSnapshotAssertion(data.params.snapshot, data.params.negate);
     } else if (data.method === 'locatorChanged') {
       this._locator = data.params.locator;
+    } else if (data.method === 'aiSuggest') {
+      await this._aiSuggest();
     }
+  }
+
+  private async _aiSuggest() {
+    if (!this._aiProvider || !this._locator) {
+      this.postMessage('aiSuggestions', { suggestions: [], error: 'No element picked yet.' });
+      return;
+    }
+    this.postMessage('aiSuggestProcessing', { processing: true });
+    try {
+      const suggestions = await this._aiProvider.suggestAssertions(
+        this._elementInfo || {},
+        this._ariaSnapshot,
+        this._locator,
+      );
+      this.postMessage('aiSuggestions', { suggestions });
+    } catch (e: unknown) {
+      this.postMessage('aiSuggestions', { suggestions: [], error: (e as Error).message });
+    }
+    this.postMessage('aiSuggestProcessing', { processing: false });
   }
 
   protected onViewReady() {
