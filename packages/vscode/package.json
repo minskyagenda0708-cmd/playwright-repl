@@ -38,6 +38,21 @@
     "workspaceContains:**/*playwright*.config.{ts,js,mjs}"
   ],
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "playwright-repl.assistant",
+        "name": "playwright-repl",
+        "fullName": "Playwright REPL Assistant",
+        "description": "Fix, polish, review, and debug Playwright tests with browser tools",
+        "isSticky": true,
+        "commands": [
+          { "name": "fix", "description": "Fix failing test until it passes" },
+          { "name": "improve", "description": "Polish locators, assertions, and readability" },
+          { "name": "verify", "description": "Run test and lint, report results" },
+          { "name": "review", "description": "Review for anti-patterns and issues" }
+        ]
+      }
+    ],
     "commands": [
       {
         "category": "Test",
@@ -153,35 +168,9 @@
         "command": "playwright-repl.repl.find",
         "icon": "$(search)",
         "title": "Find in REPL"
-      },
-      {
-        "category": "Playwright REPL",
-        "command": "playwright-repl.aiAssist",
-        "icon": "$(sparkle)",
-        "title": "AI Assist"
-      },
-      {
-        "category": "Playwright REPL",
-        "command": "playwright-repl.aiChat.clear",
-        "icon": "$(clear-all)",
-        "title": "Clear AI Chat"
       }
     ],
     "menus": {
-      "editor/title": [
-        {
-          "command": "playwright-repl.aiAssist",
-          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
-          "group": "navigation"
-        }
-      ],
-      "editor/context": [
-        {
-          "command": "playwright-repl.aiAssist",
-          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
-          "group": "1_modification@99"
-        }
-      ],
       "view/title": [
         {
           "command": "playwright-repl.repl.clear",
@@ -197,11 +186,6 @@
           "command": "playwright-repl.repl.find",
           "group": "navigation@3",
           "when": "view == playwright-repl.replView"
-        },
-        {
-          "command": "playwright-repl.aiChat.clear",
-          "group": "navigation@1",
-          "when": "view == playwright-repl.aiChatView"
         }
       ]
     },
@@ -287,11 +271,6 @@
           "id": "assertContainer",
           "title": "Assert",
           "icon": "images/playwright-logo.png"
-        },
-        {
-          "id": "aiChatContainer",
-          "title": "AI Chat",
-          "icon": "images/playwright-logo.png"
         }
       ]
     },
@@ -322,13 +301,6 @@
           "type": "webview",
           "id": "playwright-repl.assertView",
           "name": "Assert"
-        }
-      ],
-      "aiChatContainer": [
-        {
-          "type": "webview",
-          "id": "playwright-repl.aiChatView",
-          "name": "AI Chat"
         }
       ]
     }

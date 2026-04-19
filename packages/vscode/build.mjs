@@ -14,7 +14,6 @@ const options = {
     'src/locatorsView.script.ts',
     'src/replView.script.ts',
     'src/assertView.script.ts',
-    'src/aiChatView.script.ts',
   ],
   bundle: true,
   outdir: 'dist',

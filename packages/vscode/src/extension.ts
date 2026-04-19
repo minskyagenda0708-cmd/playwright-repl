@@ -37,8 +37,8 @@ import { findTestEndPosition } from './babelHighlightUtil';
 import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
-import { AiChatView } from './aiChatView';
 import { VSCodeLMProvider } from './ai/provider';
+import { registerChatParticipant } from './ai/chatParticipant';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -98,7 +98,6 @@ export class Extension implements RunHooks {
   private _browserController!: BrowserController;
   private _replView!: ReplView;
   private _assertView!: AssertView;
-  private _aiChatView!: AiChatView;
 
   private _modelRebuild?: { result: Promise<void>; token: vscodeTypes.CancellationTokenSource; needsAnother: boolean; };
 
@@ -207,8 +206,6 @@ export class Extension implements RunHooks {
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
     this._assertView.setAIProvider(new VSCodeLMProvider(vscode));
-    this._aiChatView = new AiChatView(vscode, this._context.extensionUri);
-    this._aiChatView.setLogger(this._logger);
     this._browserController = new BrowserController(vscode, this._logger);
     this._browserController.setViews(this._replView, this._locatorsView, this._assertView, this._settingsView);
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
@@ -375,19 +372,14 @@ export class Extension implements RunHooks {
       vscode.commands.registerCommand('playwright-repl.repl.find', () => {
         this._replView.toggleSearch();
       }),
-      vscode.commands.registerCommand('playwright-repl.aiAssist', async () => {
-        this._logger.info('[AI Assist] Command triggered');
-        // Pass browser manager to the chat view
-        const browserManager = this._browserController.browserManager?.isRunning()
+      registerChatParticipant(
+        vscode,
+        this._context.extensionUri,
+        () => this._browserController.browserManager?.isRunning()
           ? this._browserController.browserManager
-          : undefined;
-        this._aiChatView.setBrowserManager(browserManager);
-        // Focus the AI Chat panel — user types prompt in the webview
-        await this._aiChatView.startAssist();
-      }),
-      vscode.commands.registerCommand('playwright-repl.aiChat.clear', () => {
-        this._aiChatView.clear();
-      }),
+          : undefined,
+        this._logger,
+      ),
     ];
 
     const configObserver = new WorkspaceObserver(this._vscode, () => this._scheduleRebuildModels(), this._isUnderTest);
