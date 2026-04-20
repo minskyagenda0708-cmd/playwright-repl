@@ -203,7 +203,36 @@ ${userPrompt}
 - Be concise and direct.`;
 }
 
-function buildAgentSystemPrompt(userPrompt?: string): string {
+function buildGenerateSystemPrompt(description: string): string {
+  return `You are a Playwright test generator. Generate a complete Playwright test based on the current page state.
+
+${BEST_PRACTICES}
+
+${TOOLS_DESCRIPTION}
+
+## What to test
+${description}
+
+## Workflow
+1. Call \`snapshot\` to see the current page state and understand what elements are on the page.
+2. Explore the page using \`run_command\` — click around, fill forms, hover elements — to understand the UI flows.
+3. Generate a complete Playwright test file covering the described scenarios.
+4. Run the test with \`run_test\` to verify it passes.
+5. If it fails, fix the code and re-run until it passes.
+6. Return the final passing test code.
+
+## Output Rules
+- Return a COMPLETE Playwright test file with imports and test blocks.
+- Start with \`import { test, expect } from '@playwright/test';\`
+- Use descriptive test names that reflect the scenarios.
+- Each test should navigate to the starting URL and be self-contained.
+- Include proper assertions (toBeVisible, toHaveText, toHaveURL, etc.).
+- Return ONLY the final code. No prose, no explanation, no code fences.
+- If the file already has tests, add the new test(s) to the existing structure.`;
+}
+
+function buildAgentSystemPrompt(userPrompt?: string, generate?: boolean): string {
+  if (generate) return buildGenerateSystemPrompt(userPrompt || 'the current page');
   return userPrompt ? buildCustomSystemPrompt(userPrompt) : buildAutoSystemPrompt();
 }
 
@@ -336,6 +365,10 @@ function findWorkspaceRoot(filePath: string): string {
   return path.dirname(filePath); // fallback
 }
 
+export interface AiAssistOptions {
+  generate?: boolean;
+}
+
 export async function aiAssist(
   vscode: vscodeTypes.VSCode,
   initialEditor: vscodeTypes.TextEditor,
@@ -344,6 +377,7 @@ export async function aiAssist(
   userPrompt?: string,
   onEvent?: (event: AgentEvent) => void,
   token?: vscodeTypes.CancellationToken,
+  options?: AiAssistOptions,
 ): Promise<void> {
   let editor = initialEditor;
   const log = (msg: string) => logger?.info(`[AI Assist] ${msg}`);
@@ -358,7 +392,7 @@ export async function aiAssist(
   log(`Target range: lines ${targetRange.start.line + 1}-${targetRange.end.line + 1}`);
 
   const originalText = editor.document.getText(targetRange);
-  if (!originalText.trim()) {
+  if (!originalText.trim() && !options?.generate) {
     vscode.window.showWarningMessage('No code to fix.');
     return;
   }
@@ -377,17 +411,31 @@ export async function aiAssist(
   const hasBrowser = !!browserManager;
 
   // Build initial messages
+  const isGenerate = !!options?.generate;
   const messages: any[] = [
-    vscode.LanguageModelChatMessage.User(buildAgentSystemPrompt(userPrompt)),
-    vscode.LanguageModelChatMessage.User(
+    vscode.LanguageModelChatMessage.User(buildAgentSystemPrompt(userPrompt, isGenerate)),
+  ];
+
+  if (isGenerate) {
+    messages.push(vscode.LanguageModelChatMessage.User(
+      (originalText.trim()
+        ? `The current file has this content:\n\n${fullFileText}\n\nAdd the new test(s) to this existing file.\n\n`
+        : 'The editor is empty. Generate a complete new test file.\n\n')
+      + (hasBrowser
+        ? 'IMPORTANT: Start by calling the snapshot tool to see the current page state.'
+        : 'NOTE: No browser is running. Browser tools (snapshot, screenshot, run_command, run_script) are unavailable. ')
+      + 'When using run_test, use the FULL test name including describe() prefixes separated by " > ".',
+    ));
+  } else {
+    messages.push(vscode.LanguageModelChatMessage.User(
       `Here is the full test file for context:\n\n${fullFileText}\n\n`
       + `Here is the specific test code to improve (lines ${targetRange.start.line + 1}-${targetRange.end.line + 1}):\n\n${originalText}\n\n`
       + (hasBrowser
         ? 'IMPORTANT: Start by calling the snapshot tool to see the current page state before making any changes. '
         : 'NOTE: No browser is running. Browser tools (snapshot, screenshot, run_command, run_script) are unavailable. Use run_test and lint to verify changes. ')
       + 'When using run_test, use the FULL test name including describe() prefixes separated by " > ".',
-    ),
-  ];
+    ));
+  }
 
   // ─── Agent loop ─────────────────────────────────────────────────────────
 
@@ -403,20 +451,20 @@ export async function aiAssist(
   }
 
   async function runAgentLoop(loopToken: vscodeTypes.CancellationToken): Promise<string | undefined> {
-    const maxIterations = userPrompt ? MAX_ITERATIONS_CUSTOM : MAX_ITERATIONS_AUTO;
+    const maxIterations = (isGenerate || !userPrompt) ? MAX_ITERATIONS_AUTO : MAX_ITERATIONS_CUSTOM;
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       if (loopToken.isCancellationRequested) return undefined;
 
       emit({ type: 'iteration', current: iteration + 1, max: maxIterations });
 
-      // Force tool use on the first iteration (only for auto mode, not custom prompts)
+      // Force tool use on the first iteration (auto mode and generate mode)
       let tools = AGENT_TOOLS;
       let toolMode: number | undefined;
-      if (iteration === 0 && !userPrompt) {
+      if (iteration === 0 && (!userPrompt || isGenerate)) {
         if (hasBrowser) {
           tools = [AGENT_TOOLS[0]]; // force snapshot
           toolMode = 2;
-        } else {
+        } else if (!isGenerate) {
           tools = AGENT_TOOLS.filter(t => t.name === 'lint'); // force lint
           toolMode = 2;
         }
@@ -577,7 +625,7 @@ export async function aiAssist(
     const polished = parsePolishResponse(finalCode, originalText);
     log(`Parsed: ${polished.length} chars, Original: ${originalText.length} chars, Same: ${polished.trim() === originalText.trim()}`);
 
-    if (polished.trim() === originalText.trim()) {
+    if (!isGenerate && polished.trim() === originalText.trim()) {
       log('No changes needed');
       emit({ type: 'done', summary: 'Code looks good — no changes needed.' });
       vscode.window.showInformationMessage('Code looks good — no changes needed.');

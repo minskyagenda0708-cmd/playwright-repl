@@ -43,13 +43,14 @@
         "id": "playwright-repl.assistant",
         "name": "playwright-repl",
         "fullName": "Playwright REPL Assistant",
-        "description": "Fix, polish, review, and debug Playwright tests with browser tools",
+        "description": "Generate, fix, polish, review, and debug Playwright tests with browser tools",
         "isSticky": true,
         "commands": [
           { "name": "fix", "description": "Fix failing test until it passes" },
           { "name": "improve", "description": "Polish locators, assertions, and readability" },
           { "name": "verify", "description": "Run test and lint, report results" },
-          { "name": "review", "description": "Review for anti-patterns and issues" }
+          { "name": "review", "description": "Review for anti-patterns and issues" },
+          { "name": "generate", "description": "Generate a new test from the current page state" }
         ]
       }
     ],

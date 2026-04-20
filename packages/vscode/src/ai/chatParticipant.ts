@@ -7,7 +7,7 @@
 
 import type * as vscodeTypes from '../vscodeTypes';
 import type { IBrowserManager } from '../browser';
-import { aiAssist, type AgentEvent } from './agent';
+import { aiAssist, type AgentEvent, type AiAssistOptions } from './agent';
 
 /** Strip ANSI escape codes from terminal output. */
 function stripAnsi(text: string): string {
@@ -59,9 +59,13 @@ export function registerChatParticipant(
         review: 'Review this test for anti-patterns, flaky patterns, missing assertions, and issues. Report findings.',
       };
 
-      const userPrompt = command
-        ? (commandPrompts[command] + (request.prompt ? ` ${request.prompt}` : ''))
-        : (request.prompt?.trim() || undefined);
+      const isGenerate = command === 'generate';
+      const userPrompt = isGenerate
+        ? (request.prompt?.trim() || 'the current page')
+        : command
+          ? (commandPrompts[command] + (request.prompt ? ` ${request.prompt}` : ''))
+          : (request.prompt?.trim() || undefined);
+      const assistOptions: AiAssistOptions | undefined = isGenerate ? { generate: true } : undefined;
 
       // Map AgentEvent to Chat stream
       const onEvent = (event: AgentEvent) => {
@@ -104,7 +108,7 @@ export function registerChatParticipant(
         await aiAssist(
           vscode, editor, browserManager,
           logger, userPrompt,
-          onEvent, token,
+          onEvent, token, assistOptions,
         );
       } catch (e: unknown) {
         const msg = (e as Error).message || '';
