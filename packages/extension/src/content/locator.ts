@@ -101,6 +101,12 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
         const text = (clone.textContent || '').trim();
         if (text) return text;
     }
+    // Informal association: preceding table cell or sibling text (common in legacy forms)
+    const cell = el.closest('td, th');
+    if (cell?.previousElementSibling) {
+        const text = (cell.previousElementSibling.textContent || '').trim();
+        if (text && text.length <= 80) return text;
+    }
     return '';
 }
 
@@ -319,10 +325,11 @@ export function locatorToPwArgs(locator: string, role?: string | null): string {
     if (testIdMatch) return `${q(testIdMatch[1])}${nth}`;
 
     // getByLabel / getByText / getByPlaceholder / getByTitle / getByAltText — prepend role if available
-    const getByMatch = locator.match(/getBy\w+\(['"](.+?)['"]\)/);
+    const getByMatch = locator.match(/getBy\w+\(['"](.+?)['"](,\s*\{[^}]*\})?\)/);
     if (getByMatch) {
         const prefix = role ? `${role} ` : '';
-        return `${prefix}${q(getByMatch[1])}${nth}`;
+        const exact = getByMatch[0].includes('exact: true') ? ' --exact' : '';
+        return `${prefix}${q(getByMatch[1])}${exact}${nth}`;
     }
 
     // locator('css') fallback
@@ -382,10 +389,11 @@ export function generateLocator(el: Element): string {
     const title = el.getAttribute('title');
     if (title) return `getByTitle(${escapeString(title)})`;
 
-    // 7. Text content (use substring for long text — getByText does partial matching)
+    // 7. Text content — use exact matching for full text, substring for long text
     const text = (el.textContent || '').trim();
     if (text) {
-        const snippet = text.length <= 80 ? text : text.slice(0, 50).replace(/\s+\S*$/, '');
+        if (text.length <= 80) return `getByText(${escapeString(text)}, { exact: true })`;
+        const snippet = text.slice(0, 50).replace(/\s+\S*$/, '');
         if (snippet) return `getByText(${escapeString(snippet)})`;
     }
 
@@ -500,8 +508,13 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'fill': {
             const val = opts?.value ?? '';
+            // Bare role without name (e.g. "textbox") makes fill ambiguous:
+            // `fill textbox "val"` parses as fill(role=textbox, name="val", value="")
+            const fillLoc = /^[a-z]+$/.test(pwArgs)
+                ? q(buildCssSelector(el))
+                : pwArgs;
             return {
-                pw: `fill ${pwArgs} ${q(val)}${inFlag}`,
+                pw: `fill ${fillLoc} ${q(val)}${inFlag}`,
                 js: `await ${jsLoc}.fill(${escapeString(val)});`,
             };
         }
@@ -520,8 +533,12 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'select': {
             const optVal = opts?.option ?? '';
+            // Same bare-role guard as fill
+            const selLoc = /^[a-z]+$/.test(pwArgs)
+                ? q(buildCssSelector(el))
+                : pwArgs;
             return {
-                pw: `select ${pwArgs} ${q(optVal)}${inFlag}`,
+                pw: `select ${selLoc} ${q(optVal)}${inFlag}`,
                 js: `await ${jsLoc}.selectOption(${escapeString(optVal)});`,
             };
         }

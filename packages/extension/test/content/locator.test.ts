@@ -241,6 +241,18 @@ describe('locator', () => {
             const input = document.querySelector('input') as HTMLInputElement;
             expect(getLabel(input)).toBe('Name');
         });
+
+        it('detects informal label from preceding table cell', () => {
+            document.body.innerHTML = '<table><tr><td>Benutzerkennung:*</td><td><input type="text"></td></tr></table>';
+            const input = document.querySelector('input') as HTMLInputElement;
+            expect(getLabel(input)).toBe('Benutzerkennung:*');
+        });
+
+        it('returns empty when preceding cell has no text', () => {
+            document.body.innerHTML = '<table><tr><td></td><td><input type="text"></td></tr></table>';
+            const input = document.querySelector('input') as HTMLInputElement;
+            expect(getLabel(input)).toBe('');
+        });
     });
 
     // ─── findByRoleAndName ────────────────────────────────────────────────
@@ -380,11 +392,11 @@ describe('locator', () => {
             expect(generateLocator(el)).toBe("getByTitle('Tooltip text')");
         });
 
-        it('uses getByText for element with short text', () => {
+        it('uses getByText with exact: true for element with short text', () => {
             const el = document.createElement('span');
             el.textContent = 'Hello world';
             document.body.appendChild(el);
-            expect(generateLocator(el)).toBe("getByText('Hello world')");
+            expect(generateLocator(el)).toBe("getByText('Hello world', { exact: true })");
         });
 
         it('uses getByRole without name for role-only elements', () => {
@@ -654,6 +666,11 @@ describe('locator', () => {
         it('parses getByText', () => {
             expect(locatorToPwArgs("getByText('hello')"))
                 .toBe('"hello"');
+        });
+
+        it('parses getByText with exact: true and adds --exact', () => {
+            expect(locatorToPwArgs("getByText('Bis 45 km/h', { exact: true })"))
+                .toBe('"Bis 45 km/h" --exact');
         });
 
         it('parses getByTestId', () => {
@@ -955,6 +972,33 @@ describe('locator', () => {
             const editButtons = [...document.querySelectorAll('button')].filter(b => b.textContent === 'Edit');
             const cmds = buildCommands('click', editButtons[1]);
             expect(cmds!.pw).toBe('click button "Edit" --in row "Bob"');
+        });
+
+        it('uses CSS fallback for fill when textbox has no accessible name', () => {
+            document.body.innerHTML = '<input type="text" class="username">';
+            const input = document.querySelector('input')!;
+            const cmds = buildCommands('fill', input, { value: 'user' });
+            // Should NOT produce `fill textbox "user"` (ambiguous)
+            expect(cmds!.pw).not.toMatch(/^fill textbox /);
+            // Should use CSS selector fallback
+            expect(cmds!.pw).toContain('"user"');
+            expect(cmds!.js).toContain(".fill('user')");
+        });
+
+        it('uses label from preceding table cell for fill', () => {
+            document.body.innerHTML = '<table><tr><td>Username:</td><td><input type="text"></td></tr></table>';
+            const input = document.querySelector('input')!;
+            const cmds = buildCommands('fill', input, { value: 'admin' });
+            expect(cmds!.pw).toContain('"Username:"');
+            expect(cmds!.pw).toContain('"admin"');
+        });
+
+        it('adds --exact for text-based click locator', () => {
+            document.body.innerHTML = '<div>Bis 45 km/h</div>';
+            const div = document.querySelector('div')!;
+            const cmds = buildCommands('click', div);
+            expect(cmds!.pw).toContain('--exact');
+            expect(cmds!.js).toContain("getByText('Bis 45 km/h', { exact: true })");
         });
 
         it('uses text-only --in from heading context instead of --nth', () => {

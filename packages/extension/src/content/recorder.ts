@@ -33,28 +33,29 @@ function detectFrameSelector(): string | null {
         // Same-origin: window.frameElement is accessible
         const frame = window.frameElement;
         if (frame) {
+            const tag = frame.tagName.toLowerCase(); // 'frame' or 'iframe'
             // Prefer id selector
             if (frame.id) return `#${CSS.escape(frame.id)}`;
             // Prefer name attribute
             const name = frame.getAttribute('name');
-            if (name) return `iframe[name="${name}"]`;
+            if (name) return `${tag}[name="${name}"]`;
             // Prefer src attribute
             const src = frame.getAttribute('src');
-            if (src) return `iframe[src="${src}"]`;
+            if (src) return `${tag}[src="${src}"]`;
             // Fall back to tag + nth-of-type
             const parent = frame.parentElement;
             if (parent) {
-                const siblings = Array.from(parent.querySelectorAll(':scope > iframe'));
+                const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
                 const idx = siblings.indexOf(frame);
-                if (siblings.length === 1) return 'iframe';
-                return `iframe:nth-of-type(${idx + 1})`;
+                if (siblings.length === 1) return tag;
+                return `${tag}:nth-of-type(${idx + 1})`;
             }
-            return 'iframe';
+            return tag;
         }
     } catch { /* cross-origin — frameElement throws */ }
 
     // Cross-origin fallback: use location to build a src-based selector
-    // This is a best-effort approach
+    // This is a best-effort approach — assume iframe (modern standard)
     try {
         const src = window.location.href;
         if (src && src !== 'about:blank') return `iframe[src="${src}"]`;
