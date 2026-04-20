@@ -20,6 +20,12 @@ export function registerChatParticipant(
   getBrowserManager: () => IBrowserManager | undefined,
   logger?: vscodeTypes.LogOutputChannel,
 ): vscodeTypes.Disposable {
+  // Chat Participant API may not be available (e.g. in mock tests, older VS Code)
+  if (!(vscode as any).chat?.createChatParticipant) {
+    logger?.info('[Chat Participant] vscode.chat API not available — skipping registration');
+    return { dispose() {} } as vscodeTypes.Disposable;
+  }
+
   const participant = (vscode as any).chat.createChatParticipant(
     'playwright-repl.assistant',
     async (
