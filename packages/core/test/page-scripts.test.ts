@@ -320,6 +320,33 @@ describe('fillByText', () => {
     await fillByText(page, 'Email', 'test@example.com');
     expect(page._loc.fill).toHaveBeenCalledWith('test@example.com');
   });
+
+  it('fills via informal label fallback when no formal label (#768)', async () => {
+    // Simulate: <tr><td>Benutzerkennung:*</td><td><input></td></tr>
+    // No <label for> association, so getByLabel/getByPlaceholder/getByRole all return count=0.
+    const filledWith = [];
+    const inputLoc = {
+      fill: vi.fn().mockImplementation((v) => { filledWith.push(v); }),
+    };
+    const noMatch = { count: vi.fn().mockResolvedValue(0) };
+    const page = {
+      getByLabel: vi.fn().mockReturnValue(noMatch),
+      getByPlaceholder: vi.fn().mockReturnValue(noMatch),
+      getByRole: vi.fn().mockReturnValue(noMatch),
+      getByText: vi.fn().mockReturnValue({
+        first: vi.fn().mockReturnValue({
+          evaluate: vi.fn().mockResolvedValue('[data-pw-fill="test123"]'),
+        }),
+      }),
+      locator: vi.fn().mockReturnValue(inputLoc),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await fillByText(page, 'Benutzerkennung:*', 'user');
+    expect(page.getByText).toHaveBeenCalledWith('Benutzerkennung:*');
+    expect(page.locator).toHaveBeenCalledWith('[data-pw-fill="test123"]');
+    expect(filledWith).toEqual(['user']);
+  });
 });
 
 describe('selectByText', () => {

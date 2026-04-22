@@ -150,6 +150,28 @@ export async function fillByText(page, text, value, nth?, exact?) {
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByPlaceholder(text);
     if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+    // Informal label fallback: find text, walk up DOM to locate a nearby input
+    if (await loc.count() === 0) {
+      const sel = await page.getByText(text).first().evaluate((el: Element) => {
+        let a: Element | null = el.closest('tr') || el.parentElement;
+        while (a && a !== document.body) {
+          const inp = a.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, [contenteditable="true"]');
+          if (inp) {
+            const id = '__pw_fill_' + Math.random().toString(36).slice(2);
+            inp.setAttribute('data-pw-fill', id);
+            return '[data-pw-fill="' + id + '"]';
+          }
+          a = a.parentElement;
+        }
+        return null;
+      });
+      if (sel) {
+        loc = page.locator(sel);
+        await loc.fill(value);
+        await page.evaluate(() => document.querySelectorAll('[data-pw-fill]').forEach(el => el.removeAttribute('data-pw-fill'))).catch(() => {});
+        return;
+      }
+    }
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.fill(value);
