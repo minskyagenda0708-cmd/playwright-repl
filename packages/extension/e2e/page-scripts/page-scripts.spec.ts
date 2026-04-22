@@ -421,3 +421,34 @@ test.describe('cookies', () => {
         expect(await cookieClear(page)).toBe('Cleared');
     });
 });
+
+// ─── Informal label fill (#768) ──────────────────────────────────────────
+
+test.describe('fillByText — informal label', () => {
+    test('fills input in legacy table form without <label for> (#768)', async ({ page }) => {
+        await fillByText(page, 'Benutzerkennung:*', 'testuser', undefined);
+        expect(await page.inputValue('#LoginName')).toBe('testuser');
+    });
+
+    test('does not fill hidden or checkbox inputs (#768)', async ({ page }) => {
+        // "Benutzerkennung:*" is in the same <tr> as a text input — should find that
+        await fillByText(page, 'Benutzerkennung:*', 'hello', undefined);
+        const val = await page.inputValue('#LoginName');
+        expect(val).toBe('hello');
+    });
+});
+
+// ��── --in scoping (#734) ─────────────────────────────────────────────────
+
+test.describe('actionByText — --in scoping', () => {
+    test('clicks correct radio when --in matches the right fieldset (#734)', async ({ page }) => {
+        // "Bis 25 km/h" exists in BOTH the Moped and E-Scooter fieldsets.
+        // Scoping to "E-Scooter" should click the one in the E-Scooter fieldset.
+        await actionByText(
+            page.getByRole('group').filter({ hasText: 'E-Scooter' }).first(),
+            'Bis 25 km/h', 'click', undefined,
+        );
+        expect(await page.isChecked('input[name="escooter-speed"][value="25"]')).toBe(true);
+        expect(await page.isChecked('input[name="moped-speed"][value="25"]')).toBe(false);
+    });
+});
