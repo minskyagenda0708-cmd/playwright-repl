@@ -41,18 +41,20 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   const tgtSer = JSON.stringify(targetText);
   return { _: ['run-code', `async (page) => {
   let __scope = page;
-  for (const __r of ['region','group','article','listitem','dialog','form']) {
+  for (const __r of ['group','article','listitem','region','dialog','form']) {
     const __c = page.getByRole(__r).filter({ hasText: ${inSer} });
-    if (await __c.getByText(${tgtSer}, { exact: true }).count() > 0) { __scope = __c; break; }
+    const __n = await __c.count();
+    if (__n > 0) { __scope = __c.first(); break; }
   }
   if (__scope === page) {
     try {
       let __anchor = page.getByText(${inSer}, { exact: true });
       if (await __anchor.count() === 0) __anchor = page.getByText(${inSer});
-      const __sel = await __anchor.first().evaluate((el, tgt) => {
+      const __sel = await __anchor.first().evaluate((el) => {
+        const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM']);
         let a = el.parentElement;
         while (a && a !== document.body) {
-          if (a.textContent.includes(tgt)) {
+          if (S.has(a.tagName) || a.hasAttribute('role')) {
             const id = '__pw_in_' + Math.random().toString(36).slice(2);
             a.setAttribute('data-pw-in', id);
             return '[data-pw-in="' + id + '"]';
@@ -60,7 +62,7 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
           a = a.parentElement;
         }
         return null;
-      }, ${tgtSer});
+      });
       if (__sel) __scope = page.locator(__sel);
     } catch {}
   }

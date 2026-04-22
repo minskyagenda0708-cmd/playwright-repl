@@ -273,6 +273,29 @@ describe('--in with text locators (resolveArgs)', () => {
     expect(code).toContain('__anchor.count()');
     expect(code).toContain('__anchor = page.getByText("Moped, Roller")');
   });
+
+  it('role-based scoping picks narrowest container with --in text (#734)', () => {
+    const args = parseInput('click "Bis 45 km/h" --in "E-Scooter"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // Should scope to first role element containing --in text (group before form)
+    // without requiring the target text to also be present
+    expect(code).toContain('filter({ hasText: "E-Scooter" })');
+    expect(code).toContain('__c.first()');
+    // Should NOT check for target text in the role loop
+    expect(code).not.toContain('__c.getByText');
+  });
+
+  it('DOM fallback stops at section boundary, not at target text (#734)', () => {
+    const args = parseInput('click "Bis 45 km/h" --in "E-Scooter"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // DOM fallback should find nearest section-level ancestor
+    // without walking up to a broad container that happens to contain target
+    expect(code).toContain('FIELDSET');
+    expect(code).toContain('SECTION');
+    expect(code).toContain('a.hasAttribute');
+  });
 });
 
 describe('verify css subcommand (#787)', () => {
