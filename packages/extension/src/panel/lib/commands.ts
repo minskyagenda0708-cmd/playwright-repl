@@ -186,21 +186,14 @@ function call(fn: any, ...args: unknown[]): string {
  * then calls fn with the scoped locator as `page`.
  * First tries role-based scoping, then falls back to DOM proximity via locator.evaluate().
  */
-function callScoped(fn: any, inText: string, targetText: string, ...args: unknown[]): string {
-  // For bare roles (empty targetText), use role-based scope detection
-  const targetRole = !targetText && args.length > 0 ? args[0] as string : '';
-  const scopeCheck = targetText
-    ? `await __c.getByText(${ser(targetText)}, { exact: true }).count() > 0`
-    : targetRole
-      ? `await __c.getByRole(${ser(targetRole)}).count() > 0`
-      : `false`;
+function callScoped(fn: any, inText: string, _targetText: string, ...args: unknown[]): string {
   // Try exact match first, then fall back to substring (consistent with actionByText)
   const anchorCode = `(async () => { const __e = page.getByText(${ser(inText)}, { exact: true }); return (await __e.count()) > 0 ? __e : page.getByText(${ser(inText)}); })()`;
-  const fallbackCheck = targetText
-    ? `(await ${anchorCode}).first().evaluate((el, tgt) => {
+  const fallbackCheck = `(await ${anchorCode}).first().evaluate((el) => {
+          const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM']);
           let a = el.parentElement;
           while (a && a !== document.body) {
-            if (a.textContent.includes(tgt)) {
+            if (S.has(a.tagName) || a.hasAttribute('role')) {
               const id = '__pw_in_' + Math.random().toString(36).slice(2);
               a.setAttribute('data-pw-in', id);
               return '[data-pw-in="' + id + '"]';
@@ -208,22 +201,13 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
             a = a.parentElement;
           }
           return null;
-        }, ${ser(targetText)})`
-    : `(await ${anchorCode}).first().evaluate((el) => {
-          let a = el.parentElement;
-          while (a && a !== document.body) {
-            const id = '__pw_in_' + Math.random().toString(36).slice(2);
-            a.setAttribute('data-pw-in', id);
-            return '[data-pw-in="' + id + '"]';
-          }
-          return null;
         })`;
   return `await (async () => {
     let __scope = page;
-    const __roles = ['region', 'group', 'article', 'listitem', 'dialog', 'form'];
+    const __roles = ['group', 'article', 'listitem', 'region', 'dialog', 'form'];
     for (const __r of __roles) {
       const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
-      if (${scopeCheck}) { __scope = __c; break; }
+      if (await __c.count() > 0) { __scope = __c.first(); break; }
     }
     if (__scope === page) {
       try {
