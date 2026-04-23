@@ -280,6 +280,7 @@ export const jsModeExtension = [
 ];
 
 export const baseExtensions = [
+    EditorView.lineWrapping,                 // wrap long lines (#801)
     languageCompartment.of(pwModeExtension), // dynamic language compartment
     breakpointField,                         // ← breakpoint state (must register before gutter)
     breakpointGutter,                        // ← clickable breakpoint dots (leftmost gutter)
