@@ -236,7 +236,7 @@ html, body {
 
 .ot-key    { color: var(--color-flag); }
 .ot-colon  { color: var(--text-dim); }
-.ot-string { color: var(--color-string); }
+.ot-string { color: var(--color-string); word-break: break-word; }
 .ot-number { color: var(--color-url); }
 .ot-boolean { color: var(--color-url); }
 .ot-null, .ot-undefined { color: var(--text-dim); font-style: italic; }
