@@ -118,7 +118,7 @@ test.describe('Recording flow', () => {
       expect(editorText).not.toContain('css');
     });
 
-    test('clicking inside a <frame> uses frame tag, not iframe (#769)', async ({ sidePanel, testPage }) => {
+    test('clicking inside a <frame> records --frame with CSS selector (#769)', async ({ sidePanel, testPage }) => {
       const ctx = testPage.context();
       // Serve frameset pages via route so they're same-origin (file:// treats frames as cross-origin)
       await ctx.route('https://test.local/frameset.html', route => route.fulfill({
@@ -141,7 +141,34 @@ test.describe('Recording flow', () => {
 
       await sidePanel.waitForEditorText('click button "Arbeitskorb"');
       const editorText = await sidePanel.getEditorText();
-      expect(editorText).toContain('--frame "main"');
+      // No id → falls back to name attribute CSS selector
+      expect(editorText).toContain('--frame "frame[name="main"]"');
+    });
+
+    test('clicking inside an <iframe> with id records --frame with CSS id (#800)', async ({ sidePanel, testPage }) => {
+      const ctx = testPage.context();
+      await ctx.route('https://test.local/iframe-page.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><body><iframe id="oevd-iframe" name="oevd-iframe" src="https://test.local/iframe-content.html"></iframe></body></html>',
+      }));
+      await ctx.route('https://test.local/iframe-content.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<button>Submit</button>',
+      }));
+
+      await testPage.goto('https://test.local/iframe-page.html');
+      await testPage.bringToFront();
+      await sidePanel.attachToActiveTab();
+
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.frameLocator('#oevd-iframe').getByRole('button', { name: 'Submit' }).click();
+
+      await sidePanel.waitForEditorText('click button "Submit"');
+      const editorText = await sidePanel.getEditorText();
+      // CSS id matches pickLocator format
+      expect(editorText).toContain('--frame "#oevd-iframe"');
     });
 
     test('stop recording resets button state', async ({ sidePanel }) => {

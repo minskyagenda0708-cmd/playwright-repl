@@ -27,53 +27,48 @@ export const SPECIAL_KEYS = new Set([
  * due to security restrictions — we fall back to using the frame's src URL.
  */
 /**
- * Compute selectors for a single frame element.
- * pw: plain name/id for --frame (resolved by page.frame())
- * css: CSS selector for JS .locator().contentFrame()
+ * Compute CSS selector for a frame element.
+ * Uses the same selector for both --frame flag (PW) and .locator().contentFrame() (JS),
+ * matching pickLocator's output format for consistency.
+ * Priority: CSS id > name attribute > src attribute > nth-of-type fallback.
  */
-function selectorsForFrame(frame: Element): { pw: string; css: string } {
+function selectorForFrame(frame: Element): string {
+    if (frame.id) return `#${CSS.escape(frame.id)}`;
     const tag = frame.tagName.toLowerCase(); // 'frame' or 'iframe'
     const name = frame.getAttribute('name');
-    if (name) return { pw: name, css: `${tag}[name="${name}"]` };
-    if (frame.id) return { pw: frame.id, css: `#${CSS.escape(frame.id)}` };
+    if (name) return `${tag}[name="${name}"]`;
     const src = frame.getAttribute('src');
-    if (src) { const sel = `${tag}[src="${src}"]`; return { pw: sel, css: sel }; }
+    if (src) return `${tag}[src="${src}"]`;
     const parent = frame.parentElement;
     if (parent) {
         const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
         const idx = siblings.indexOf(frame);
-        const sel = siblings.length === 1 ? tag : `${tag}:nth-of-type(${idx + 1})`;
-        return { pw: sel, css: sel };
+        return siblings.length === 1 ? tag : `${tag}:nth-of-type(${idx + 1})`;
     }
-    return { pw: tag, css: tag };
+    return tag;
 }
 
 /**
  * Detect the full frame chain from this window up to the top frame.
- * Returns arrays of selectors, one per ancestor frame, outermost first.
- * Returns empty arrays if we're in the top frame.
+ * Returns array of CSS selectors, one per ancestor frame, outermost first.
+ * Returns empty array if we're in the top frame.
  */
-function detectFrameChain(): { pw: string[]; css: string[] } {
-    if (window === window.top) return { pw: [], css: [] };
+function detectFrameChain(): string[] {
+    if (window === window.top) return [];
 
-    const pwChain: string[] = [];
-    const cssChain: string[] = [];
+    const chain: string[] = [];
     let win: Window = window;
     while (win !== win.top) {
         try {
             const frame = win.frameElement;
             if (frame) {
-                const sels = selectorsForFrame(frame);
-                pwChain.push(sels.pw);
-                cssChain.push(sels.css);
+                chain.push(selectorForFrame(frame));
             } else {
                 // Cross-origin: frameElement is null, use src fallback
                 try {
                     const src = win.location.href;
-                    const sel = (src && src !== 'about:blank') ? `iframe[src="${src}"]` : 'iframe';
-                    pwChain.push(sel);
-                    cssChain.push(sel);
-                } catch { pwChain.push('iframe'); cssChain.push('iframe'); }
+                    chain.push((src && src !== 'about:blank') ? `iframe[src="${src}"]` : 'iframe');
+                } catch { chain.push('iframe'); }
                 break; // Can't walk further up from cross-origin
             }
         } catch {
@@ -81,24 +76,20 @@ function detectFrameChain(): { pw: string[]; css: string[] } {
         }
         win = win.parent;
     }
-    return { pw: pwChain.reverse(), css: cssChain.reverse() };
+    return chain.reverse();
 }
 
 /** Cached frame chain — computed once on init */
-let framePath: { pw: string[]; css: string[] } = { pw: [], css: [] };
+let framePath: string[] = [];
 
 /**
  * Wrap recorded commands with frame context if we're inside an iframe.
  * Prepends --frame flag(s) to PW and .contentFrame() chain to JS.
  */
 function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; js: string } {
-    if (framePath.pw.length === 0) return cmds;
-    // Single frame: use plain name for PW (page.frame() resolves it)
-    // Nested frames: use CSS selectors for PW (locator().contentFrame() at each level)
-    const frameArg = framePath.pw.length === 1
-        ? framePath.pw[0]
-        : framePath.css.join(' ');
-    const jsChain = framePath.css.map(sel => `.locator(${JSON.stringify(sel)}).contentFrame()`).join('');
+    if (framePath.length === 0) return cmds;
+    const frameArg = framePath.join(' ');
+    const jsChain = framePath.map(sel => `.locator(${JSON.stringify(sel)}).contentFrame()`).join('');
     return {
         pw: `${cmds.pw} --frame "${frameArg}"`,
         js: `await page${jsChain}.${cmds.js.replace(/^await page\./, '')}`,
