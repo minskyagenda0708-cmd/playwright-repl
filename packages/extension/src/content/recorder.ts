@@ -105,6 +105,19 @@ function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; j
     };
 }
 
+/**
+ * Safe wrapper for chrome.runtime.sendMessage — if the extension context
+ * has been invalidated (e.g. extension reloaded), clean up event listeners
+ * instead of throwing an uncaught error (#823).
+ */
+function safeSendMessage(msg: any) {
+    try {
+        chrome.runtime.sendMessage(msg);
+    } catch {
+        cleanup();
+    }
+}
+
 // ─── Fill buffering state machine ─────────────────────────────────────────
 
 export let pendingFill: { el: Element; value: string } | null = null;
@@ -135,14 +148,14 @@ export function onClickCapture(e: MouseEvent) {
         if (hoverTarget) {
             const hoverCmds = buildCommands('hover', hoverTarget);
             if (hoverCmds) {
-                chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(hoverCmds) });
+                safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(hoverCmds) });
             }
         }
     }
 
     const cmds = buildCommands('click', target);
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+        safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
     }
 }
 
@@ -157,7 +170,7 @@ export function onInputCapture(e: Event) {
         pendingFill.value = value;
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: wrapWithFrameContext(cmds) });
+            safeSendMessage({ type: 'recorded-fill-update', action: wrapWithFrameContext(cmds) });
         }
     } else {
         // Different element or first input — flush old, start new
@@ -165,7 +178,7 @@ export function onInputCapture(e: Event) {
         pendingFill = { el: target, value };
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+            safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
     }
 }
@@ -180,7 +193,7 @@ export function onChangeCapture(e: Event) {
         const checked = (target as HTMLInputElement).checked;
         const cmds = buildCommands(checked ? 'check' : 'uncheck', target);
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+            safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
         return;
     }
@@ -193,7 +206,7 @@ export function onChangeCapture(e: Event) {
         const option = selected ? selected.text.trim() || target.value : target.value;
         const cmds = buildCommands('select', target, { option });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+            safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
         return;
     }
@@ -218,7 +231,7 @@ export function onKeyDownCapture(e: KeyboardEvent) {
         ? buildCommands('press', target, { key: e.key })
         : { pw: `press ${e.key}`, js: `await page.keyboard.press(${escapeString(e.key)});` };
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+        safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
     }
 }
 
