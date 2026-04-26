@@ -237,7 +237,8 @@ function findLeafText(node: Node): string {
  */
 function findNearestHeading(el: Element): { container: Element; text: string } | null {
     let current = el.parentElement;
-    while (current && current !== document.body && current !== document.documentElement) {
+    let depth = 0;
+    while (current && current !== document.body && current !== document.documentElement && depth < 5) {
         for (const child of current.children) {
             if (child.contains(el)) break; // stop at el's branch
             // Skip peer items — section labels don't contain navigation links
@@ -245,10 +246,14 @@ function findNearestHeading(el: Element): { container: Element; text: string } |
             // Skip peer radio/checkbox labels — "Ja" label is not a heading for "Nein"
             if (child.querySelector('input[type="radio"], input[type="checkbox"]')) continue;
             if (child.matches('input[type="radio"], input[type="checkbox"]')) continue;
+            // Skip navigation/toolbar chrome — text like "Previous"/"Next" is not a section heading
+            if (child.matches('nav, [role="navigation"], [role="toolbar"], [role="tablist"]')) continue;
+            if (child.closest('nav, [role="navigation"], [role="toolbar"], [role="tablist"]')) continue;
             const text = findLeafText(child);
             if (text) return { container: current, text };
         }
         current = current.parentElement;
+        depth++;
     }
     return null;
 }

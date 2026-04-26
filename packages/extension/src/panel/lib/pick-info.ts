@@ -145,6 +145,9 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
     // (which may be a substring — Playwright's getByRole uses substring matching by default)
     const name = ariaParsed?.element.name || parsed.name;
 
+    // URL: extract from aria snapshot for link elements without an accessible name
+    const ariaUrl = ariaSnapshot?.match(/\/url:\s*(\S+)/)?.[1];
+
     // --in: from chained locator (getByRole('group', { name: 'X' }).getByLabel('Y'))
     // or from aria parent (when parent role differs from element role)
     let inFlag = '';
@@ -166,6 +169,10 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
 
     // Only add heading --in when replacing --nth or complex CSS scoping (locator()/filter())
     const needsScoping = nth || /\.locator\(|\.filter\(|^locator\(/.test(info.locator);
+
+    // Link with URL but no accessible name — use URL as the link identifier
+    // (ariaUrl presence implies a link even when aria parsing fails to extract the role)
+    if (!name && ariaUrl) return `highlight link "${ariaUrl}"`;
 
     if (role || name) {
         const base = parts.join(' ');
@@ -203,9 +210,11 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     const inputType = info.attributes?.type?.toLowerCase() ?? '';
     // Extract name from pw command, falling back to JS locator parsing
     // Skip extraction for CSS fallback commands — the quoted value is a selector, not a name
+    // Skip URL values — they're href identifiers, not visible text for assertions
     const parsed = parseJsLocator(locator);
     const isCssPw = pwCommand?.includes(' css ') ?? false;
-    const name = (pwCommand && !isCssPw ? extractPwName(pwCommand) : null) ?? parsed.name ?? null;
+    const pwName = pwCommand && !isCssPw ? extractPwName(pwCommand) : null;
+    const name = (pwName && !/^\/|^https?:\/\//.test(pwName) ? pwName : null) ?? parsed.name ?? null;
     const quotedName = name ? `"${name}"` : null;
     // Extract role from aria snapshot, element attributes, or JS locator
     const ariaRole = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot)?.element.role : null;
@@ -244,6 +253,15 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
         if (quotedName) return `${quotedName}${nth}`;
         if (fallbackText) return `"${fallbackText}"${nth}`;
         return '';
+    }
+
+    // Link identified by URL — assert visibility, not text content
+    const isUrlLink = pwName && /^\/|^https?:\/\//.test(pwName);
+    if (isUrlLink) {
+        return {
+            assertJs: `await expect(${locator}).toBeVisible();`,
+            assertPw: `verify-element link "${pwName}"`,
+        };
     }
 
     // Has text content → text assertion

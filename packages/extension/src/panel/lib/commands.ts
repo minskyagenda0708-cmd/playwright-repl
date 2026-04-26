@@ -215,6 +215,10 @@ function callScoped(fn: (...args: unknown[]) => unknown, inText: string, _target
         if (__sel) __scope = page.locator(__sel);
       } catch {}
     }
+    if (__scope !== page) {
+      const __tc = await __scope.getByText(${ser(_targetText)}).count().catch(() => 0);
+      if (__tc === 0) __scope = page;
+    }
     try {
       return await (${fn.toString()})(__scope, ${args.map(ser).join(', ')});
     } finally {

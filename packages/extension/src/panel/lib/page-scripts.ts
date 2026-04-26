@@ -18,7 +18,10 @@ export async function verifyText(page, text) {
 }
 
 export async function verifyElement(page, role, name) {
-  if (await page.getByRole(role, { name }).count() === 0)
+  // Link with URL: match by href instead of accessible name
+  const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
+  const loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, { name });
+  if (await loc.count() === 0)
     throw new Error('Element not found: ' + role + ' "' + name + '"');
 }
 
@@ -248,8 +251,10 @@ export async function uncheckByText(page, text, nth?, exact?) {
 // ─── Role-based actions (used by recorder output) ──────────────────────────
 
 export async function actionByRole(page, role, name, action, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
+  // Link with URL: match by href instead of accessible name
+  const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
+  const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
+  let loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
@@ -311,8 +316,10 @@ export async function highlightByText(page, text, nth?, exact?) {
 }
 
 export async function highlightByRole(page, role, name, nth, inRole?, inText?) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
+  // Link with URL: match by href instead of accessible name
+  const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
+  const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
+  let loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
