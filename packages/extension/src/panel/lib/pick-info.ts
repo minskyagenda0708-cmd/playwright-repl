@@ -23,7 +23,7 @@ type AriaNode = { role: string; name: string };
  */
 function parseAriaLine(line: string): AriaNode | null {
     const trimmed = line.replace(/^\s*-\s*/, '').replace(/:$/, '')
-        .replace(/\s*\[[\w\s=]+\]\s*$/, ''); // strip aria attributes like [checked], [disabled]
+        .replace(/(\s*\[[\w\s=]+\])+\s*$/, ''); // strip aria attributes like [ref=e1], [cursor=pointer]
     // role "name" or role 'name'
     const match = trimmed.match(/^(\w[\w-]*)\s+["'](.+?)["']$/);
     if (match) return { role: match[1], name: match[2] };

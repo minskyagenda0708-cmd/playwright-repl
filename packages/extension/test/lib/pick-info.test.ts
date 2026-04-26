@@ -576,4 +576,78 @@ describe('buildPickResult', () => {
         }), null, '', null);
         expect(result.pwCommand).toBe('highlight css ".item" --nth 0');
     });
+
+    // ─── Link with URL (nameless links) ──────────────────────────────────
+
+    it('uses URL for nameless link with CSS locator (#833)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('a').filter({ hasText: ':04' })",
+            tag: 'a',
+            text: '14:04',
+            attributes: {},
+        }), null, '- link [ref=e1]:\n  - /url: /watch?v=d1uwvo5Z8LY\n  - generic [ref=e2]: 14:04');
+        expect(result.pwCommand).toBe('highlight link "/watch?v=d1uwvo5Z8LY"');
+    });
+
+    it('URL link assertion uses verify-element, not text (#833)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('a').filter({ hasText: ':04' })",
+            tag: 'a',
+            text: '14:04',
+            attributes: {},
+        }), null, '- link [ref=e1]:\n  - /url: /watch?v=d1uwvo5Z8LY\n  - generic [ref=e2]: 14:04');
+        expect(result.assertPw).toBe('verify-element link "/watch?v=d1uwvo5Z8LY"');
+        expect(result.assertJs).toContain('toBeVisible()');
+    });
+
+    it('uses full aria name for link with accessible name (#833)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Stop Guessing on Contract' })",
+            tag: 'a',
+            text: 'Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity.',
+            attributes: {},
+        }), null, '- link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity." [ref=e1]:\n  - /url: /watch?v=Dkk4tZLeLO0');
+        expect(result.pwCommand).toBe('highlight link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity."');
+    });
+
+    it('named link assertion uses full aria name', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Stop Guessing on Contract' })",
+            tag: 'a',
+            text: 'Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity.',
+            attributes: {},
+        }), null, '- link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity." [ref=e1]:\n  - /url: /watch?v=Dkk4tZLeLO0');
+        expect(result.assertPw).toBe('verify-element link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity."');
+    });
+
+    it('uses full aria name with multiple bracket attributes [ref] [cursor] (#833)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Stop Guessing on Contract' })",
+            tag: 'a',
+            text: 'Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity.',
+            attributes: {},
+        }), null, '- link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity." [ref=e1] [cursor=pointer]:\n  - /url: /watch?v=Dkk4tZLeLO0');
+        expect(result.pwCommand).toBe('highlight link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity."');
+    });
+
+    it('uses full aria name even without ref attributes in snapshot', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Stop Guessing on Contract' })",
+            tag: 'a',
+            text: 'Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity.',
+            attributes: {},
+        }), null, '- link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity.":\n  - /url: /watch?v=Dkk4tZLeLO0');
+        expect(result.pwCommand).toBe('highlight link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity."');
+    });
+
+    it('does not use URL when link has an accessible name', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Home' })",
+            tag: 'a',
+            text: 'Home',
+            attributes: { href: '/' },
+        }), null, '- link "Home" [ref=e1]:\n  - /url: /');
+        expect(result.pwCommand).toBe('highlight link "Home"');
+        expect(result.pwCommand).not.toContain('/');
+    });
 });
