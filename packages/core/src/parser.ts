@@ -302,19 +302,35 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
     const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
     if (ROLE_ACTIONS[cmdName]) {
       const name = args._.slice(2).join(' ');
-      args = buildRunCode(actionByRole as PageScriptFn, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText);
+      if (inText && !inRole) {
+        args = buildRunCodeScoped(actionByRole as PageScriptFn, inText, name, role, name, ROLE_ACTIONS[cmdName], nth);
+      } else {
+        args = buildRunCode(actionByRole as PageScriptFn, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText);
+      }
     } else if (cmdName === 'fill') {
       const name = args._[2];
       const value = args._.slice(3).join(' ') || '';
-      args = buildRunCode(fillByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      if (inText && !inRole) {
+        args = buildRunCodeScoped(fillByRole as PageScriptFn, inText, name, role, name, value, nth);
+      } else {
+        args = buildRunCode(fillByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      }
     } else if (cmdName === 'select') {
       const name = args._[2];
       const value = args._.slice(3).join(' ') || '';
-      args = buildRunCode(selectByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      if (inText && !inRole) {
+        args = buildRunCodeScoped(selectByRole as PageScriptFn, inText, name, role, name, value, nth);
+      } else {
+        args = buildRunCode(selectByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      }
     } else if (cmdName === 'press') {
       const name = args._[2];
       const key = args._.slice(3).join(' ') || '';
-      args = buildRunCode(pressKeyByRole as PageScriptFn, role, name, key, nth, inRole, inText);
+      if (inText && !inRole) {
+        args = buildRunCodeScoped(pressKeyByRole as PageScriptFn, inText, name, role, name, key, nth);
+      } else {
+        args = buildRunCode(pressKeyByRole as PageScriptFn, role, name, key, nth, inRole, inText);
+      }
     }
   }
 

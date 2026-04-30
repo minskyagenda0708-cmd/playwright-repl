@@ -281,7 +281,7 @@ describe('--in with text locators (resolveArgs)', () => {
     const code = resolved._[1];
     // Should scope to first role element containing --in text (group before form)
     // without requiring the target text to also be present
-    expect(code).toContain('filter({ hasText: "E-Scooter" })');
+    expect(code).toContain('filter({ has: page.getByText("E-Scooter", { exact: true }) })');
     expect(code).toContain('__c.first()');
     // Should NOT check for target text in the role loop
     expect(code).not.toContain('__c.getByText');
@@ -296,6 +296,70 @@ describe('--in with text locators (resolveArgs)', () => {
     expect(code).toContain('FIELDSET');
     expect(code).toContain('SECTION');
     expect(code).toContain('a.hasAttribute');
+  });
+});
+
+describe('--in with role-based commands (#863)', () => {
+  it('scopes role-based check with --in text-only', () => {
+    // "check radio "ja" --in "Very long text"" must use buildRunCodeScoped
+    // so the radio is found within the ancestor containing "Very long text"
+    const args = parseInput('check radio "ja" --in "Very long text"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('actionByRole');
+    // Should scope via data-pw-in fallback (buildRunCodeScoped)
+    expect(resolved._[1]).toContain('data-pw-in');
+    expect(resolved._[1]).toContain('"Very long text"');
+  });
+
+  it('scopes role-based click with --in text-only', () => {
+    const args = parseInput('click radio "nein" --in "Another very long text"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('actionByRole');
+    expect(resolved._[1]).toContain('data-pw-in');
+    expect(resolved._[1]).toContain('"Another very long text"');
+  });
+
+  it('scopes role-based fill with --in text-only', () => {
+    const args = parseInput('fill textbox "Email" user@test.com --in "Contact Info"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('fillByRole');
+    expect(resolved._[1]).toContain('data-pw-in');
+    expect(resolved._[1]).toContain('"Contact Info"');
+  });
+
+  it('still uses direct --in role text for role-based commands', () => {
+    // "check radio "ja" --in row "Very long text"" should NOT use scoping
+    // but pass inRole/inText directly to actionByRole
+    const args = parseInput('check radio "ja" --in row "Very long text"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('actionByRole');
+    // Should NOT use scoped fallback — uses the direct inRole/inText path
+    expect(resolved._[1]).not.toContain('data-pw-in');
+  });
+
+  it('uses exact text matching in --in role filter (#863)', () => {
+    // "check radio "ja" --in row "Very long text"" must use
+    // has: page.getByText("Very long text", { exact: true })
+    // not hasText: "Very long text" (which is substring matching)
+    const args = parseInput('check radio "ja" --in row "Very long text"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // actionByRole is stringified — check the filter uses exact matching
+    expect(code).toContain('getByText(inText, { exact: true })');
+    expect(code).not.toContain('hasText');
+  });
+
+  it('uses exact text matching in --in text-only scoping (#863)', () => {
+    const args = parseInput('check radio "ja" --in "Very long text"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // buildRunCodeScoped filter should use exact text matching
+    expect(code).toContain('filter({ has: page.getByText("Very long text", { exact: true }) })');
+    expect(code).not.toContain('hasText');
   });
 });
 

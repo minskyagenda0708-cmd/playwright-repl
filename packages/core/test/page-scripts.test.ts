@@ -118,7 +118,9 @@ describe('buildRunCodeScoped', () => {
       getByPlaceholder: vi.fn().mockReturnValue({ count: vi.fn().mockResolvedValue(0) }),
     };
 
+    const textLocator = { _type: 'getByText-locator' };
     const page = {
+      getByText: vi.fn().mockReturnValue(textLocator),
       getByRole: vi.fn().mockImplementation((role) => {
         if (role === 'group') {
           return {
@@ -423,27 +425,47 @@ describe('actionByRole', () => {
     expect(nthLoc.click).toHaveBeenCalled();
   });
 
-  it('supports --in container context', async () => {
+  it('supports --in container context with exact text matching (#863)', async () => {
+    const textLoc = mockLocator(1);
     const innerLoc = mockLocator(1);
     const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
     const loc = mockLocator(1);
     loc.filter = vi.fn().mockReturnValue(filterLoc);
-    const page = { getByRole: vi.fn().mockReturnValue(loc) };
+    const page = {
+      getByRole: vi.fn().mockReturnValue(loc),
+      getByText: vi.fn().mockReturnValue(textLoc),
+    };
     await actionByRole(page, 'button', 'Save', 'click', undefined, 'dialog', 'Settings');
     expect(page.getByRole).toHaveBeenCalledWith('dialog');
-    expect(loc.filter).toHaveBeenCalledWith({ hasText: 'Settings' });
+    expect(page.getByText).toHaveBeenCalledWith('Settings', { exact: true });
+    expect(loc.filter).toHaveBeenCalledWith({ has: textLoc });
     expect(filterLoc.getByRole).toHaveBeenCalledWith('button', { name: 'Save', exact: true });
     expect(innerLoc.click).toHaveBeenCalled();
   });
 
   it('maps list to listitem for --in', async () => {
+    const textLoc = mockLocator(1);
     const innerLoc = mockLocator(1);
     const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
     const loc = mockLocator(1);
     loc.filter = vi.fn().mockReturnValue(filterLoc);
-    const page = { getByRole: vi.fn().mockReturnValue(loc) };
+    const page = {
+      getByRole: vi.fn().mockReturnValue(loc),
+      getByText: vi.fn().mockReturnValue(textLoc),
+    };
     await actionByRole(page, 'checkbox', 'Done', 'check', undefined, 'list', 'Tasks');
     expect(page.getByRole).toHaveBeenCalledWith('listitem');
+  });
+
+  it('ignores --in when inRole is undefined but inText is provided', async () => {
+    // Without the fix, actionByRole silently ignores inText when inRole is undefined.
+    // The fix routes through buildRunCodeScoped in parser.ts instead, so actionByRole
+    // is never called with (undefined, inText) — but verify the guard works anyway.
+    const page = mockPage(1);
+    await actionByRole(page, 'radio', 'ja', 'check', undefined, undefined, 'Very long text');
+    // Should NOT have called getByText — scoping is handled externally
+    expect(page.getByRole).toHaveBeenCalledWith('radio', { name: 'ja', exact: true });
+    expect(page._loc.check).toHaveBeenCalled();
   });
 });
 

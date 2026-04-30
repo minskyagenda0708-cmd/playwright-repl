@@ -73,7 +73,7 @@ function callScoped(fn, inText, _targetText, ...args) {
     let __scope = page;
     const __roles = ['group', 'article', 'listitem', 'region', 'dialog', 'form'];
     for (const __r of __roles) {
-      const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
+      const __c = page.getByRole(__r).filter({ has: page.getByText(${ser(inText)}, { exact: true }) });
       if (await __c.count() > 0) { __scope = __c.first(); break; }
     }
     if (__scope === page) {

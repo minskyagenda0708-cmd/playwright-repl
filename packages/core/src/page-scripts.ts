@@ -42,7 +42,7 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   return { _: ['run-code', `async (page) => {
   let __scope = page;
   for (const __r of ['group','article','listitem','region','dialog','form']) {
-    const __c = page.getByRole(__r).filter({ hasText: ${inSer} });
+    const __c = page.getByRole(__r).filter({ has: page.getByText(${inSer}, { exact: true }) });
     const __n = await __c.count();
     if (__n > 0) { __scope = __c.first(); break; }
   }
@@ -296,7 +296,7 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
   let loc = page.getByRole(role, { name, exact: true });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc[action]();
@@ -306,7 +306,7 @@ export async function fillByRole(page, role, name, value, nth, inRole, inText) {
   let loc = page.getByRole(role, { name, exact: true });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.fill(value);
@@ -316,7 +316,7 @@ export async function selectByRole(page, role, name, value, nth, inRole, inText)
   let loc = page.getByRole(role, { name, exact: true });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.selectOption(value);
@@ -326,7 +326,7 @@ export async function pressKeyByRole(page, role, name, key, nth, inRole, inText)
   let loc = page.getByRole(role, { name, exact: true });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.press(key);
