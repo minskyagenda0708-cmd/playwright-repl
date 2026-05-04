@@ -150,6 +150,16 @@ describe('buildRunCodeScoped', () => {
     // Should scope to the narrow E-Scooter fieldset, NOT the broad form
     expect(scopedTo).toEqual(['escooter-fieldset']);
   });
+
+  it('includes row in container roles for table structures (#863)', () => {
+    const dummy = async function dummyAction(scope) {};
+    const result = buildRunCodeScoped(dummy, 'Some text', 'target', 'radio', 'ja', 'check');
+    const code = result._[1];
+    // row must be in the roles list so table rows can be scoped
+    expect(code).toContain("'row'");
+    // TR must be in the fallback tag set
+    expect(code).toContain("'TR'");
+  });
 });
 
 // ─── Verify functions ───────────────────────────────────────────────────────
@@ -454,15 +464,24 @@ describe('actionByRole', () => {
     expect(page.getByRole).toHaveBeenCalledWith('listitem');
   });
 
-  it('ignores --in when inRole is undefined but inText is provided', async () => {
-    // Without the fix, actionByRole silently ignores inText when inRole is undefined.
-    // The fix routes through buildRunCodeScoped in parser.ts instead, so actionByRole
-    // is never called with (undefined, inText) — but verify the guard works anyway.
-    const page = mockPage(1);
+  it('scopes via row when inText provided without inRole (#863)', async () => {
+    const innerLoc = mockLocator(1);
+    const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
+    const rowLoc = mockLocator(1);
+    rowLoc.filter = vi.fn().mockReturnValue(filterLoc);
+    const radioLoc = mockLocator(1);
+    const page = {
+      getByRole: vi.fn().mockImplementation((role) => {
+        if (role === 'row') return rowLoc;
+        if (role === 'radio') return radioLoc;
+        return mockLocator(0);
+      }),
+    };
     await actionByRole(page, 'radio', 'ja', 'check', undefined, undefined, 'Very long text');
-    // Should NOT have called getByText — scoping is handled externally
-    expect(page.getByRole).toHaveBeenCalledWith('radio', { name: 'ja', exact: true });
-    expect(page._loc.check).toHaveBeenCalled();
+    expect(page.getByRole).toHaveBeenCalledWith('row');
+    expect(rowLoc.filter).toHaveBeenCalledWith({ hasText: 'Very long text' });
+    expect(filterLoc.getByRole).toHaveBeenCalledWith('radio', { name: 'ja', exact: true });
+    expect(innerLoc.check).toHaveBeenCalled();
   });
 });
 

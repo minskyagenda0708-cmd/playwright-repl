@@ -41,7 +41,7 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   const tgtSer = JSON.stringify(targetText);
   return { _: ['run-code', `async (page) => {
   let __scope = page;
-  for (const __r of ['group','article','listitem','region','dialog','form']) {
+  for (const __r of ['row','group','article','listitem','region','dialog','form']) {
     const __c = page.getByRole(__r).filter({ has: page.getByText(${inSer}, { exact: true }) });
     const __n = await __c.count();
     if (__n > 0) { __scope = __c.first(); break; }
@@ -51,7 +51,7 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
       let __anchor = page.getByText(${inSer}, { exact: true });
       if (await __anchor.count() === 0) __anchor = page.getByText(${inSer});
       const __sel = await __anchor.first().evaluate((el) => {
-        const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM']);
+        const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM','TR']);
         let a = el.parentElement;
         while (a && a !== document.body) {
           if (S.has(a.tagName) || a.hasAttribute('role')) {
@@ -342,7 +342,7 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
-    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
       const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
@@ -359,7 +359,7 @@ export async function fillByRole(page, role, name, value, nth, inRole, inText) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
-    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
       const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
@@ -376,7 +376,7 @@ export async function selectByRole(page, role, name, value, nth, inRole, inText)
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
-    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
       const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
@@ -393,7 +393,7 @@ export async function pressKeyByRole(page, role, name, key, nth, inRole, inText)
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
-    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
       const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
