@@ -54,6 +54,9 @@ Update commands (click, fill, goto, press, hover, select, check, uncheck, etc.) 
 
 Use snapshot only for initial exploration or after read-only commands. Use screenshot to visually verify the current state.
 
+Recording: start-recording [filename], stop-recording, pause-recording, discard-recording
+Records commands to a .pw file with stable text locators (refs like e5 are auto-converted to role+name locators). Run snapshot before actions so refs can be resolved.
+
 IMPORTANT: Before writing .pw commands, run 'help' to get the full list of available commands. Only use commands that appear in the help output. Do not invent commands.`,
 
     runScript: `Run a multi-line script. Supports both .pw keyword commands (language='pw') and JavaScript (language='javascript').
