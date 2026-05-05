@@ -375,6 +375,12 @@ describe("--in text-only", () => {
     expect(exactCount).toBeGreaterThanOrEqual(1);
     expect(substringCount).toBeGreaterThanOrEqual(1);
   });
+
+  it("callScoped includes row in container roles for table structures (#863)", () => {
+    const { jsExpr } = direct('check radio "nein" --in "Very long text"');
+    expect(jsExpr).toContain("'row'");
+    expect(jsExpr).toContain("'TR'");
+  });
 });
 
 describe("press", () => {
