@@ -190,7 +190,7 @@ function callScoped(fn: (...args: unknown[]) => unknown, inText: string, _target
   // Try exact match first, then fall back to substring (consistent with actionByText)
   const anchorCode = `(async () => { const __e = page.getByText(${ser(inText)}, { exact: true }); return (await __e.count()) > 0 ? __e : page.getByText(${ser(inText)}); })()`;
   const fallbackCheck = `(await ${anchorCode}).first().evaluate((el) => {
-          const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM']);
+          const S = new Set(['FIELDSET','SECTION','ARTICLE','DETAILS','DIALOG','FORM','TR']);
           let a = el.parentElement;
           while (a && a !== document.body) {
             if (S.has(a.tagName) || a.hasAttribute('role')) {
@@ -204,9 +204,9 @@ function callScoped(fn: (...args: unknown[]) => unknown, inText: string, _target
         })`;
   return `await (async () => {
     let __scope = page;
-    const __roles = ['group', 'article', 'listitem', 'region', 'dialog', 'form'];
+    const __roles = ['row', 'group', 'article', 'listitem', 'region', 'dialog', 'form'];
     for (const __r of __roles) {
-      const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
+      const __c = page.getByRole(__r).filter({ has: page.getByText(${ser(inText)}, { exact: true }) });
       if (await __c.count() > 0) { __scope = __c.first(); break; }
     }
     if (__scope === page) {

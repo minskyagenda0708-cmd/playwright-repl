@@ -7,6 +7,7 @@ import { COMMANDS, CATEGORIES } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
 import { createStandaloneRunner } from './standalone.js';
 import { createRelayRunner } from './relay.js';
+import { withRecording } from './recording.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, logHttp, LOG_FILE } from './logger.js';
 import type { Runner } from './types.js';
 // ─── Process exit handlers — log why the process dies ───────────────────────
@@ -48,7 +49,8 @@ if (relay) {
     runnerModule = createStandaloneRunner(headed);
 }
 
-const { runner, descriptions } = runnerModule;
+const { runner: innerRunner, descriptions } = runnerModule;
+const runner = withRecording(innerRunner);
 
 const mode = relay ? 'relay' : 'standalone';
 logStartup(mode, `log → ${LOG_FILE}`);
