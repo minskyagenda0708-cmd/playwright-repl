@@ -93,37 +93,6 @@ const patchedExpect: typeof expect = Object.assign(
 import { installFramework } from './test-framework';
 installFramework();
 
-// ─── Offscreen Document (CLI Bridge) ─────────────────────────────────────────
-
-async function ensureOffscreen() {
-  if (await chrome.offscreen.hasDocument()) return;
-  await chrome.offscreen.createDocument({
-    url: 'offscreen/offscreen.html',
-    reasons: [chrome.offscreen.Reason.BLOBS, chrome.offscreen.Reason.USER_MEDIA],
-    justification: 'Maintains WebSocket connection to CLI/MCP bridge server and handles video capture',
-  });
-}
-
-// Web Store installs: always create offscreen doc (auto-connect to bridge).
-// Development installs (--load-extension): only create if bridgePort was previously
-// configured, to avoid connecting to a real bridge during CLI/tests/VS Code.
-chrome.management.getSelf().then(async (info) => {
-  if (info.installType === 'normal') {
-    ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
-  } else {
-    const { bridgePort } = await chrome.storage.local.get(['bridgePort']);
-    if (bridgePort) ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
-  }
-});
-
-// Re-check offscreen doc periodically — Chrome may kill it after idle.
-chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'ensure-offscreen') {
-    ensureOffscreen().catch(() => {});
-  }
-});
-
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
@@ -135,12 +104,6 @@ loadSettings().then(s => cachedSettings = s).catch(e => console.warn('[pw-repl] 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.openAs) {
     cachedSettings.openAs = changes.openAs.newValue;
-  }
-  if (area === 'local' && changes.bridgePort) {
-    // Ensure offscreen doc exists before telling it to reconnect (may not exist in development mode)
-    ensureOffscreen().then(() => {
-      chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => {});
-    }).catch(() => {});
   }
 });
 
@@ -345,6 +308,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // ─── Video Capture ──────────────────────────────────────────────────────────
 
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: 'offscreen/offscreen.html',
+    reasons: [chrome.offscreen.Reason.BLOBS, chrome.offscreen.Reason.USER_MEDIA],
+    justification: 'Video capture requires getUserMedia and MediaRecorder (unavailable in service workers)',
+  });
+}
+
 let videoRecording = false;
 let videoStartTime = 0;
 
@@ -368,7 +340,7 @@ async function startVideoCapture(): Promise<{ ok: boolean; error?: string }> {
       videoRecording = true;
       videoStartTime = Date.now();
     }
-    return result ?? { ok: false, error: 'No response from offscreen document' };
+    return result ?? { ok: false, error: 'No response' };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -385,7 +357,7 @@ async function stopVideoCapture(): Promise<{ ok: boolean; error?: string; blobUr
     return { ok: true, blobUrl: result.blobUrl, duration, size: result.size };
   }
 
-  return result ?? { ok: false, error: 'No response from offscreen document' };
+  return result ?? { ok: false, error: 'No response' };
 }
 
 // ─── Tracing ─────────────────────────────────────────────────────────────────
@@ -881,18 +853,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     sendResponse({ ok: true });
     return false;
-  }
-  if (msg.type === 'cdp-relay-connect') {
-    // Forward relay URL to offscreen document
-    ensureOffscreen().then(() => {
-      chrome.runtime.sendMessage({ type: 'cdp-relay-connect', relayUrl: msg.relayUrl });
-    });
-    sendResponse({ ok: true });
-    return false;
-  }
-  if (msg.type === 'get-bridge-port') {
-    chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
-    return true;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
 

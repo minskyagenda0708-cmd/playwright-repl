@@ -14,7 +14,8 @@
     "scripting",
     "tabCapture",
     "webNavigation",
-    "downloads"
+    "downloads",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"
