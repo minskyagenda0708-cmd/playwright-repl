@@ -44,7 +44,7 @@ Language mode preference (.pw or JS) in Options
 Light / dark mode
 Side panel or popup window (configurable in Options)
 DevTools tab — "Playwright" tab in Chrome DevTools with the same console
-Connects to CLI (playwright-repl --bridge) and MCP server for AI-driven automation
+Connects to CLI (playwright-repl) and MCP server for AI-driven automation
 
 Use cases
 

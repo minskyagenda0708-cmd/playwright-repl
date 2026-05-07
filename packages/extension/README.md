@@ -11,7 +11,7 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 | **Recorder** | Captures clicks, fills, navigations as `.pw` commands and Playwright code |
 | **Object Tree** | Expandable CDP object tree, like Chrome DevTools |
 | **Tab Switcher** | Switch active target to any open tab from the toolbar |
-| **Preferences** | Language mode, bridge port, open mode — configurable in Options |
+| **Preferences** | Language mode, open mode — configurable in Options |
 | **Light / Dark** | Toggle themes from toolbar, persisted across sessions |
 | **DevTools REPL** | Console-only tab in Chrome DevTools for quick debugging |
 
@@ -81,12 +81,12 @@ Ambiguous elements are disambiguated with ancestor context (e.g. `click "Save" -
 - **Connection status** — color-coded indicator (green / yellow / red)
 - **Attach button** — manually re-attach after tab navigation
 
-## Connect to CLI (Bridge Mode)
+## Connect to CLI
 
-The extension connects to the CLI bridge server automatically:
+The CLI connects to your browser via CDP relay:
 
 ```bash
-playwright-repl --bridge   # start the CLI bridge server
+playwright-repl --connect   # connect to Chrome with Dramaturg installed
 ```
 
 Your terminal becomes a remote console for the browser — commands execute in your real Chrome session.
@@ -95,11 +95,11 @@ See [packages/cli/README.md](../cli/README.md) for CLI setup.
 
 ## Connect to MCP Server (AI Browser Agent)
 
-The extension connects to the `@playwright-repl/mcp` server for AI-driven automation:
+The MCP server connects to your browser for AI-driven automation:
 
 ```bash
 npm install -g @playwright-repl/mcp
-playwright-repl-mcp   # starts the MCP bridge server
+playwright-repl-mcp --relay   # connect to Chrome via CDP relay
 ```
 
 See [packages/mcp/README.md](../mcp/README.md) for MCP setup.
