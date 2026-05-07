@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.27.1
+
+**2026-05-06**
+
+### Fixes
+
+- Restore offscreen document for video capture in Chrome extension.
+
 ## 0.27.0
 
 **2026-05-06**

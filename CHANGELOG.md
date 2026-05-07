@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.27.1
+
+**2026-05-06**
+
+### Fixes
+
+- Restore offscreen document for video capture — broken since v0.26.1 when bridge removal also deleted the offscreen files. ([#899](https://github.com/stevez/playwright-repl/pull/899))
+- Remove dead bridge code from extension background (startup alarm, bridgePort listener, get-bridge-port, cdp-relay-connect handlers).
+
 ## v0.27.0
 
 **2026-05-06**

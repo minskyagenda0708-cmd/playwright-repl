@@ -272,20 +272,6 @@ describe("background.ts message handlers", () => {
     expect(result).toEqual({ pong: true });
   });
 
-  // ─── get-bridge-port ──────────────────────────────────────────────────────
-
-  it("get-bridge-port returns stored port", async () => {
-    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({ bridgePort: 1234 });
-    const result = await sendMessage({ type: 'get-bridge-port' });
-    expect(result).toBe(1234);
-  });
-
-  it("get-bridge-port returns default 9876 when not set", async () => {
-    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
-    const result = await sendMessage({ type: 'get-bridge-port' });
-    expect(result).toBe(9876);
-  });
-
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
   it("attach retries on 'Frame has been detached' error via detachAll", async () => {
@@ -460,15 +446,6 @@ describe("background.ts message handlers", () => {
     await onActionClicked({ id: 42, windowId: 1 });
     expect(chrome.windows.create).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'popup' })
-    );
-  });
-
-  it("storage onChanged sends bridge-port-changed message", async () => {
-    onStorageChanged({ bridgePort: { newValue: 5555 } }, 'local');
-    // ensureOffscreen is async — flush promises before checking sendMessage
-    await new Promise(r => setTimeout(r, 0));
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'bridge-port-changed', port: 5555 })
     );
   });
 

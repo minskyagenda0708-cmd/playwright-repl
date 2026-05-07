@@ -61,6 +61,7 @@ export default defineConfig({
         "preferences/preferences": resolve(__dirname, "src/preferences/preferences.html"),
         "devtools/devtools": resolve(__dirname, "src/devtools/devtools.html"),
         "devtools/console": resolve(__dirname, "src/devtools/console.html"),
+        "offscreen/offscreen": resolve(__dirname, "src/offscreen/offscreen.html"),
       },
       output: {
         entryFileNames: "[name].js",
