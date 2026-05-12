@@ -3,7 +3,7 @@ import { loadSettings, storeSettings } from '../panel/lib/settings';
 import type { PwReplSettings } from '../panel/lib/settings';
 
 export default function PreferencesForm() {
-  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', languageMode: 'pw', commandTimeout: 15000 });
+  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', relayPort: 9877, languageMode: 'pw', commandTimeout: 15000 });
 
   useEffect(() => {
     loadSettings().then(setSettings);
@@ -45,6 +45,22 @@ export default function PreferencesForm() {
           />
           Popup Window
         </label>
+      </fieldset>
+      <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>
+        <legend style={{ fontWeight: 600, marginBottom: '12px' }}>Relay Port:</legend>
+        <input
+          type="number"
+          value={settings.relayPort}
+          onChange={(e) => {
+            const next = { ...settings, relayPort: Number(e.target.value) };
+            setSettings(next);
+            storeSettings(next);
+          }}
+          style={{ width: '100px', padding: '4px 8px', fontSize: '14px' }}
+        />
+        <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#888' }}>
+          Port for CLI --connect and MCP --relay mode (default: 9877).
+        </p>
       </fieldset>
       <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>
         <legend style={{ fontWeight: 600, marginBottom: '12px' }}>Language Mode:</legend>
