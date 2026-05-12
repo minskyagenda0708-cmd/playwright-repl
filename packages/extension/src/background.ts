@@ -93,6 +93,37 @@ const patchedExpect: typeof expect = Object.assign(
 import { installFramework } from './test-framework';
 installFramework();
 
+// ─── Offscreen Document (CDP Relay) ──────────────────────────────────────────
+
+async function ensureOffscreenRelay() {
+  if (await chrome.offscreen.hasDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: 'offscreen/offscreen.html',
+    reasons: [chrome.offscreen.Reason.BLOBS, chrome.offscreen.Reason.USER_MEDIA],
+    justification: 'CDP relay WebSocket connection and video capture (getUserMedia/MediaRecorder)',
+  });
+}
+
+// Web Store installs: always create offscreen doc (auto-connect to relay).
+// Development installs (--load-extension): only create if relayPort was previously
+// configured, to avoid connecting to a relay during CLI/tests/VS Code.
+chrome.management.getSelf().then(async (info) => {
+  if (info.installType === 'normal') {
+    ensureOffscreenRelay().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  } else {
+    const { relayPort } = await chrome.storage.local.get(['relayPort']);
+    if (relayPort) ensureOffscreenRelay().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  }
+});
+
+// Re-check offscreen doc periodically — Chrome may kill it after idle.
+chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'ensure-offscreen') {
+    ensureOffscreenRelay().catch(() => {});
+  }
+});
+
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
@@ -104,6 +135,11 @@ loadSettings().then(s => cachedSettings = s).catch(e => console.warn('[pw-repl] 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.openAs) {
     cachedSettings.openAs = changes.openAs.newValue;
+  }
+  if (area === 'local' && changes.relayPort) {
+    ensureOffscreenRelay().then(() => {
+      chrome.runtime.sendMessage({ type: 'relay-port-changed', port: changes.relayPort.newValue }).catch(() => {});
+    }).catch(() => {});
   }
 });
 
@@ -308,15 +344,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // ─── Video Capture ──────────────────────────────────────────────────────────
 
-async function ensureOffscreen() {
-  if (await chrome.offscreen.hasDocument()) return;
-  await chrome.offscreen.createDocument({
-    url: 'offscreen/offscreen.html',
-    reasons: [chrome.offscreen.Reason.BLOBS, chrome.offscreen.Reason.USER_MEDIA],
-    justification: 'Video capture requires getUserMedia and MediaRecorder (unavailable in service workers)',
-  });
-}
-
 let videoRecording = false;
 let videoStartTime = 0;
 
@@ -327,7 +354,7 @@ async function startVideoCapture(): Promise<{ ok: boolean; error?: string }> {
   if (!tabId) return { ok: false, error: 'No active tab' };
 
   try {
-    await ensureOffscreen();
+    await ensureOffscreenRelay();
 
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
 
@@ -855,6 +882,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
+  if (msg.type === 'get-relay-port') {
+    chrome.storage.local.get(['relayPort']).then(s => sendResponse((s.relayPort as number) || 9877));
+    return true;
+  }
 
   // ── Handoff: side panel ↔ popup state transfer (#820) ──
   if (msg.type === 'handoff-save') { handoffState = msg.state; sendResponse({ ok: true }); return false; }

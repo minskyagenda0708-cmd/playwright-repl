@@ -2,14 +2,15 @@
 
 export type PwReplSettings = {
     openAs: 'sidepanel' | 'popup',
+    relayPort: number,
     languageMode: 'pw' | 'js',
     commandTimeout: number,
 };
 
-const DEFAULT: PwReplSettings = { openAs: 'sidepanel', languageMode: 'pw', commandTimeout: 15000 };
+const DEFAULT: PwReplSettings = { openAs: 'sidepanel', relayPort: 9877, languageMode: 'pw', commandTimeout: 15000 };
 
 export async function loadSettings(): Promise<PwReplSettings> {
-    const stored = await chrome.storage.local.get(['openAs', 'languageMode', 'commandTimeout']) as Partial<PwReplSettings>;
+    const stored = await chrome.storage.local.get(['openAs', 'relayPort', 'languageMode', 'commandTimeout']) as Partial<PwReplSettings>;
     return { ...DEFAULT, ...stored };
 }
 

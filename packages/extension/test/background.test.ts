@@ -272,6 +272,20 @@ describe("background.ts message handlers", () => {
     expect(result).toEqual({ pong: true });
   });
 
+  // ─── get-relay-port ────────────────────────────────────────────────────────
+
+  it("get-relay-port returns stored port", async () => {
+    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({ relayPort: 1234 });
+    const result = await sendMessage({ type: 'get-relay-port' });
+    expect(result).toBe(1234);
+  });
+
+  it("get-relay-port returns default 9877 when not set", async () => {
+    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const result = await sendMessage({ type: 'get-relay-port' });
+    expect(result).toBe(9877);
+  });
+
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
   it("attach retries on 'Frame has been detached' error via detachAll", async () => {
@@ -446,6 +460,15 @@ describe("background.ts message handlers", () => {
     await onActionClicked({ id: 42, windowId: 1 });
     expect(chrome.windows.create).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'popup' })
+    );
+  });
+
+  it("storage onChanged sends relay-port-changed message", async () => {
+    onStorageChanged({ relayPort: { newValue: 5555 } }, 'local');
+    // ensureOffscreenRelay is async — flush promises before checking sendMessage
+    await new Promise(r => setTimeout(r, 0));
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'relay-port-changed', port: 5555 })
     );
   });
 
