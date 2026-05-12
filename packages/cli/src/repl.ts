@@ -1207,8 +1207,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     if (opts.connect) {
       // Connect mode: attach to existing Chrome via extension + CDP relay
       relay = new CDPRelayServer();
-      const relayPort = opts.port ?? (typeof opts.connect === 'number' ? opts.connect : undefined);
-      await relay.start(relayPort);
+      await relay.start(opts.port);
       log(`CDP relay listening on ${relay.cdpEndpoint()}`);
       log(`Extension endpoint: ${relay.relayEndpoint()}`);
       log('Waiting for extension to connect...');
