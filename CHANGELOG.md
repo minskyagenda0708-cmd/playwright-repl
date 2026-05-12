@@ -2,12 +2,13 @@
 
 ## v0.27.1
 
-**2026-05-06**
+**2026-05-11**
 
 ### Fixes
 
 - Restore offscreen document for video capture — broken since v0.26.1 when bridge removal also deleted the offscreen files. ([#899](https://github.com/stevez/playwright-repl/pull/899))
 - Remove dead bridge code from extension background (startup alarm, bridgePort listener, get-bridge-port, cdp-relay-connect handlers).
+- Cross-origin frame recording: resolve frame selectors via postMessage when `frameElement` is null (e.g. `file://` URLs, cross-origin `<frame>` elements). ([#900](https://github.com/stevez/playwright-repl/pull/900))
 
 ## v0.27.0
 
