@@ -5,4 +5,5 @@
  * discover and invoke skills through existing run_command / run_script MCP tools.
  */
 
-export { }
+export { discoverSkills, findSkill } from './skills.js';
+export type { SkillInfo } from './skills.js';
