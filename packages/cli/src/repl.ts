@@ -1251,6 +1251,23 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       return;
     }
 
+    if (opts.http) {
+      const httpPort = opts.httpPort ?? DEFAULT_HTTP_PORT;
+      const runner: CommandRunner = {
+        run: async (command: string) => relayExec(command, relayPage, relayCtx, pwExpect),
+        runScript: async (script: string) => relayExec(script, relayPage, relayCtx, pwExpect),
+      };
+      await startHttpServer(httpPort, runner, log);
+      if (opts.interactive) {
+        log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
+        await startRelayLoop(opts, relay, browser, relayPage, relayCtx, pwExpect);
+      } else {
+        await waitForShutdown(log);
+        await cleanup();
+      }
+      return;
+    }
+
     log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
     await startRelayLoop(opts, relay, browser, relayPage, relayCtx, pwExpect);
     return;
