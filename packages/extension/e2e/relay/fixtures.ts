@@ -9,7 +9,7 @@
  */
 
 import { test as base, chromium, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { resolveCommand, UPDATE_COMMANDS, COMMANDS, CATEGORIES } from '../../../core/dist/index.js';
+import { resolveCommand, COMMANDS, CATEGORIES } from '../../../core/dist/index.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
