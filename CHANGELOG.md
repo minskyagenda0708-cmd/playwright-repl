@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.27.2
+
+**2026-05-11**
+
+### Fixes
+
+- Restore CDP relay WebSocket bridge in extension — `--connect` mode and MCP `--relay` were broken since v0.27.0 when bridge removal also deleted the relay WebSocket client. ([#904](https://github.com/stevez/playwright-repl/pull/904))
+- Add `relayPort` setting (default 9877) to extension preferences so users can configure which port the relay connects to.
+- Wire `--port` flag to `relay.start()` in CLI so `playwright-repl --connect --port <N>` actually uses the specified port.
+- Restore relay E2E test suite and add connect mode CI test.
+
 ## v0.27.1
 
 **2026-05-11**

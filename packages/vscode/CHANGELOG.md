@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.27.2
+
+**2026-05-11**
+
+### Fixes
+
+- Restore CDP relay WebSocket bridge in Chrome extension for `--connect` and MCP `--relay` modes.
+
 ## 0.27.1
 
 **2026-05-06**
