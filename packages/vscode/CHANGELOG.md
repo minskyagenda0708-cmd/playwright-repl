@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.3
+
+**2026-05-12**
+
+### Fixes
+
+- Wire `--http` flag into `--connect` mode.
+- Default `--connect` relay port to 9877 instead of 9222.
+
 ## 0.27.2
 
 **2026-05-11**

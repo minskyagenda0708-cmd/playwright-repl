@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.27.3
+
+**2026-05-12**
+
+### Fixes
+
+- Wire `--http` flag into `--connect` mode so the HTTP server starts when using connect. ([#905](https://github.com/stevez/playwright-repl/pull/905))
+- Default `--connect` relay port to 9877 (matching the extension default) instead of 9222.
+
 ## v0.27.2
 
 **2026-05-11**
