@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.27.4
+
+**2026-05-14**
+
+### Fixes
+
+- Remove `alarms` permission from Chrome extension.
+
 ## 0.27.3
 
 **2026-05-12**

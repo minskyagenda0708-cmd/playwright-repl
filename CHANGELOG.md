@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.4
+
+**2026-05-14**
+
+### Fixes
+
+- Remove `alarms` permission from Chrome extension — rejected by Chrome Web Store review. The offscreen document's own `setInterval` health check keeps it alive. ([#906](https://github.com/stevez/playwright-repl/pull/906))
+
 ## v0.27.3
 
 **2026-05-12**
