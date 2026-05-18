@@ -8,15 +8,20 @@
     ".": "./dist/index.js"
   },
   "types": "./dist/index.d.ts",
+  "bin": {
+    "stagecraft": "./dist/stagecraft.js"
+  },
   "files": [
     "dist/",
     "skills/"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc -b tsconfig.build.json",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@playwright-repl/core": "workspace:*"
+    "@playwright-repl/core": "workspace:*",
+    "playwright": "^1.59.1"
   },
   "license": "ISC"
 }
