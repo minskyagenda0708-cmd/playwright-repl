@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.5
+
+**2026-05-18**
+
+### Fixes
+
+- Dramaturg extension now supports Microsoft Edge — `edge://` internal pages are blocked from attachment (same as `chrome://`), tab labels display correctly, and the attach error message is browser-agnostic. ([#907](https://github.com/stevez/playwright-repl/pull/907))
+
 ## v0.27.4
 
 **2026-05-14**

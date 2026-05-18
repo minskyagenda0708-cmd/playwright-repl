@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.27.5
+
+**2026-05-18**
+
+### Fixes
+
+- Dramaturg extension now supports Microsoft Edge.
+
 ## 0.27.4
 
 **2026-05-14**

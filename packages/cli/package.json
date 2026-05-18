@@ -1,6 +1,6 @@
 {
   "name": "playwright-repl",
-  "version": "0.27.4",
+  "version": "0.27.5",
   "description": "Interactive REPL for Playwright — keyword commands, recording, and replay",
   "type": "module",
   "bin": {
