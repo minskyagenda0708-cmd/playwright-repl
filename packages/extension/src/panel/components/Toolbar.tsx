@@ -35,7 +35,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     function isInternalUrl(url: string | undefined) {
         if (!url) return true;
-        return url.startsWith('chrome://') || url.startsWith('chrome-extension://');
+        return url.startsWith('chrome://') || url.startsWith('edge://') || url.startsWith('chrome-extension://');
     }
 
     function getTabLabel(tab: chrome.tabs.Tab): string {
@@ -43,6 +43,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             if (tab.url?.startsWith('about:')) return tab.url;
             const url = new URL(tab.url!);
             if (url.protocol === 'chrome:') return `chrome://${url.hostname}`;
+            if (url.protocol === 'edge:') return `edge://${url.hostname}`;
             return url.hostname;
         } catch {
             return tab.url ?? '(unknown)';
@@ -282,7 +283,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         setIsRecording(true);
 
-        if (result.url && result.url !== 'about:blank' && !result.url.startsWith('chrome://') && isEditorEmpty()) {
+        if (result.url && result.url !== 'about:blank' && !result.url.startsWith('chrome://') && !result.url.startsWith('edge://') && isEditorEmpty()) {
             const gotoCmd = editorMode === 'js'
                 ? `await page.goto(${JSON.stringify(result.url)});`
                 : `goto "${result.url}"`;

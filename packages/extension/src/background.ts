@@ -171,6 +171,7 @@ async function ensureCrxApp(): Promise<CrxApplication> {
 function isAttachableUrl(url: string | undefined): boolean {
   if (!url) return true; // no URL info — let attachToTab decide
   if (url.startsWith('chrome://')) return false;
+  if (url.startsWith('edge://')) return false;
   if (url.startsWith('https://chromewebstore.google.com')) return false;
   if (url.startsWith('chrome-extension://') && !url.startsWith(`chrome-extension://${chrome.runtime.id}/`)) return false;
   return true;
@@ -207,14 +208,14 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
     const tab = await chrome.tabs.get(tabId);
     const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
     const url = tab.url ?? '';
-    if (url.startsWith('chrome://') ||
+    if (url.startsWith('chrome://') || url.startsWith('edge://') ||
         (url.startsWith('chrome-extension://') && !url.startsWith(ownOrigin)) ||
         url.startsWith('https://chromewebstore.google.com')) {
       if (activeTabId === tabId) {
         activeTabId = null;
         currentPage = null;
       }
-      return { ok: false, error: 'Cannot attach to this page — Chrome restricts extension access. Navigate to a regular webpage first.' };
+      return { ok: false, error: 'Cannot attach to this page — browser restricts extension access. Navigate to a regular webpage first.' };
     }
 
     const app = await ensureCrxApp();
