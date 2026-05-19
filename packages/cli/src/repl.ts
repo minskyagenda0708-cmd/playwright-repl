@@ -948,13 +948,17 @@ async function startRelayLoop(
   const historyDir = path.join(os.homedir(), '.playwright-repl');
   const historyFile = path.join(historyDir, '.repl-history');
 
-  const promptReady = `${c.cyan}relay>${c.reset} `;
+  const session = new SessionManager();
+
+  const promptReady = () => session.mode === 'recording'
+    ? `${c.red}⏺${c.reset} ${c.cyan}relay>${c.reset} `
+    : `${c.cyan}relay>${c.reset} `;
   const promptCont  = `${c.dim}...${c.reset} `;
 
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: promptReady,
+    prompt: promptReady(),
     historySize: 500,
   });
 
@@ -975,7 +979,7 @@ async function startRelayLoop(
     }
     const command = buffer.trim();
     buffer = '';
-    rl.setPrompt(promptReady);
+    rl.setPrompt(promptReady());
 
     if (!command || command.startsWith('#')) return;
 
@@ -993,14 +997,55 @@ async function startRelayLoop(
       fs.appendFileSync(historyFile, command + '\n');
     } catch { /* ignore */ }
 
+    // ── Recording commands ──────────────────────────────────────────
+    const cmdName = command.split(/\s+/)[0].toLowerCase();
+    if (cmdName === 'start-recording') {
+      const filename = command.split(/\s+/)[1] || undefined;
+      try {
+        const file = session.startRecording(filename);
+        log(`${c.red}⏺${c.reset} Recording to ${c.bold}${file}${c.reset}`);
+        rl.setPrompt(promptReady());
+      } catch (err: unknown) { log(`${c.yellow}${(err as Error).message}${c.reset}`); }
+      return;
+    }
+    if (cmdName === 'stop-recording') {
+      try {
+        const { filename, count } = session.save();
+        log(`${c.green}✓${c.reset} Saved ${count} commands to ${c.bold}${filename}${c.reset}`);
+        rl.setPrompt(promptReady());
+      } catch (err: unknown) { log(`${c.yellow}${(err as Error).message}${c.reset}`); }
+      return;
+    }
+    if (cmdName === 'pause-recording') {
+      try {
+        const paused = session.togglePause();
+        log(paused ? `${c.yellow}⏸${c.reset} Recording paused` : `${c.red}⏺${c.reset} Recording resumed`);
+      } catch (err: unknown) { log(`${c.yellow}${(err as Error).message}${c.reset}`); }
+      return;
+    }
+    if (cmdName === 'discard-recording') {
+      try {
+        session.discard();
+        log(`${c.yellow}Recording discarded${c.reset}`);
+        rl.setPrompt(promptReady());
+      } catch (err: unknown) { log(`${c.yellow}${(err as Error).message}${c.reset}`); }
+      return;
+    }
+
     const startTime = performance.now();
     const result = await relayExec(command, page, context, expect);
     const elapsed = (performance.now() - startTime).toFixed(0);
+
+    if (!result.isError) {
+      if (cmdName === 'snapshot' && result.text) session.setSnapshot(result.text);
+      session.record(command);
+    }
+
     if (result.text) {
       // Pass command name so filterResponse keeps the right sections
       const parsed = parseInput(command);
-      const cmdName = parsed?._[0];
-      const filtered = filterResponse(result.text, cmdName);
+      const filteredName = parsed?._[0];
+      const filtered = filterResponse(result.text, filteredName);
       if (filtered !== null) {
         log(result.isError ? `${c.red}${filtered}${c.reset}` : filtered);
       }
@@ -1026,7 +1071,7 @@ async function startRelayLoop(
     process.exit(0);
   });
   rl.on('SIGINT', () => {
-    if (buffer) { buffer = ''; rl.setPrompt(promptReady); rl.prompt(); }
+    if (buffer) { buffer = ''; rl.setPrompt(promptReady()); rl.prompt(); }
     else rl.close();
   });
 }
@@ -1253,8 +1298,59 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
     if (opts.http) {
       const httpPort = opts.httpPort ?? DEFAULT_HTTP_PORT;
+      const httpSession = new SessionManager();
       const runner: CommandRunner = {
-        run: async (command: string) => relayExec(command, relayPage, relayCtx, pwExpect),
+        run: async (command: string) => {
+          const trimmed = command.trim();
+          const cmdName = trimmed.split(/\s+/)[0].toLowerCase();
+
+          // ── Recording commands ────────────────────────────────────
+          if (cmdName === 'start-recording') {
+            const filename = trimmed.split(/\s+/)[1] || undefined;
+            try {
+              const file = httpSession.startRecording(filename);
+              return { text: `Recording to ${file}`, isError: false };
+            } catch (err: unknown) {
+              return { text: (err as Error).message, isError: true };
+            }
+          }
+          if (cmdName === 'stop-recording') {
+            try {
+              const { filename, count } = httpSession.save();
+              return { text: `Saved ${count} commands to ${filename}`, isError: false };
+            } catch (err: unknown) {
+              return { text: (err as Error).message, isError: true };
+            }
+          }
+          if (cmdName === 'pause-recording') {
+            try {
+              const paused = httpSession.togglePause();
+              return { text: paused ? 'Recording paused' : 'Recording resumed', isError: false };
+            } catch (err: unknown) {
+              return { text: (err as Error).message, isError: true };
+            }
+          }
+          if (cmdName === 'discard-recording') {
+            try {
+              httpSession.discard();
+              return { text: 'Recording discarded', isError: false };
+            } catch (err: unknown) {
+              return { text: (err as Error).message, isError: true };
+            }
+          }
+
+          const result = await relayExec(trimmed, relayPage, relayCtx, pwExpect);
+
+          if (!result.isError) {
+            // Feed snapshot for ref-to-locator resolution
+            if (cmdName === 'snapshot' && result.text) {
+              httpSession.setSnapshot(result.text);
+            }
+            httpSession.record(trimmed);
+          }
+
+          return result;
+        },
         runScript: async (script: string) => relayExec(script, relayPage, relayCtx, pwExpect),
       };
       await startHttpServer(httpPort, runner, log);
