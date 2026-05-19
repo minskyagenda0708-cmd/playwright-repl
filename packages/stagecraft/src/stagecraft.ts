@@ -12,18 +12,21 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
 import fs from 'node:fs';
 import { minimist, SessionPlayer, resolveCommand } from '@playwright-repl/core';
 import { discoverSkills, findSkill } from './skills.js';
 
 const args = minimist(process.argv.slice(2), {
-  string: ['variable', 'http-port'],
+  string: ['variable', 'http-port', 'skills-dir'],
   boolean: ['http'],
   alias: { v: 'variable' },
 });
 
 const command = args._[0];
 const skillsDir = path.resolve(import.meta.dirname, '..', 'skills');
+const userSkillsDir = (args['skills-dir'] as string | undefined)
+  ?? path.join(os.homedir(), '.stagecraft', 'skills');
 
 if (!command || command === 'help') {
   printHelp();
@@ -47,11 +50,15 @@ function printHelp() {
 stagecraft — skill library for playwright-repl
 
 Usage:
-  stagecraft list                       List available skills
-  stagecraft run <skill-name>           Run a skill's .pw file
+  stagecraft list                       List available skills (builtin + ~/.stagecraft/skills/)
+  stagecraft run <skill-name>           Run a skill's .pw file or .js script
     --variable key=value (-v)           Set template variables (repeatable)
     --http                              Connect to running playwright-repl --http server
     --http-port <port>                  HTTP server port (default: 9223)
+    --skills-dir <path>                 Override user skills directory
+
+User skills live in ~/.stagecraft/skills/ — create a subdirectory with a SKILL.md to add your own.
+User skills with the same name as a builtin skill override it.
 
 Examples:
   stagecraft list
@@ -60,10 +67,12 @@ Examples:
 `.trim());
 }
 
-function listSkills(dir?: string) {
-  const skills = discoverSkills(dir || skillsDir);
+function listSkills() {
+  const skills = discoverSkills(skillsDir, userSkillsDir);
   if (skills.length === 0) {
     console.log('No skills found.');
+    console.log(`  Builtin: ${skillsDir}`);
+    console.log(`  User:    ${userSkillsDir}`);
     return;
   }
 
@@ -80,7 +89,8 @@ function listSkills(dir?: string) {
   for (const [category, items] of grouped) {
     console.log(`  ${category}`);
     for (const skill of items) {
-      const name = skill.name.padEnd(24);
+      const tag = skill.source === 'user' ? ' [user]' : '';
+      const name = (skill.name + tag).padEnd(30);
       console.log(`    ${name}${skill.description}`);
     }
   }
@@ -93,7 +103,7 @@ async function runSkill() {
     process.exit(1);
   }
 
-  const skills = discoverSkills(skillsDir);
+  const skills = discoverSkills(skillsDir, userSkillsDir);
   const skill = findSkill(skills, skillName);
   if (!skill) {
     console.error(`Skill not found: ${skillName}`);

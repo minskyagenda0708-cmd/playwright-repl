@@ -17,9 +17,10 @@ export interface SkillInfo {
   preconditions?: string;
   parameters?: { name: string; description: string }[];
   output?: string;
-  dir: string;       // absolute path to skill directory
-  pwFile?: string;   // path to .pw file (if exists)
-  jsFile?: string;   // path to .js file (if exists)
+  dir: string;            // absolute path to skill directory
+  pwFile?: string;        // path to .pw file (if exists)
+  jsFile?: string;        // path to .js file (if exists)
+  source: 'builtin' | 'user';  // where the skill was discovered
 }
 
 // ─── Frontmatter parsing ────────────────────────────────────────────────────
@@ -76,10 +77,9 @@ function parseFrontmatter(content: string): Record<string, unknown> | null {
 // ─── Discovery ──────────────────────────────────────────────────────────────
 
 /**
- * Discover all skills in the given directory.
- * Each subdirectory with a SKILL.md is treated as a skill.
+ * Scan a single directory for skills. Returns unsorted results.
  */
-export function discoverSkills(skillsDir: string): SkillInfo[] {
+function scanSkillsDir(skillsDir: string, source: 'builtin' | 'user'): SkillInfo[] {
   if (!fs.existsSync(skillsDir)) return [];
 
   const skills: SkillInfo[] = [];
@@ -91,11 +91,37 @@ export function discoverSkills(skillsDir: string): SkillInfo[] {
     const skillMd = path.join(dir, 'SKILL.md');
     if (!fs.existsSync(skillMd)) continue;
 
-    const info = parseSkillMd(skillMd, dir);
+    const info = parseSkillMd(skillMd, dir, source);
     if (info) skills.push(info);
   }
 
-  // Sort by category then name
+  return skills;
+}
+
+/**
+ * Discover all skills from both the builtin skills directory and the user
+ * skills directory (~/.stagecraft/skills/). User skills with the same name
+ * as a builtin skill take precedence (override).
+ *
+ * @param builtinDir - absolute path to the package's bundled skills directory
+ * @param userDir    - user skills directory (default: ~/.stagecraft/skills)
+ */
+export function discoverSkills(builtinDir: string, userDir?: string): SkillInfo[] {
+  const resolvedUserDir = userDir ?? path.join(
+    process.env['HOME'] || process.env['USERPROFILE'] || '~',
+    '.stagecraft',
+    'skills',
+  );
+
+  const builtin = scanSkillsDir(builtinDir, 'builtin');
+  const user = scanSkillsDir(resolvedUserDir, 'user');
+
+  // User skills override builtin skills of the same name
+  const byName = new Map<string, SkillInfo>();
+  for (const skill of builtin) byName.set(skill.name, skill);
+  for (const skill of user) byName.set(skill.name, skill);   // overrides
+
+  const skills = Array.from(byName.values());
   skills.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
   return skills;
 }
@@ -103,7 +129,7 @@ export function discoverSkills(skillsDir: string): SkillInfo[] {
 /**
  * Parse a single SKILL.md file into a SkillInfo object.
  */
-function parseSkillMd(filepath: string, dir: string): SkillInfo | null {
+function parseSkillMd(filepath: string, dir: string, source: 'builtin' | 'user'): SkillInfo | null {
   const content = fs.readFileSync(filepath, 'utf-8');
   const data = parseFrontmatter(content);
   if (!data) return null;
@@ -128,6 +154,7 @@ function parseSkillMd(filepath: string, dir: string): SkillInfo | null {
     dir,
     pwFile: pwFile ? path.join(dir, pwFile) : undefined,
     jsFile: jsFile ? path.join(dir, jsFile) : undefined,
+    source,
   };
 }
 
