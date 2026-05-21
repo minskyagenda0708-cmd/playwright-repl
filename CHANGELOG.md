@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.27.6
+
+**2026-05-19**
+
+### Features
+
+- **Stagecraft `--http` mode** — `stagecraft run <skill> --http` connects to a running `playwright-repl --http` server instead of launching a fresh browser, enabling skills to run against real user sessions with cookies and auth intact. ([#908](https://github.com/stevez/playwright-repl/pull/908))
+- **Native download tracking in `.js` skills** — `download-bill.js` rewritten using `page.waitForEvent('download')` + `download.saveAs(path)`; agent receives the saved file path in the response. No extension changes needed. ([#908](https://github.com/stevez/playwright-repl/pull/908))
+- **Recording commands in relay `--http` and interactive loop** — `start-recording`, `stop-recording`, `pause-recording`, `discard-recording` now work when sent via `POST /run` to `playwright-repl --http`, and in the relay interactive loop. Includes ref-to-locator resolution from auto-snapshot results. ([#908](https://github.com/stevez/playwright-repl/pull/908))
+- **User skills directory** — `~/.stagecraft/skills/` is now discovered alongside builtin skills. User skills override builtins of the same name. `stagecraft list` marks user skills with `[user]`. Use `--skills-dir <path>` to override. ([#908](https://github.com/stevez/playwright-repl/pull/908))
+- **`AGENT.md` recording guide** — step-by-step instructions for AI agents recording new skills: setup, snapshot discipline for stable ref resolution, `.pw` vs `.js` skill choice, and command reference. ([#908](https://github.com/stevez/playwright-repl/pull/908))
+
 ## v0.27.5
 
 **2026-05-18**
