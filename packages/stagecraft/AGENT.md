@@ -161,6 +161,7 @@ Run `help` via MCP to get the full list. Key commands for recording flows:
 | `select <text\|ref> <value>` | Select dropdown option |
 | `verify-text <text>` | Assert text is present |
 | `download-as <filename>` | Set filename for next browser download |
+| `wait-download` | Wait for download to complete; returns full saved path |
 | `start-recording [file]` | Begin recording to .pw file |
 | `stop-recording` | Save recording |
 | `pause-recording` | Pause/resume |

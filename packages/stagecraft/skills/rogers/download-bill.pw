@@ -3,11 +3,14 @@
 # Requires: logged into rogers.com (bridge mode)
 #
 # Usage:
-#   replay skills/rogers/download-bill.pw --variable billing_period="January 24, 2026"
+#   replay skills/rogers/download-bill.pw --variable billing_period="January 24, 2026" --variable filename="rogers-2026-01.pdf"
 
+# Ensure wide viewport — Rogers shows "Save PDF" at desktop width, different text at narrow width
+resize 1280 800
 goto https://www.rogers.com/consumer/self-serve/overview
 click "View your bill" --exact
 click "Save PDF"
 check "{{billing_period}}"
 download-as {{filename}}
 click "Download bills"
+wait-download
