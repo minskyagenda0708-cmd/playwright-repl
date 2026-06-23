@@ -172,6 +172,9 @@ export const COMMANDS: Record<string, CommandInfo> = {
   'download-as':       { desc: 'Set filename for next download', options: [],
                          usage: 'download-as <filename>',
                          examples: ['download-as bills/rogers-2026-03.pdf'] },
+  'wait-download':     { desc: 'Wait for the next browser download to complete (returns full path)', options: [],
+                         usage: 'wait-download',
+                         examples: ['wait-download'] },
   'start-recording':   { desc: 'Start recording commands to .pw file', options: [],
                          usage: 'start-recording [filename]',
                          examples: ['start-recording', 'start-recording my-flow.pw'] },
@@ -197,7 +200,7 @@ export const CATEGORIES: Record<string, string[]> = {
   'Video':          ['video-start', 'video-stop', 'video-chapter'],
   'Tracing':        ['tracing-start', 'tracing-stop'],
   'Recording':      ['start-recording', 'stop-recording', 'pause-recording', 'discard-recording'],
-  'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'download-as', 'config-print'],
+  'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'download-as', 'wait-download', 'config-print'],
 };
 
 /** Commands that mutate the page — snapshot should be attached when includeSnapshot is on. */

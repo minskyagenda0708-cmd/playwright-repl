@@ -599,6 +599,9 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
 
 type BridgeResult = { text: string; isError: boolean; image?: string; blobUrl?: string; duration?: number; size?: number };
 
+// Pending resolver for wait-download command
+let pendingDownloadResolve: ((result: BridgeResult) => void) | null = null;
+
 function executeCommandPayload(msg: {
   command: string;
   scriptType?: 'command' | 'script';
@@ -714,6 +717,26 @@ async function handleBridgeCommand(msg: {
     if (!path) return { text: 'Usage: download-as <filename>', isError: true };
     globalThis.__downloadFilename = path;
     return { text: `Next download will save as: ${path}`, isError: false };
+  }
+
+  // ── Wait download ───────────────────────────────────────────────────────────
+  // Waits for the next browser download to complete and returns its full path.
+  if (cmd === 'wait-download') {
+    return new Promise<BridgeResult>((resolve) => {
+      if (pendingDownloadResolve) {
+        resolve({ text: 'A wait-download is already pending', isError: true });
+        return;
+      }
+      const timer = setTimeout(() => {
+        pendingDownloadResolve = null;
+        resolve({ text: 'wait-download timed out after 30s', isError: true });
+      }, 30_000);
+      pendingDownloadResolve = (result) => {
+        clearTimeout(timer);
+        pendingDownloadResolve = null;
+        resolve(result);
+      };
+    });
   }
 
   // Validate existing page connection is still alive (#849)
@@ -991,6 +1014,21 @@ chrome.downloads.onDeterminingFilename.addListener((_item, suggest) => {
     const filename = globalThis.__downloadFilename;
     globalThis.__downloadFilename = undefined;
     suggest({ filename });
+  }
+});
+
+// ─── Download completion tracking ───────────────────────────────────────────
+// Resolves pending wait-download promises when a download completes or fails.
+chrome.downloads.onChanged.addListener((delta) => {
+  if (!pendingDownloadResolve) return;
+  if (delta.state?.current === 'complete') {
+    chrome.downloads.search({ id: delta.id }, (items) => {
+      if (items[0] && pendingDownloadResolve) {
+        pendingDownloadResolve({ text: items[0].filename, isError: false });
+      }
+    });
+  } else if (delta.state?.current === 'interrupted') {
+    pendingDownloadResolve({ text: `Download interrupted: ${delta.error?.current ?? 'unknown'}`, isError: true });
   }
 });
 
