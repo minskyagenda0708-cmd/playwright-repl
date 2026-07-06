@@ -111,7 +111,9 @@ export async function createRelayRunner(
         const pw = await (Function('m', 'return import(m)')(pwModule)) as typeof import('@playwright/test');
         expect = pw.expect;
 
-        browser = await pw.chromium.connectOverCDP(relay.cdpEndpoint());
+        // noDefaults:true stops Playwright from pushing colorScheme:'light' onto the
+        // attached browser's default context (theme-flip anti-fraud signal).
+        browser = await pw.chromium.connectOverCDP(relay.cdpEndpoint(), { noDefaults: true });
         context = browser.contexts()[0];
         page = context.pages()[0];
 

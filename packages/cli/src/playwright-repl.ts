@@ -18,7 +18,7 @@ import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
   boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'relay', 'include-snapshot', 'verbose', 'http', 'interactive'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'command', 'http-port'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'cdp-endpoint', 'command', 'http-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -42,6 +42,9 @@ Options:
   --profile <dir>        Persistent profile directory
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
   --cdp-port <number>    Chrome CDP port (default: 9222)
+  --cdp-endpoint <url>   Connect directly to a CDP endpoint URL (e.g. http://127.0.0.1:52230).
+                         No relay, no extension -- for anti-detect browsers exposing CDP directly
+                         (MultiloginX, Multilogin, etc.). Uses noDefaults:true + default context.
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
   --http                 Start HTTP server for external command access (port 9223).
@@ -74,6 +77,7 @@ Examples:
   playwright-repl --headed               # start with visible browser
   playwright-repl --connect              # connect to Chrome on port 9222
   playwright-repl --connect 9333         # connect to Chrome on custom port
+  playwright-repl --cdp-endpoint http://127.0.0.1:52230  # direct CDP attach (MultiloginX)
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
   playwright-repl --replay tests/         # replay all .pw files in folder
@@ -100,6 +104,7 @@ startRepl({
   persistent: args.persistent as boolean,
   profile: args.profile as string,
   connect: args.connect as number | undefined,
+  cdpEndpoint: (args['cdp-endpoint'] as string) || undefined,
   spawn: args.spawn === true,
   port: args.port ? parseInt(args.port as string, 10) : undefined,
   cdpPort: args['cdp-port'] ? parseInt(args['cdp-port'] as string, 10) : undefined,

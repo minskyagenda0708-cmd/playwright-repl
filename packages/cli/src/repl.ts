@@ -28,6 +28,8 @@ export interface ReplOpts extends EngineOpts {
   silent?: boolean;
   command?: string;
   relay?: boolean;
+  /** Direct CDP endpoint URL — attach without relay/extension (anti-detect browsers). */
+  cdpEndpoint?: string;
   http?: boolean;
   httpPort?: number;
   interactive?: boolean;
@@ -1231,13 +1233,13 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
 
   // Default to standalone mode (launch own browser)
-  if (!opts.relay && !opts.connect) {
+  if (!opts.relay && !opts.connect && !opts.cdpEndpoint) {
     opts.relay = true;
   }
 
   // ─── Relay mode ───────────────────────────────────────────────────
 
-  if (opts.relay || opts.connect) {
+  if (opts.relay || opts.connect || opts.cdpEndpoint) {
     const dynamicImport = Function('m', 'return import(m)') as (m: string) => Promise<any>;
     const { chromium } = await dynamicImport('playwright');
     const { expect: pwExpect } = await dynamicImport('@playwright/test').catch(() => ({ expect: undefined }));
@@ -1249,7 +1251,23 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
     const headless = opts.headed === false; // explicit --headless
 
-    if (opts.connect) {
+    if (opts.cdpEndpoint) {
+      // Direct CDP attach — no relay, no extension. For anti-detect browsers
+      // (MultiloginX, Multilogin, ...) that expose a CDP port directly.
+      // noDefaults:true stops Playwright from pushing colorScheme:'light' onto
+      // the profile's default context (theme-flip anti-fraud signal).
+      // Default context only (browser.contexts()[0]) — never newContext() (incognito).
+      log(`${c.dim}Direct CDP attach to ${opts.cdpEndpoint}...${c.reset}`);
+      browser = await chromium.connectOverCDP(opts.cdpEndpoint, { noDefaults: true });
+      relayCtx = browser.contexts()[0];
+      if (!relayCtx) {
+        console.error(`${c.red}✗${c.reset} No default context on CDP endpoint ${opts.cdpEndpoint}`);
+        await browser.close().catch(() => {});
+        process.exit(1);
+      }
+      relayPage = relayCtx.pages()[0] ?? (await relayCtx.newPage());
+      log(`${c.green}✓${c.reset} Attached to page: ${relayPage.url()}`);
+    } else if (opts.connect) {
       // Connect mode: attach to existing Chrome via extension + CDP relay
       relay = new CDPRelayServer();
       await relay.start(opts.port);
@@ -1258,7 +1276,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       log('Waiting for extension to connect...');
       await relay.waitForExtension(30000);
       log(`${c.green}✓${c.reset} Extension connected`);
-      browser = await chromium.connectOverCDP(relay.cdpEndpoint());
+      browser = await chromium.connectOverCDP(relay.cdpEndpoint(), { noDefaults: true });
       relayCtx = browser.contexts()[0];
       relayPage = relayCtx.pages()[0];
       if (!relayPage) {
